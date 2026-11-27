@@ -27,6 +27,9 @@ export const branchSettingsSchema = z.object({
   // Terms clause 4: the estimation charge when a customer declines all work (larger of the two).
   estimationChargeMinimum: z.number({ invalid_type_error: 'Enter the minimum estimation charge as a number' }).min(0, 'The minimum estimation charge cannot be negative').max(10_000_000, 'The minimum estimation charge must be 10,000,000 or less').multipleOf(0.01, 'Use at most 2 decimal places for the minimum estimation charge'),
   estimationChargePercent: z.number({ invalid_type_error: 'Enter the estimation charge percentage as a number' }).min(0, 'The estimation charge percentage must be between 0 and 100').max(100, 'The estimation charge percentage must be between 0 and 100').multipleOf(0.01, 'Use at most 2 decimal places for the estimation charge percentage'),
+  // Terms clause 3: storage is free for these hours after the customer is told the vehicle is ready.
+  storageFreeHours: z.number({ invalid_type_error: 'Enter the free storage hours as a whole number' }).int('Enter the free storage hours as a whole number').min(0, 'The free storage hours cannot be negative').max(720, 'The free storage hours must be 720 or less'),
+  storageDailyRate: z.number({ invalid_type_error: 'Enter the storage charge per day as a number' }).min(0, 'The storage charge per day cannot be negative').max(1_000_000, 'The storage charge per day must be 1,000,000 or less').multipleOf(0.01, 'Use at most 2 decimal places for the storage charge per day'),
   repeatWindowDays: z.number().int().min(1).max(3650),
   repeatWindowKm: z.number().int().min(1).max(1_000_000).nullable(),
   printRepeatBlock: z.boolean().default(true),
@@ -53,6 +56,9 @@ export function defaultBranchSettings(): BranchSettingsValues {
     roundOffValue: 10,
     estimationChargeMinimum: 25000,
     estimationChargePercent: 10,
+    // TODO(confirm): terms clause 3 (48 hours free, then ₦2,000.00 a day) for every branch until each sets its own.
+    storageFreeHours: 48,
+    storageDailyRate: 2000,
     repeatWindowDays: Number(process.env.JOB_REPEAT_WINDOW_DAYS ?? 15),
     repeatWindowKm: 500,
     printRepeatBlock: true,
@@ -74,8 +80,13 @@ export async function getBranchSettings(branchId: string, db: Db = prisma): Prom
   const row = await db.branchSettings.findUnique({ where: { branchId } });
   if (!row)
     return defaultBranchSettings();
-  const { branchId: _branchId, updatedAt: _updatedAt, estimationChargeMinimum, estimationChargePercent, ...values } = row;
-  return { ...values, estimationChargeMinimum: Number(estimationChargeMinimum), estimationChargePercent: Number(estimationChargePercent) } as BranchSettingsValues;
+  const { branchId: _branchId, updatedAt: _updatedAt, estimationChargeMinimum, estimationChargePercent, storageDailyRate, ...values } = row;
+  return {
+    ...values,
+    estimationChargeMinimum: Number(estimationChargeMinimum),
+    estimationChargePercent: Number(estimationChargePercent),
+    storageDailyRate: Number(storageDailyRate),
+  } as BranchSettingsValues;
 }
 
 export async function getCompanyProfile(db: Db = prisma): Promise<CompanyProfile> {
@@ -111,7 +122,13 @@ export class CompanySettingsService {
         update: values,
       });
       await tx.auditLog.create({ data: { userId: actorId ?? null, action: 'BRANCH_SETTINGS_UPDATED', details: JSON.stringify({ branchId, before, after: saved }) } });
-      return saved;
+      // Money and percentages are stored as Decimal; the screen works in numbers.
+      return {
+        ...saved,
+        estimationChargeMinimum: Number(saved.estimationChargeMinimum),
+        estimationChargePercent: Number(saved.estimationChargePercent),
+        storageDailyRate: Number(saved.storageDailyRate),
+      };
     });
   }
 }

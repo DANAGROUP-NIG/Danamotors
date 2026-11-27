@@ -57,7 +57,8 @@ export function jobStageBadge(stage: JobStage, status: string): { label: string;
     case "QUALITY_CHECK":
       return { label: "Quality check", tone: "blue" };
     case "BILLING":
-      return isStatus(status, "READY", "COMPLETED") ? { label: "Ready", tone: "emerald" } : { label: "QC passed", tone: "emerald" };
+      // Marked ready, then invoiced (phase 8): still "Ready" for collection; the invoice card shows payment.
+      return isStatus(status, "READY", "COMPLETED", "BILLED") ? { label: "Ready", tone: "emerald" } : { label: "QC passed", tone: "emerald" };
     case "DELIVERY":
       return { label: "Ready", tone: "emerald" };
     case "CLOSED":
@@ -120,7 +121,7 @@ export const ACTION_LABELS: Record<StageAction, string> = {
   SEND_TO_QC: "Send for quality check",
   QC_PASSED_TO_ADVISOR: "Pass quality check",
   RETURN_TO_REPAIR: "Fail and return to technician",
-  MARK_READY: "Mark vehicle ready",
+  MARK_READY: "Mark ready and notify customer",
   SEND_TO_DELIVERY: "Send to delivery",
   CANCEL: "Cancel job",
 };
@@ -176,7 +177,8 @@ export const SUB_STEP_LABELS: Record<SubStep, string> = {
   QC_PASSED: "Quality check passed",
   QC_FAILED: "Quality check failed",
   MARK_READY: "Waiting for the advisor to mark the vehicle ready",
-  INVOICE: "Waiting for the bill",
+  INVOICE: "Waiting for the invoice",
+  PAYMENT: "Waiting for payment",
   HANDOVER: "Waiting for the customer to collect",
 };
 

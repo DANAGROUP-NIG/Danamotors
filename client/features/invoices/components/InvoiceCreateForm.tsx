@@ -16,6 +16,8 @@ import {
 } from "../api/invoice.api";
 import { invoiceKeys } from "../api/invoice.keys";
 import { useCreateInvoice } from "../hooks/use-create-invoice";
+import { StorageChargeDecision } from "@/features/job-cards/components/billing/StorageChargeDecision";
+import { storageDecisionSchema, type StorageDecisionValues } from "@/features/job-cards/lib/billing.logic";
 
 const currency = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" });
 
@@ -33,6 +35,10 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
   const [labourDiscountPercent, setLabourDiscountPercent] = useState(0);
   const [serviceAdvisorId, setServiceAdvisorId] = useState("");
   const [notes, setNotes] = useState("");
+  // Terms clause 3: a due storage charge is accepted or removed with a reason, never skipped.
+  const [storage, setStorage] = useState<Partial<StorageDecisionValues>>({ reason: "" });
+  const [storageTried, setStorageTried] = useState(false);
+  const [requestId, setRequestId] = useState(() => crypto.randomUUID());
 
   const jobCards = useQuery({
     queryKey: [...invoiceKeys.billableJobCards(), branchId],
@@ -55,7 +61,16 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
   const effectiveAdvisorId = advisors.data?.advisors.some((advisor) => advisor.id === candidateAdvisorId) ? candidateAdvisorId : "";
   const validDiscounts = [partsDiscountPercent, labourDiscountPercent].every((value) => Number.isFinite(value) && value >= 0 && value <= 100);
 
+  const storageCheck = bill?.storage ? storageDecisionSchema.safeParse({ decision: storage.decision, reason: storage.reason ?? "" }) : null;
+  const storageErrors =
+    storageTried && storageCheck && !storageCheck.success
+      ? Object.fromEntries(storageCheck.error.issues.map((issue) => [String(issue.path[0] ?? "decision"), issue.message]))
+      : {};
+
   function selectJobCard(id: string) {
+    setStorage({ reason: "" });
+    setStorageTried(false);
+    setRequestId(crypto.randomUUID());
     setJobCardId(id);
     setServiceAdvisorId("");
     setPartsDiscountPercent(0);
@@ -64,6 +79,8 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setStorageTried(true);
+    if (storageCheck && !storageCheck.success) return;
     if (!bill?.review.canBill || !jobCardId || !effectiveAdvisorId || !bill || preview.isFetching || preview.isError || !validDiscounts || create.isPending) return;
     create.mutate({
       jobCardId,
@@ -72,6 +89,10 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
       labourDiscountPercent,
       serviceAdvisorId: effectiveAdvisorId,
       notes: notes.trim() || undefined,
+      requestId,
+      ...(storageCheck?.success
+        ? { storageCharge: storageCheck.data.decision === "ACCEPT" ? { decision: "ACCEPT" as const } : { decision: "REMOVE" as const, reason: storageCheck.data.reason } }
+        : {}),
     }, { onSuccess });
   }
 
@@ -139,6 +160,9 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
       {bill && <section className="grid gap-3 border-y py-4"><h2 className="font-semibold">Approved estimate vs actual charges</h2><p className="text-sm">{bill.review.status}. Comparison is before discounts, VAT and round-off.</p><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b text-left"><th>Work</th><th>Approved qty</th><th>Actual qty</th><th>Approved</th><th>Actual</th><th>Difference</th></tr></thead><tbody>{bill.review.rows.map((row, index) => <tr key={index} className="border-b"><td className="py-2">{row.description}{row.included ? " (included)" : ""}{row.reason && <p className="text-destructive">{row.reason}</p>}</td><td>{row.approvedQuantity}</td><td>{row.actualQuantity}</td><td>{currency.format(row.approvedAmount)}</td><td>{currency.format(row.actualAmount)}</td><td>{currency.format(row.difference)}</td></tr>)}</tbody></table></div>{!bill.review.canBill && <div role="alert" className="text-sm text-destructive">{bill.review.issues.map((issue, index) => <p key={index}>{issue}</p>)}<Link className="underline" href={`/job-cards/${jobCardId}#estimate-approval`}>Review estimate and approval on the job card</Link></div>}</section>}
 
       {bill && <VatBreakdownTable rows={bill.vatBreakdown}/>}
+      {bill?.storage && (
+        <StorageChargeDecision proposal={bill.storage} value={storage} errors={storageErrors} disabled={create.isPending} onChange={setStorage} />
+      )}
       {jobCardId && (
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Parts discount (%)">

@@ -71,6 +71,7 @@ test('every stage has a readable badge and step label', () => {
   assert.deepEqual({ ...stages.jobStageBadge('WARRANTY', 'OPEN') }, { label: 'Warranty check', tone: 'purple' });
   assert.deepEqual({ ...stages.jobStageBadge('ESTIMATE', 'OPEN') }, { label: 'Awaiting approval', tone: 'amber' });
   assert.deepEqual({ ...stages.jobStageBadge('BILLING', 'QC') }, { label: 'QC passed', tone: 'emerald' });
+  assert.deepEqual({ ...stages.jobStageBadge('BILLING', 'BILLED') }, { label: 'Ready', tone: 'emerald' });
   assert.deepEqual({ ...stages.jobStageBadge('BILLING', 'READY') }, { label: 'Ready', tone: 'emerald' });
   assert.deepEqual({ ...stages.jobStageBadge('CLOSED', 'DELIVERED') }, { label: 'Delivered', tone: 'gray' });
   assert.deepEqual({ ...stages.jobStageBadge('CANCELLED', 'CANCELLED') }, { label: 'Cancelled', tone: 'red' });

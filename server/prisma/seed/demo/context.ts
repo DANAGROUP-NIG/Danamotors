@@ -71,7 +71,7 @@ function findStaff(roles: string[], branchId?: string) {
  * Finds the branches and the existing staff the seed acts as. Read-only: the seed never
  * creates or changes user accounts, so missing roles are reported instead.
  */
-export async function loadContext(branchNames: Record<BranchKey, string>): Promise<DemoContext> {
+export async function loadContext(branchNames: Record<BranchKey, string>, options: { mainStaffOnly?: boolean } = {}): Promise<DemoContext> {
   const branches = {} as DemoContext["branches"];
   for (const key of ["main", "second"] as const) {
     assertDemoBranch({ name: branchNames[key], code: null });
@@ -92,6 +92,11 @@ export async function loadContext(branchNames: Record<BranchKey, string>): Promi
   const staff = {} as DemoContext["staff"];
   for (const key of ["main", "second"] as const) {
     const { id, name } = branches[key];
+    // --stage-only seeds main-branch jobs only: the second branch may have no staff of its own.
+    if (key === "second" && options.mainStaffOnly && !(await findStaff([ROLES.SERVICE_ADVISOR], id))) {
+      staff.second = staff.main;
+      continue;
+    }
     const advisor = need(`${ROLES.SERVICE_ADVISOR} at ${name}`, await findStaff([ROLES.SERVICE_ADVISOR], id));
     const technician = need(`${ROLES.TECHNICIAN} at ${name}`, await findStaff([ROLES.TECHNICIAN], id));
     const store =

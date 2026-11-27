@@ -116,8 +116,9 @@ export function legacyStatusForStage(stage: JobStage, facts: LegacyStatusFacts =
     case "QUALITY_CHECK":
       return "QC";
     case "BILLING":
-      // QC until the advisor marks it ready, then READY. Once invoiced (BILLED) the job is at delivery.
-      return facts.markedReady ? "READY" : "QC";
+      // QC until the advisor marks it ready, then READY, then BILLED once invoiced (phase 8: the job stays
+      // at billing until the advisor sends it to delivery).
+      return facts.billed ? "BILLED" : facts.markedReady ? "READY" : "QC";
     case "DELIVERY":
       return facts.billed ? "BILLED" : "READY";
     case "CLOSED":
@@ -135,7 +136,7 @@ export const STAGE_STATUSES: Record<JobStage, readonly CanonicalStatus[]> = {
   ESTIMATE: ["OPEN"],
   REPAIR: ["IN_PROGRESS", "WAITING_PARTS"],
   QUALITY_CHECK: ["QC"],
-  BILLING: ["QC", "READY"],
+  BILLING: ["QC", "READY", "BILLED"],
   DELIVERY: ["READY", "BILLED"],
   CLOSED: ["DELIVERED"],
   CANCELLED: ["CANCELLED"],
@@ -165,7 +166,9 @@ export function reconcileStage(
     case "DELIVERED":
       return "CLOSED";
     case "BILLED":
-      return "DELIVERY";
+      // A bill keeps the job at billing until it is paid and sent on (phase 8); a job already at delivery
+      // (on credit) stays there.
+      return current === "DELIVERY" ? "DELIVERY" : "BILLING";
     case "READY":
       // An unbilled job waits at delivery only on approved credit. A cancelled bill returns it to billing.
       return current === "DELIVERY" && creditApproved ? "DELIVERY" : "BILLING";
@@ -220,6 +223,8 @@ export function stageOwnerFor(stage: JobStage, job: OwnerFacts): StageOwner {
     case "QUALITY_CHECK":
       return { ownerId: job.qualityInspectorId, ownerRole: ROLES.WORKSHOP_MANAGER };
     case "BILLING":
+      // The advisor marks the vehicle ready, billing officers invoice it, then the advisor sees it paid
+      // and sends it to delivery. TODO(confirm): the advisor holds an invoiced job while it waits for payment.
       return normaliseJobStatus(job.status) === "READY"
         ? { ownerId: null, ownerRole: ROLES.BILLING_OFFICER }
         : advisor;
@@ -283,6 +288,8 @@ export interface StageFacts {
   warrantyProblems: string[];
   billed: boolean;
   creditApproved: boolean;
+  /** Billing (phase 8): why the job cannot go to delivery yet (deliveryPaymentProblem), or null. */
+  paymentProblem?: string | null;
   unansweredCampaigns: number;
   /** Estimate step only (phase 5): where the latest revision is. Absent elsewhere. */
   estimate?: EstimateStageFacts | null;
@@ -500,17 +507,19 @@ export const ACTION_RULES: Record<StageAction, ActionRule> = {
       ...problems(facts.openingSignatureProblem, facts.approvalProblem),
     ],
   },
+  // Payment before delivery: balance paid, credit approved, or nothing for the customer to pay.
   SEND_TO_DELIVERY: {
     from: ["BILLING"],
     to: "DELIVERY",
-    statuses: ["READY"],
+    statuses: ["READY", "BILLED"],
     roles: ADVISORS,
     kind: "handoff",
-    gates: (facts) =>
-      facts.billed || facts.creditApproved ? [] : ["Create the bill or record credit approval before delivery."],
+    gates: (facts) => (facts.paymentProblem ? [facts.paymentProblem] : []),
   },
   CANCEL: {
     from: ["CHECK_IN", "DIAGNOSIS", "WARRANTY", "ESTIMATE", "REPAIR", "QUALITY_CHECK", "BILLING"],
+    // An invoiced job (BILLED, phase 8 keeps it at billing) is not offered: its bill is cancelled first.
+    statuses: ["OPEN", "IN_PROGRESS", "WAITING_PARTS", "QC", "READY"],
     to: "CANCELLED",
     toStatus: "CANCELLED",
     roles: CANCELLERS,
@@ -622,6 +631,7 @@ export type SubStep =
   | "QC_FAILED"
   | "MARK_READY"
   | "INVOICE"
+  | "PAYMENT"
   | "HANDOVER";
 
 /** The part of the current step the job is on. Later phases refine these as each stage is rebuilt. */
@@ -649,7 +659,7 @@ export function currentSubStep(facts: StageFacts): SubStep | null {
     case "QUALITY_CHECK":
       return qc === "PASSED" ? "QC_PASSED" : qc === "FAILED" ? "QC_FAILED" : "INSPECTION";
     case "BILLING":
-      return status === "READY" ? "INVOICE" : "MARK_READY";
+      return status === "BILLED" ? "PAYMENT" : status === "READY" ? "INVOICE" : "MARK_READY";
     case "DELIVERY":
       return "HANDOVER";
     default:

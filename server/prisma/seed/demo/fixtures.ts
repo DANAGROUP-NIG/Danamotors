@@ -167,6 +167,12 @@ export const VEHICLES = {
   stgQcReady: { vin: "KNAPM81DMK7000527", registrationNumber: "LSR-537ST", customer: "okafor", model: "SORENTO", saleDaysAgo: 2300 },
   stgQcReturned: { vin: "KNAPM81DMK7000528", registrationNumber: "LSR-538ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2250 },
   stgQcSecond: { vin: "KNAPM81DMK7000529", registrationNumber: "LSR-539ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2400 },
+  // Billing (phase 8): quality check passed, not yet marked ready; ready four days ago (storage due);
+  // invoiced and unpaid after the advance; invoiced and unpaid for a credit approval.
+  stgBillReady: { vin: "KNAPM81DMK7000530", registrationNumber: "LSR-540ST", customer: "okafor", model: "SORENTO", saleDaysAgo: 2350 },
+  stgBillStorage: { vin: "KNAPM81DMK7000531", registrationNumber: "LSR-541ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2280 },
+  stgBillUnpaid: { vin: "KNAPM81DMK7000532", registrationNumber: "LSR-542ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2420 },
+  stgBillCredit: { vin: "KNAPM81DMK7000533", registrationNumber: "LSR-543ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2310 },
 } satisfies Record<string, VehicleFixture>;
 
 export type VehicleKey = keyof typeof VEHICLES;
@@ -381,6 +387,8 @@ export interface JobFixture {
   repair?: RepairFixture;
   /** Quality check (phase 7): a failed check before the job stops. */
   qualityCheck?: QualityCheckFixture;
+  /** Billing (phase 8): a second notice by SMS and the washed tick, after the vehicle is marked ready. */
+  billing?: { notifyAgain?: boolean; washed?: boolean };
   /** An earlier odometer reading for a vehicle with no visits yet, so check-in shows "Last recorded". */
   priorMileage?: number;
   /** The answer recorded for linked campaigns (FPC) before READY; without it a FREE line must pre-set it. */
@@ -673,7 +681,7 @@ const serviceEstimate = (decided: boolean): EstimateFixture => ({
 const stageJob = (
   id: string,
   vehicle: VehicleKey,
-  fields: Pick<JobFixture, "description" | "complaints" | "mileage" | "withTechnician" | "target" | "checkIn" | "priorMileage" | "diagnosis" | "estimateStep" | "repair" | "qualityCheck"> & {
+  fields: Pick<JobFixture, "description" | "complaints" | "mileage" | "withTechnician" | "target" | "checkIn" | "priorMileage" | "diagnosis" | "estimateStep" | "repair" | "qualityCheck" | "billing"> & {
     /** Repair jobs priced from their diagnosis record labour through the work list, not as legacy lines. */
     labour?: [LabourKey, number][];
     issues?: [PartKey, number][];
@@ -701,10 +709,20 @@ const stageJob = (
   estimateStep: fields.estimateStep,
   repair: fields.repair,
   qualityCheck: fields.qualityCheck,
+  billing: fields.billing,
   priorMileage: fields.priorMileage,
   startDaysAgo: 0,
   spanHours: 0,
 });
+
+/** Billing demo jobs (phase 8): the service and the brake pads, confirmed by the service engineer. */
+const BILLING_DIAGNOSIS: DiagnosisFixture = {
+  stop: "confirmed",
+  findings: [
+    { request: 0, text: "Due for the 50,000 km service.", labour: [], parts: [["engineOil", 1]] },
+    { request: 1, text: "Front pads worn to 2 mm. Caliper slider dry.", labour: ["brakePads"], parts: [["brakePads", 1]] },
+  ],
+};
 
 /** One job at every step of the staged job card (job card revamp, phase 0). Seeded after JOBS. */
 export const STAGE_JOBS: JobFixture[] = [
@@ -966,6 +984,40 @@ export const STAGE_JOBS: JobFixture[] = [
       ],
     },
     qualityCheck: { fail: { note: "Pads squeal under light braking. Clean and grease the caliper sliders.", lines: ["brakePads"] }, redone: true },
+  }),
+  // Billing (phase 8). The quality check passed; the advisor has not marked the vehicle ready yet.
+  stageJob("JC-S29", "stgBillReady", {
+    description: "50,000 km periodic service. Noise from the front left wheel when braking.",
+    complaints: ["Periodic service (50,000 km)", "Noise from front left wheel when braking"],
+    mileage: 50_410, withTechnician: true, target: "IN_PROGRESS", stop: "QC_PASSED", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1], ["engineOil", 1]],
+    diagnosis: BILLING_DIAGNOSIS,
+  }),
+  // Marked ready and the customer told four days ago (then reminded by SMS), washed: two days of storage
+  // are proposed when the invoice is created.
+  {
+    ...stageJob("JC-S30", "stgBillStorage", {
+      description: "Periodic service. Brakes noisy when stopping.",
+      complaints: ["Periodic service (50,000 km)", "Brakes noisy when stopping"],
+      mileage: 52_960, withTechnician: true, target: "READY", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1], ["engineOil", 1]],
+      diagnosis: BILLING_DIAGNOSIS,
+      billing: { notifyAgain: true, washed: true },
+    }),
+    startDaysAgo: 5,
+    spanHours: 22,
+  },
+  // Invoiced; the advance is applied and a balance is left for the cashier.
+  stageJob("JC-S31", "stgBillUnpaid", {
+    description: "Periodic service. Squeal from the front brakes.",
+    complaints: ["Periodic service (50,000 km)", "Squeal from the front brakes"],
+    mileage: 47_380, withTechnician: true, target: "BILLED", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1], ["engineOil", 1]],
+    diagnosis: BILLING_DIAGNOSIS,
+  }),
+  // Invoiced and unpaid: a fleet customer the service manager can approve for delivery on credit.
+  stageJob("JC-S32", "stgBillCredit", {
+    description: "Periodic service for a fleet vehicle. Brake noise reported by the driver.",
+    complaints: ["Periodic service (50,000 km)", "Brake noise reported by the driver"],
+    mileage: 55_120, withTechnician: true, target: "BILLED", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1], ["engineOil", 1]],
+    diagnosis: BILLING_DIAGNOSIS,
   }),
   stageJob("JC-S12", "stgSigned", {
     description: "Clicking noise when turning the steering fully.",

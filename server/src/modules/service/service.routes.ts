@@ -7,6 +7,8 @@ import { jobWarrantyRoutes } from "./job-warranty.routes";
 import { jobEstimateRoutes } from "./job-estimate.routes";
 import { jobRepairRoutes, myJobsRoutes } from "./job-repair.routes";
 import { jobQualityCheckRoutes } from "./job-quality-check.routes";
+import { jobBillingRoutes } from "./job-billing-step.routes";
+import { CREDIT_APPROVERS } from "./job-billing-step.service";
 import { loadOpeningConsent } from "./job-opening-consent";
 import { assertBookable } from "./booking.logic";
 import { projectEstimatePrint } from "./estimate-print";
@@ -64,6 +66,7 @@ router.use("/job-cards/:id/warranty", jobWarrantyRoutes);
 router.use("/job-cards/:id/estimate", jobEstimateRoutes);
 router.use("/job-cards/:id/repair", jobRepairRoutes);
 router.use("/job-cards/:id/quality-check", jobQualityCheckRoutes);
+router.use("/job-cards/:id/billing", jobBillingRoutes);
 router.use("/my-jobs", myJobsRoutes);
 router.get(
   "/staff",
@@ -193,7 +196,8 @@ router.post(
 );
 router.post(
   "/job-cards/:id/credit-approval",
-  requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN),
+  // TODO(confirm): the service manager may approve delivery on credit too (design prompt 14, phase 8).
+  requireRole(...CREDIT_APPROVERS),
   validateRequest(
     z.object({
       params: z.object({ id: z.string().uuid() }),

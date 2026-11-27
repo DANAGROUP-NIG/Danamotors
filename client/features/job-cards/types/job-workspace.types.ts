@@ -52,6 +52,7 @@ export type SubStep =
   | "QC_FAILED"
   | "MARK_READY"
   | "INVOICE"
+  | "PAYMENT"
   | "HANDOVER";
 
 export interface StageActionView {

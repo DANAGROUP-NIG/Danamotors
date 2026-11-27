@@ -12,13 +12,11 @@ import { MAX_LATE_REASONS } from "@/features/late-deliveries/lib/late-delivery.l
 import { apiErrorMessage } from "@/features/warranty/lib/warranty-format";
 import { NOT_PROVIDED } from "@/lib/format";
 import { useWorkshopActions } from "../../hooks/use-workshop-actions";
-import { canonicalJobStatus, hasJobBill } from "../../types/job-card-status";
+import { hasJobBill } from "../../types/job-card-status";
 import type { JobCard } from "../../types/job-card.types";
 import {
-  creditApprovalSchema,
   deliverySchema,
   workDoneSchema,
-  type CreditApprovalValues,
   type DeliveryValues,
   type WorkDoneValues,
 } from "../../schemas/workshop-actions.schema";
@@ -138,7 +136,7 @@ export function WorkDoneSection({ job }: { job: JobCard }) {
 }
 
 /** Delivery: hand the vehicle over and issue the gate pass. Late deliveries need reasons. */
-export function DeliverySection({ job, now = new Date() }: { job: JobCard; now?: Date }) {
+export function DeliverySection({ job, paymentProblem, now = new Date() }: { job: JobCard; paymentProblem: string | null; now?: Date }) {
   const { hasPermission } = useAuth();
   const { deliver } = useWorkshopActions(job.id, job.jobNumber);
   const late = !!job.promisedAt && now > new Date(job.promisedAt);
@@ -149,12 +147,8 @@ export function DeliverySection({ job, now = new Date() }: { job: JobCard; now?:
   });
   const allowed = hasPermission("jobcard:update") && (job.allowedTransitions ?? []).includes("DELIVERED");
   if (!allowed) return null;
-  const unpaid = (job.invoices ?? []).some(
-    (invoice) => !["CANCELLED", "CANCELED", "VOID"].includes(invoice.status.toUpperCase()) && invoice.outstandingAmount > 0,
-  );
-  const blocked = !job.creditApprovedById && (!hasJobBill(job) || unpaid)
-    ? "Create and settle the job bill, or get delivery on credit approved, before delivering this vehicle."
-    : null;
+  // Payment before delivery, from the server: paid, credit approved, or nothing to pay (phase 8).
+  const blocked = paymentProblem;
   const selected = form.watch("lateReasonIds");
   const { errors } = form.formState;
   const submit = form.handleSubmit((values) => {
@@ -242,43 +236,6 @@ export function DeliverySection({ job, now = new Date() }: { job: JobCard; now?:
               {blocked}
             </p>
           )}
-        </div>
-      </form>
-    </StageCard>
-  );
-}
-
-/** Admins can let the vehicle go before the bill is paid, with a reason. */
-export function CreditApprovalSection({ job }: { job: JobCard }) {
-  const { isAdminOrAbove } = useAuth();
-  const { approveCredit } = useWorkshopActions(job.id, job.jobNumber);
-  const form = useForm<CreditApprovalValues>({ resolver: zodResolver(creditApprovalSchema), defaultValues: { remarks: "" } });
-  const status = canonicalJobStatus(job.status);
-  if (job.creditApprovedById)
-    return (
-      <StageCard title="Delivery on credit">
-        <p className="text-sm">Delivery on credit is approved for this job.</p>
-      </StageCard>
-    );
-  if (!isAdminOrAbove || !["READY", "BILLED"].includes(status)) return null;
-  return (
-    <StageCard title="Delivery on credit" description="Approve only for customers with agreed credit terms. The reason is kept in the audit trail.">
-      <form
-        className="grid gap-3"
-        noValidate
-        onSubmit={form.handleSubmit((values) => {
-          if (!approveCredit.isPending) approveCredit.mutate(values.remarks);
-        })}
-      >
-        <Field label="Reason for credit approval" required error={form.formState.errors.remarks?.message}>
-          <textarea className={`${inputCls} h-20 py-2`} maxLength={2000} disabled={approveCredit.isPending} {...form.register("remarks")} />
-        </Field>
-        <ErrorText error={approveCredit.error} fallback="Could not approve delivery on credit. Try again." />
-        <div>
-          <Button type="submit" variant="outline" disabled={approveCredit.isPending}>
-            {approveCredit.isPending && <Loader2 className="animate-spin" aria-hidden="true" />}
-            {approveCredit.isPending ? "Approving" : "Approve delivery on credit"}
-          </Button>
         </div>
       </form>
     </StageCard>

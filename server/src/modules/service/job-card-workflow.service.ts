@@ -3,6 +3,7 @@ import { JOB_TRANSITION_ROLES, assertTransitionRole } from "./job-transitions";
 import { assertAdvanceOrExempt } from "./job-deposit.service";
 import { loadQcState, supersedeCurrentInspection } from "./job-qc-state";
 import { assertSignedJobOpening } from "./job-opening-signature.service";
+import { loadDeliveryPaymentFacts } from "./job-billing-gate";
 import { syncStage, type StageContext } from "./job-stage.writer";
 import {
   loadOpeningConsent,
@@ -799,14 +800,17 @@ export class JobCardWorkflowService {
           );
 
           if (data.status === "DELIVERED") {
+            // Payment before delivery: a paid bill, approved credit, or nothing for the customer to pay
+            // (warranty, campaign or free work only, phase 8).
             if (
-              (!billed ||
-                current.invoices.some(
-                  (invoice) =>
-                    !["CANCELLED", "CANCELED", "VOID"].includes(
-                      invoice.status.toUpperCase(),
-                    ) && invoice.outstandingAmount > 0,
-                )) &&
+              (billed
+                ? current.invoices.some(
+                    (invoice) =>
+                      !["CANCELLED", "CANCELED", "VOID"].includes(
+                        invoice.status.toUpperCase(),
+                      ) && invoice.outstandingAmount > 0,
+                  )
+                : !(await loadDeliveryPaymentFacts(tx, id)).nothingToPay) &&
               !current.creditApprovedById
             )
               throw new BadRequestError(
@@ -942,7 +946,7 @@ export class JobCardWorkflowService {
           ],
           creditApprovedById: null,
         },
-        data: { creditApprovedById: actorId },
+        data: { creditApprovedById: actorId, creditApprovedAt: new Date() },
       });
       if (!updated.count)
         throw new ConflictError(

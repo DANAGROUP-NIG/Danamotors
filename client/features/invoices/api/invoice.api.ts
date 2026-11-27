@@ -36,7 +36,20 @@ export type BillableJobCard = {
   branch: { id: string; name: string };
 };
 
+/** Terms clause 3: storage after the free period, proposed at billing for the advisor to accept or remove. */
+export type StorageProposal = {
+  notifiedAt: string;
+  freeUntil: string;
+  freeHours: number;
+  dailyRate: string;
+  days: number;
+  proposedAmount: string;
+};
+export type StorageDecision = { decision: "ACCEPT" } | { decision: "REMOVE"; reason: string };
+
 export type JobBillPreview = {
+  /** Null when no storage charge is due. */
+  storage?: StorageProposal | null;
   jobCards?: { id: string; jobNumber: string }[];
   vatBreakdown?: {category:string;rate:number;saleAmount:number;discount:number;taxableAmount:number;vat:number}[];
   review: { estimateId: string | null; status: string; canBill: boolean; issues: string[]; approvedSubtotal: number; actualSubtotal: number; rows: { type: string; referenceId?: string | null; description: string; approvedQuantity: number; actualQuantity: number; approvedAmount: number; actualAmount: number; difference: number; included: boolean; reason: string | null }[] };
@@ -100,6 +113,10 @@ export type CreateJobBillPayload = {
   labourDiscountPercent: number;
   serviceAdvisorId: string;
   notes?: string;
+  /** A repeated request returns the bill it already created. */
+  requestId?: string;
+  /** Required when the preview proposes a storage charge. */
+  storageCharge?: StorageDecision;
 };
 
 export async function getBillableJobCardsRequest(branchId?: string): Promise<{ jobCards: BillableJobCard[] }> {

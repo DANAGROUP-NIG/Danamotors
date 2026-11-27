@@ -66,7 +66,8 @@ export async function retimeJob(jobCardId: string, window: JobWindow, promiseHou
     prisma.$executeRaw`UPDATE "JobCardCampaign" SET ${set(["createdAt"])} WHERE "jobCardId" = ${jobCardId}`,
     prisma.$executeRaw`UPDATE "CampaignVehicle" SET ${set(["scheduledAt", "completedAt"])} WHERE "completedJobCardId" = ${jobCardId}`,
     prisma.$executeRaw`UPDATE "JobStageEvent" SET ${set(["createdAt"])} WHERE "jobCardId" = ${jobCardId}`,
-    prisma.$executeRaw`UPDATE "JobCard" SET ${set(["createdAt", "updatedAt", "readyAt", "deliveredAt", "billedAt", "warrantyAcknowledgedAt", "stageEnteredAt"])} WHERE id = ${jobCardId}`,
+    prisma.$executeRaw`UPDATE "CustomerContact" SET ${set(["contactedAt"])} WHERE "jobCardId" = ${jobCardId}`,
+    prisma.$executeRaw`UPDATE "JobCard" SET ${set(["createdAt", "updatedAt", "readyAt", "deliveredAt", "billedAt", "warrantyAcknowledgedAt", "stageEnteredAt", "vehicleWashedAt"])} WHERE id = ${jobCardId}`,
     prisma.$executeRaw`UPDATE "RepeatJob" SET ${set(["createdAt", "updatedAt", "reviewedAt"])} WHERE "jobCardId" = ${jobCardId}`,
   ]);
   // A repeat's day difference follows the moved job date (Lagos calendar days from the previous job).

@@ -19,6 +19,7 @@ import { applyWarrantyHandoff, loadWarrantyFacts } from "./job-warranty.service"
 import { loadEstimateStageFacts, vehicleDeclinedItems } from "./job-estimate.service";
 import { createWorkLines, loadRepairProblems, pauseWorkLines } from "./job-repair.service";
 import { moveStage } from "./job-stage.writer";
+import { loadDeliveryPaymentProblem } from "./job-billing-gate";
 import { QC_STATE_SELECT, qcStateFrom } from "./job-qc-state";
 import {
   ACTION_RULES,
@@ -91,6 +92,11 @@ async function stageFacts(tx: Prisma.TransactionClient, job: WorkspaceJob, now: 
   const warrantyProblems = job.stage === "WARRANTY" && job.jobType !== JobCardType.PDI ? await loadWarrantyFacts(tx, job.id) : [];
   const estimate = job.stage === "ESTIMATE" && job.jobType !== JobCardType.PDI ? await loadEstimateStageFacts(tx, job.id) : null;
   const repairProblems = job.stage === "REPAIR" && job.jobType !== JobCardType.PDI ? await loadRepairProblems(tx, job.id) : [];
+  // Billing (phase 8): payment before delivery, once the vehicle is marked ready.
+  const paymentProblem =
+    job.stage === "BILLING" && job.jobType !== JobCardType.PDI && normaliseJobStatus(job.status) !== "QC"
+      ? await loadDeliveryPaymentProblem(tx, job.id)
+      : null;
   const [openingSignatureProblem, approvalProblem, depositProblem] = gated
     ? await Promise.all([
         job.openingSignatureRequired ? gateProblem(() => assertSignedJobOpening(tx, job.id)) : null,
@@ -123,6 +129,7 @@ async function stageFacts(tx: Prisma.TransactionClient, job: WorkspaceJob, now: 
       normaliseJobStatus(job.status) === "BILLED" ||
       [...job.invoices, ...job.consolidatedInvoices].some((invoice) => ACTIVE_INVOICE(invoice.status)),
     creditApproved: !!job.creditApprovedById,
+    paymentProblem,
     unansweredCampaigns: job.campaigns.filter((campaign) => campaign.attended === null).length,
     estimate,
     repairProblems,

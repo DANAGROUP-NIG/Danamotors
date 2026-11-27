@@ -170,9 +170,12 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     expect(await expectAt(card.id, 'BILLING', 'READY')).toMatchObject({ stageOwnerId: null, stageOwnerRole: 'BillingOfficer' });
 
     await billing.createJobBill({ jobCardId: card.id, serviceAdvisorId: users.advisor.id, actorId: users.billing.id, partsDiscountPercent: 0, labourDiscountPercent: 0 });
-    expect(await expectAt(card.id, 'DELIVERY', 'BILLED')).toMatchObject({ stageOwnerId: users.advisor.id, stageOwnerRole: 'ServiceAdviser' });
+    // Phase 8: the invoiced job waits at billing with the advisor until it is paid (or credit approved).
+    expect(await expectAt(card.id, 'BILLING', 'BILLED')).toMatchObject({ stageOwnerId: users.advisor.id, stageOwnerRole: 'ServiceAdviser' });
 
     await workflow.approveCredit(card.id, users.admin.id, 'Fleet account on credit terms');
+    await act(card.id, 'SEND_TO_DELIVERY', 'advisor');
+    expect(await expectAt(card.id, 'DELIVERY', 'BILLED')).toMatchObject({ stageOwnerId: users.advisor.id, stageOwnerRole: 'ServiceAdviser' });
     await workflow.update(card.id, { status: 'DELIVERED', deliveryAdvisorId: users.advisor.id, remarks: 'Vehicle handed over' }, users.advisor.id);
     await expectAt(card.id, 'CLOSED', 'DELIVERED');
 
@@ -186,7 +189,7 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
 
     const events = await db.jobStageEvent.findMany({ where: { jobCardId: card.id }, orderBy: { createdAt: 'asc' } });
     expect(events.map(e => e.toStage)).toEqual([
-      'DIAGNOSIS', 'DIAGNOSIS', 'DIAGNOSIS', 'ESTIMATE', 'REPAIR', 'REPAIR', 'REPAIR', 'QUALITY_CHECK', 'BILLING', 'BILLING', 'DELIVERY', 'CLOSED',
+      'DIAGNOSIS', 'DIAGNOSIS', 'DIAGNOSIS', 'ESTIMATE', 'REPAIR', 'REPAIR', 'REPAIR', 'QUALITY_CHECK', 'BILLING', 'BILLING', 'BILLING', 'DELIVERY', 'CLOSED',
     ]);
     const audits = await db.auditLog.count({ where: { action: 'JOB_STAGE_CHANGED', details: { contains: card.id } } });
     expect(audits).toBe(events.length);
@@ -194,7 +197,7 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     expect(history.map(h => h.toStatus)).toEqual(['IN_PROGRESS', 'WAITING_PARTS', 'IN_PROGRESS', 'QC', 'READY', 'BILLED', 'DELIVERED']);
   });
 
-  it('sends a billed job to delivery, back to billing when the bill is cancelled, and on to delivery on credit', async () => {
+  it('keeps an invoiced job at billing, back to ready when the bill is cancelled, and on to delivery on credit', async () => {
     const card = await job('REPAIR', 'IN_PROGRESS');
     await labour.addJobCardLine(card.id, { labourItemId, technicianId: users.technician.id }, users.technician.id);
     await db.$transaction(tx => lines.syncLines(tx, card.id));
@@ -203,10 +206,10 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     await db.receipt.deleteMany({ where: { advanceJobCardId: card.id } });
 
     const blocked = await stages.workspace(card.id, users.advisor);
-    expect(blocked.actions.find(a => a.action === 'SEND_TO_DELIVERY')).toMatchObject({ enabled: false, reasons: ['Create the bill or record credit approval before delivery.'] });
+    expect(blocked.actions.find(a => a.action === 'SEND_TO_DELIVERY')).toMatchObject({ enabled: false, reasons: ['Create the invoice before sending the job to delivery.'] });
 
     const bill = await billing.createJobBill({ jobCardId: card.id, serviceAdvisorId: users.advisor.id, actorId: users.billing.id, partsDiscountPercent: 0, labourDiscountPercent: 0 });
-    await expectAt(card.id, 'DELIVERY', 'BILLED');
+    await expectAt(card.id, 'BILLING', 'BILLED');
     await billing.cancelJobBill(bill.id, users.billing.id, 'Wrong discount');
     await expectAt(card.id, 'BILLING', 'READY');
 

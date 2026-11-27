@@ -111,6 +111,7 @@ describe("legacyStatusForStage", () => {
     ["QUALITY_CHECK", {}, "QC"],
     ["BILLING", {}, "QC"],
     ["BILLING", { markedReady: true }, "READY"],
+    ["BILLING", { markedReady: true, billed: true }, "BILLED"],
     ["DELIVERY", {}, "READY"],
     ["DELIVERY", { billed: true }, "BILLED"],
     ["CLOSED", {}, "DELIVERED"],
@@ -142,7 +143,9 @@ describe("reconcileStage keeps the stage in step with any status change", () => 
     ["BILLING", "QC", "PENDING", false, "QUALITY_CHECK"],
     ["BILLING", "QC", "FAILED", false, "QUALITY_CHECK"],
     ["BILLING", "READY", "PASSED", false, "BILLING"],
-    ["BILLING", "BILLED", "PASSED", false, "DELIVERY"],
+    // Phase 8: an invoiced job stays at billing until it is paid and sent on; one already at delivery stays there.
+    ["BILLING", "BILLED", "PASSED", false, "BILLING"],
+    ["DELIVERY", "BILLED", "PASSED", true, "DELIVERY"],
     ["DELIVERY", "READY", "PASSED", false, "BILLING"],
     ["DELIVERY", "READY", "PASSED", true, "DELIVERY"],
     ["DELIVERY", "DELIVERED", "PASSED", false, "CLOSED"],
@@ -334,18 +337,26 @@ describe("allowed and blocked moves", () => {
     expect(checkStageAction("QC_PASSED_TO_ADVISOR", failed, technician)).toMatchObject({ ok: false, kind: "forbidden" });
   });
 
-  it("billing: only the service advisor marks ready, then credit or a bill sends it to delivery", () => {
+  it("billing: only the service advisor marks ready, then payment, credit or nothing to pay sends it to delivery", () => {
     const billingQc = facts({ stage: "BILLING", status: "QC", qcState: "PASSED" });
     expect(checkStageAction("MARK_READY", billingQc, advisor)).toEqual({ ok: true, to: "BILLING", toStatus: "READY" });
     expect(checkStageAction("MARK_READY", billingQc, { id: "admin", role: ROLES.ADMIN })).toMatchObject({ ok: false, kind: "forbidden" });
     expect(checkStageAction("MARK_READY", { ...billingQc, unansweredCampaigns: 1 }, advisor)).toEqual({
       ok: false, kind: "blocked", reasons: ["Record whether the campaign work was done for each campaign on this job."],
     });
-    const ready = facts({ stage: "BILLING", status: "READY", qcState: "PASSED" });
+    // The gate's reason comes from the payment facts (deliveryPaymentProblem); the rule only passes it on.
+    const ready = facts({ stage: "BILLING", status: "READY", qcState: "PASSED", paymentProblem: "Create the invoice before sending the job to delivery." });
     expect(checkStageAction("SEND_TO_DELIVERY", ready, advisor)).toEqual({
-      ok: false, kind: "blocked", reasons: ["Create the bill or record credit approval before delivery."],
+      ok: false, kind: "blocked", reasons: ["Create the invoice before sending the job to delivery."],
     });
-    expect(checkStageAction("SEND_TO_DELIVERY", { ...ready, creditApproved: true }, advisor)).toEqual({ ok: true, to: "DELIVERY", toStatus: undefined });
+    expect(checkStageAction("SEND_TO_DELIVERY", { ...ready, paymentProblem: null }, advisor)).toEqual({ ok: true, to: "DELIVERY", toStatus: undefined });
+    const unpaid = facts({ stage: "BILLING", status: "BILLED", qcState: "PASSED", billed: true, paymentProblem: "Balance of ₦48,350.00 not yet paid." });
+    expect(checkStageAction("SEND_TO_DELIVERY", unpaid, advisor)).toEqual({ ok: false, kind: "blocked", reasons: ["Balance of ₦48,350.00 not yet paid."] });
+    expect(checkStageAction("SEND_TO_DELIVERY", { ...unpaid, paymentProblem: null }, advisor)).toEqual({ ok: true, to: "DELIVERY", toStatus: undefined });
+    expect(checkStageAction("SEND_TO_DELIVERY", { ...unpaid, paymentProblem: null }, billing)).toMatchObject({ ok: false, kind: "forbidden" });
+    expect(currentSubStep(unpaid)).toBe("PAYMENT");
+    // A billed job is not cancelled from the job card: the bill is cancelled first.
+    expect(checkStageAction("CANCEL", unpaid, advisor)).toMatchObject({ ok: false, kind: "unavailable" });
     expect(canWorkStage("BILLING", billing, null)).toBe(true);
   });
 

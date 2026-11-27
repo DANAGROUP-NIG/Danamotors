@@ -292,6 +292,8 @@ model User {
   advisedJobs         JobCard[]              @relation("JobServiceAdvisor")
   deliveredJobs       JobCard[]              @relation("JobDeliveryAdvisor")
   creditApprovedJobs  JobCard[]              @relation("JobCreditApprover")
+  vehicleWashedJobs   JobCard[]              @relation("JobVehicleWashedBy")
+  customerContacts    CustomerContact[]      @relation("CustomerContactBy")
   jobStatusChanges    JobCardStatusHistory[]
   createdJobCards     JobCard[]              @relation("CreatedJobCards")
 
@@ -804,6 +806,12 @@ model JobCard {
   lateRemarks        String?
   creditApprovedById String?
   creditApprovedBy   User?                  @relation("JobCreditApprover", fields: [creditApprovedById], references: [id], onDelete: Restrict)
+  /// When delivery on credit was approved (job card revamp phase 8). Older approvals: from the audit log.
+  creditApprovedAt   DateTime?
+  /// Billing (phase 8): the "Vehicle washed" tick, with who ticked it. Null: not washed.
+  vehicleWashedAt    DateTime?
+  vehicleWashedById  String?
+  vehicleWashedBy    User?                  @relation("JobVehicleWashedBy", fields: [vehicleWashedById], references: [id], onDelete: Restrict)
   complaints         JobComplaint[]
   statusHistory      JobCardStatusHistory[]
 
@@ -837,6 +845,8 @@ model JobCard {
   partsRequests          JobPartsRequest[]
   /// Repair (job card revamp phase 6): the approved work the technician ticks off.
   workLines              JobWorkLine[]
+  /// Billing (phase 8): every time the customer was told the vehicle is ready. The first starts the storage counter.
+  customerContacts       CustomerContact[]
 
   progress Int? @default(0)
 
@@ -1819,6 +1829,8 @@ model Invoice {
   cancelledById String?
   cancelledBy   User?     @relation("InvoiceCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
   cancelRemark  String?
+  /// The client request that created this job bill; a repeated request returns the same bill (phase 8).
+  requestId     String?   @unique
 
   // PDI bills: credit company and card for INVOICE bills, and the first print time.
   creditCompany String?
@@ -4919,6 +4931,10 @@ model BranchSettings {
   /// estimationChargePercent of the estimate's customer total is proposed.
   estimationChargeMinimum Decimal @default(25000) @db.Decimal(18, 2)
   estimationChargePercent Decimal @default(10) @db.Decimal(5, 2)
+  /// Terms clause 3: storage is free for this many hours after the customer is first told the
+  /// vehicle is ready, then storageDailyRate is proposed per started day at billing.
+  storageFreeHours        Int     @default(48)
+  storageDailyRate        Decimal @default(2000) @db.Decimal(18, 2)
 
   // Workshop rules. A job is a repeat when it is within either limit of the vehicle's last billed job.
   repeatWindowDays Int     @default(15)
@@ -5582,6 +5598,31 @@ enum WorkLineStatus {
 /// One approved piece of work (the service, or a labour operation) on the technician's tick-list.
 /// Created on release from the approved estimate, and on an approved supplementary estimate.
 /// Labour time is recorded through the labour slip when the line is done (labourLineId).
+/// How the advisor told the customer (job card revamp phase 8). There is no SMS gateway:
+/// SMS records that the advisor sent one.
+enum ReadyNoticeChannel {
+  PHONE_CALL
+  SMS
+}
+
+/// One "customer told the vehicle is ready" entry. Never updated or deleted.
+model CustomerContact {
+  id            String         @id @default(uuid())
+  jobCardId     String
+  jobCard       JobCard        @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  channel       ReadyNoticeChannel
+  /// The number used, copied from the customer when the entry was made.
+  phone         String?
+  note          String?
+  contactedAt   DateTime       @default(now())
+  contactedById String
+  contactedBy   User           @relation("CustomerContactBy", fields: [contactedById], references: [id], onDelete: Restrict)
+  requestId     String
+
+  @@unique([jobCardId, requestId])
+  @@index([jobCardId, contactedAt])
+}
+
 model JobWorkLine {
   id             String         @id @default(uuid())
   jobCardId      String

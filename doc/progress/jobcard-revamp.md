@@ -300,3 +300,32 @@ Built on Jayking (no phase branch, at the owner's request).
 - The customer portal job page showed the raw QC value and "—" fallbacks; it now shows the quality check result and "Not recorded".
 - The appointment check-in notice title used an em dash ("Checked in, open campaign" now).
 - The portal demo seed still wrote the removed `estimatedCost` column.
+
+## Phase 8: Billing (27 Nov 2026)
+
+Built on Jayking (no phase branch, at the owner's request).
+
+### Plan
+
+1. Data: `CustomerContact` (ready notices: PHONE_CALL or SMS, phone, note, who, when, request ID), `JobCard.vehicleWashedAt/ById` and `creditApprovedAt`, `Invoice.requestId`, `BranchSettings.storageFreeHours` (48) and `storageDailyRate` (₦2,000.00).
+2. Stage model: an invoiced job (BILLED) stays at Billing with the advisor until it is sent to Delivery; `SEND_TO_DELIVERY` needs the balance paid, credit approved, or nothing to pay. The delivery path accepts "nothing to pay" too.
+3. Server: pure `job-billing-step.logic.ts` (storage counter, estimated against actual, payment gate, payment status, input rules); `job-billing-gate.ts`; `job-billing-step.service.ts` and routes (`GET /billing`, `POST /billing/ready`, `POST /billing/notices`, `PUT /billing/washed`); job bill creation takes a request ID and a storage decision (accept, or remove with a reason; audited); the service manager may approve credit (`TODO(confirm)`).
+4. Client: billing logic and hook, `components/billing/`, the Billing step with its own bar, storage settings; the old Bill section deleted.
+5. Demo seed JC-S29 to JC-S32; tests; docs and manual test guide.
+
+### Status (milestones)
+
+- [x] Migration `20261127200000_jobcard_billing` (additive; existing credit approvals get `creditApprovedAt` from their audit entry). Residual diff for phase 8 objects empty on a copy of the phase 7 demo database.
+- [x] Server: logic, gate, service, routes, bill request ID and storage decision, credit time and roles, stage model. Unit 31 (billing logic) and integration 3 passing; stage logic, stage integration and billing service tests updated and passing.
+- [x] Demo seed JC-S29 to JC-S32 on a local copy (`dana_demo_p8`); the seed now marks jobs ready through the notice, sends paid or credit jobs to Delivery, and restocks parts it runs out of.
+- [x] Client: `lib/billing.logic.ts`, `use-job-billing.ts`, `components/billing/` (BillingStep, BillingCards, ReadyNoticeDialog, CreateInvoiceDialog, StorageChargeDecision, CreditApprovalDialog, DeliveryWithBilling); the Billing step draws its own bar; the storage answer on Billing, Create job bill; **Storage charge** in Company & Branch Settings. Deleted: the old Bill section, the old Delivery on credit section and the credit mutation in `use-workshop-actions`.
+- [x] Server database (27 Nov 2026): `20261127200000_jobcard_billing` applied (the only pending migration; the server also holds other teams' migrations, among them `20261128100000_job_billing_vat_snapshots`, which adds a nullable `Invoice.partsVatSnapshot`). The full demo seed now stops at its staff check because **Dana Motors Demo has no active service advisor or technician** any more; the new `--stage-only` option seeds the staged job card jobs (all at Main Branch) without it.
+- [x] Docs: `doc/job-cards.md` ("Billing (phase 8)" and the stage tables), `doc/demo-data.md`, manual test guide `doc/testing/jobcard-revamp/phase-8-manual-test.md`.
+
+### Found and fixed in passing
+
+- Billing used to move a job to Delivery the moment the bill was created, paid or not; the Delivery step could then show an unpaid job. It now waits at Billing.
+- A warranty-only job (nothing for the customer to pay) could never be billed or delivered without a credit approval; it can now go to Delivery and be delivered.
+- Oil and parts are told apart by the part type (O), as on the paper card, not by the VAT category.
+- The header badge read "QC passed" on an invoiced job; it reads "Ready" while the job is ready or invoiced.
+- The demo seed ran out of brake pads and engine oil after phase 7; it now has the store receive what is missing.

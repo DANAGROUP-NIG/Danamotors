@@ -47,6 +47,13 @@ export class FinanceController {
 
   createJobBill = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      // A repeated request (double click, retry after a lost response) gets the bill it already made.
+      const existing = await this.jobBillingService.billForRequest(req.body.requestId, undefined, req.body.jobCardId);
+      if (existing) {
+        assertBillingBranch(req, existing.jobCard?.branchId);
+        res.status(200).json({ status: 'success', statusCode: 200, message: 'Job bill created', data: { invoice: existing } });
+        return;
+      }
       const preview = await this.jobBillingService.previewJobBill(req.body);
       assertBillingBranch(req, preview.jobCard.branchId);
       const invoice = await this.jobBillingService.createJobBill({ ...req.body, actorId: req.user?.userId });

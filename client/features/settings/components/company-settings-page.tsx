@@ -15,6 +15,8 @@ type BranchSettings = {
   roundOffValue: number;
   estimationChargeMinimum: number;
   estimationChargePercent: number;
+  storageFreeHours: number;
+  storageDailyRate: number;
   repeatWindowDays: number;
   repeatWindowKm: number | null;
   printRepeatBlock: boolean;
@@ -52,6 +54,14 @@ const NUMBER_GROUPS: { title: string; note: string; fields: [NumberKey, string, 
     fields: [
       ["estimationChargeMinimum", "Minimum estimation charge (₦)", "0.01"],
       ["estimationChargePercent", "Estimation charge, share of the estimate total (%)", "0.01"],
+    ],
+  },
+  {
+    title: "Storage charge",
+    note: "Terms clause 3. Storage is free for these hours after the customer is first told the vehicle is ready. After that, the charge per whole day is proposed on the invoice for the advisor to accept or remove with a reason.",
+    fields: [
+      ["storageFreeHours", "Free storage (hours)", "1"],
+      ["storageDailyRate", "Storage charge per day (₦)", "0.01"],
     ],
   },
   {

@@ -15,6 +15,8 @@ jest.mock("../../prisma/client", () => ({
     financeSetting: { findUnique: jest.fn() },
     branchSettings: { findUnique: jest.fn() },
     documentSequence: { upsert: jest.fn() },
+    // Phase 8: no ready notice in these fixtures, so no storage is proposed.
+    customerContact: { findFirst: jest.fn(async () => null) },
   },
 }));
 

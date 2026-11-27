@@ -113,7 +113,7 @@ function JobFrame({ job }: { job: JobCard }) {
   };
   // Check-in and Diagnosis show the bar themselves: check-in with its part buttons, diagnosis with the
   // allocation's "Assign and send to" button and the engineer's note dialog.
-  const ownBar = ["CHECK_IN", "DIAGNOSIS", "WARRANTY", "ESTIMATE", "REPAIR", "QUALITY_CHECK"].includes(workspace.stage) && workspace.jobType !== "PDI";
+  const ownBar = ["CHECK_IN", "DIAGNOSIS", "WARRANTY", "ESTIMATE", "REPAIR", "QUALITY_CHECK", "BILLING"].includes(workspace.stage) && workspace.jobType !== "PDI";
   const steps = stepperView(workspace);
   const cancelled = workspace.stage === "CANCELLED";
   const waiting = waitingMessage(workspace);

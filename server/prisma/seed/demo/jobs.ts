@@ -17,6 +17,7 @@ import { decideCustomerPay } from "./warranty-check";
 import { notifyStoreOfParts } from "../../../src/modules/service/jobcard-parts-request.service";
 import { JobRepairService, type RepairActor } from "../../../src/modules/service/job-repair.service";
 import { JobQualityCheckService } from "../../../src/modules/service/job-quality-check.service";
+import { JobBillingStepService } from "../../../src/modules/service/job-billing-step.service";
 import { QC_GENERAL_CHECKS } from "../../../src/modules/service/job-quality-check.logic";
 import { demoSignaturePng } from "./check-in";
 import { ROLES } from "../../../src/shared/constants/roles";
@@ -61,6 +62,7 @@ const services = {
   estimates: new JobEstimateService(),
   repair: new JobRepairService(),
   qc: new JobQualityCheckService(),
+  billingStep: new JobBillingStepService(),
 };
 
 /** A workshop user with the permissions of their role, as the repair screens send them. */
@@ -154,6 +156,13 @@ export async function seedJob(ctx: DemoContext, ref: Reference, parties: Parties
     for (const [partKey, quantity] of fx.issues) {
       const sparePartId = ref.parts[partKey];
       if (await prisma.partIssuance.findFirst({ where: { jobCardId: id, sparePartId }, select: { id: true } })) continue;
+      // Later scenarios use more than the opening stock: the store receives what is missing first.
+      const stock = await prisma.inventoryStock.findUnique({ where: { branchId_partId: { branchId: branch.id, partId: sparePartId } } });
+      const short = quantity - ((stock?.quantity ?? 0) - (stock?.reservedQuantity ?? 0));
+      if (short > 0)
+        await services.inventory.adjustStock({
+          branchId: branch.id, partId: sparePartId, quantity: short + 4, type: "RECEIVED", notes: `${DEMO_TAG} restock for ${fx.id}`, recordedById: staff.store.id,
+        });
       await services.inventory.createPartIssuance({
         sparePartId, branchId: branch.id, jobCardId: id, issuedById: staff.store.id, quantity, notes: `Issued for job card ${job.jobNumber}`,
       });
@@ -291,7 +300,7 @@ async function advance(ctx: DemoContext, fx: JobFixture, id: string) {
         const unanswered = await prisma.jobCardCampaign.findMany({ where: { jobCardId: id, attended: null }, select: { campaignId: true } });
         for (const { campaignId } of unanswered) await services.workflow.setCampaignAttendance(id, campaignId, fx.campaignWork, staff.advisor.id);
       }
-      await services.workflow.update(id, { status: "READY", workDone: fx.workDone, remarks: "Ready for delivery" }, staff.advisor.id);
+      await markReady(fx, id, staff.advisor.id);
     } else if (status === "READY") {
       // A bill once created, even if a tester later cancelled it, is never created again.
       if (job.invoices.length > 0) return;
@@ -314,11 +323,39 @@ async function advance(ctx: DemoContext, fx: JobFixture, id: string) {
         await services.workflow.approveCredit(id, ctx.admin.id, "Fleet account on 30-day credit terms");
         continue;
       }
+      // Billing (phase 8): an invoiced job waits at billing until the advisor sends it on, once paid or on credit.
+      if (job.stage === "BILLING") {
+        await stageAction(fx, id, "SEND_TO_DELIVERY", staff.advisor.id, "Paid, sent to delivery");
+        continue;
+      }
       await services.workflow.update(id, { status: "DELIVERED", deliveryAdvisorId: staff.advisor.id, remarks: "Vehicle handed over" }, staff.advisor.id);
     } else {
       return;
     }
   }
+}
+
+/**
+ * Billing (phase 8): the advisor marks the vehicle ready and records that the customer was told, which
+ * starts the storage counter. Work done is saved first. Jobs not on the staged billing step (older data)
+ * keep the plain status move.
+ */
+async function markReady(fx: JobFixture, id: string, advisorId: string) {
+  if (fx.workDone) await services.workflow.update(id, { workDone: fx.workDone }, advisorId);
+  const { stage } = await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true } });
+  if (stage !== "BILLING") {
+    await services.workflow.update(id, { status: "READY", remarks: "Ready for delivery" }, advisorId);
+    return;
+  }
+  const advisor = await repairActor(advisorId);
+  await services.billingStep.markReady(id, advisor, {
+    requestId: demoUuid(`ready:${fx.id}`),
+    channel: "PHONE_CALL",
+    note: "Told the customer the vehicle is ready for collection.",
+  });
+  if (fx.billing?.notifyAgain)
+    await services.billingStep.notifyAgain(id, advisor, { requestId: demoUuid(`ready:${fx.id}:again`), channel: "SMS", note: "Reminder sent by SMS." });
+  if (fx.billing?.washed) await services.billingStep.setWashed(id, advisor, true);
 }
 
 /** Runs one staged job card action as a seeded staff member. The request ID makes re-runs safe. */

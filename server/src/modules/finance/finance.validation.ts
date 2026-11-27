@@ -1,3 +1,4 @@
+import { storageDecision } from '../service/job-billing-step.logic';
 import { z } from 'zod';
 const amount = z.number().finite().positive().max(1e12).multipleOf(0.01);
 
@@ -110,6 +111,9 @@ export const createJobBillSchema = z.object({
     labourDiscountPercent: z.number().min(0).max(100).default(0),
     serviceAdvisorId: z.string().uuid('Invalid service advisor ID'),
     notes: z.string().max(1000).optional(),
+    // Job card revamp phase 8: a repeated request returns the same bill; a due storage charge needs an answer.
+    requestId: z.string().uuid('Reload the page and try again').optional(),
+    storageCharge: storageDecision.optional(),
   }).strict(),
 });
 

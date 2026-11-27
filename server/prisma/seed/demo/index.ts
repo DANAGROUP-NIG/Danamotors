@@ -9,6 +9,7 @@
  *   npm run prisma:seed:demo -- --csc-only           only the CSC demo (service due cases at every follow-up step)
  *   npm run prisma:seed:demo -- --late-only          only the late delivery demo (promised date / time discrepancies, January 2026)
  *   npm run prisma:seed:demo -- --psf-only           only the post-service follow-up demo (delivered jobs and calls, February 2026)
+ *   npm run prisma:seed:demo -- --stage-only         only the staged job card jobs (JC-S01 onward, all at the main branch)
  *
  * Options:
  *   --allow-database=<name>   required when the database name does not contain "demo"
@@ -40,10 +41,10 @@ import { CAMPAIGNS, DEMO_TAG, JOBS, STAGE_JOBS } from "./fixtures";
 import { seedStageBooking } from "./check-in";
 import { prepareWarrantyDemo } from "./warranty-check";
 
-const USAGE = "Usage: npm run prisma:seed:demo -- [--reset-test] [--pdi-only] [--repeat-only] [--csc-only] [--late-only] [--psf-only] [--allow-database=<name>] [--main-branch=<name>] [--second-branch=<name>]";
+const USAGE = "Usage: npm run prisma:seed:demo -- [--reset-test] [--pdi-only] [--repeat-only] [--csc-only] [--late-only] [--psf-only] [--stage-only] [--allow-database=<name>] [--main-branch=<name>] [--second-branch=<name>]";
 
 function parseArgs(argv: string[]) {
-  const options = { resetTest: false, pdiOnly: false, repeatOnly: false, cscOnly: false, lateOnly: false, psfOnly: false, allowDatabase: undefined as string | undefined, mainBranch: "Main Branch", secondBranch: "Dana Motors Demo", help: false };
+  const options = { resetTest: false, pdiOnly: false, repeatOnly: false, cscOnly: false, lateOnly: false, psfOnly: false, stageOnly: false, allowDatabase: undefined as string | undefined, mainBranch: "Main Branch", secondBranch: "Dana Motors Demo", help: false };
   for (const arg of argv) {
     const [name, ...rest] = arg.split("=");
     const value = rest.join("=");
@@ -53,6 +54,7 @@ function parseArgs(argv: string[]) {
     else if (name === "--csc-only" && !value) options.cscOnly = true;
     else if (name === "--late-only" && !value) options.lateOnly = true;
     else if (name === "--psf-only" && !value) options.psfOnly = true;
+    else if (name === "--stage-only" && !value) options.stageOnly = true;
     else if (name === "--help" || name === "-h") options.help = true;
     else if (name === "--allow-database" && value) options.allowDatabase = value;
     else if (name === "--main-branch" && value) options.mainBranch = value;
@@ -99,7 +101,7 @@ async function main() {
   console.log(`${DEMO_TAG}: ${options.resetTest ? "resetting TEST- warranty cases in" : "loading demo data into"} ${describeTarget(target)}`);
   allowSlowTransactions(prisma);
 
-  const ctx = await loadContext({ main: options.mainBranch, second: options.secondBranch });
+  const ctx = await loadContext({ main: options.mainBranch, second: options.secondBranch }, { mainStaffOnly: options.stageOnly });
   console.log(`Branches: ${ctx.branches.main.name}, ${ctx.branches.second.name}`);
 
   if (options.resetTest) {
@@ -136,6 +138,17 @@ async function main() {
   }
   const parties = await ensureParties(ctx, ref);
   console.log("Customers and vehicles ready");
+  if (options.stageOnly) {
+    const seeded = new Map<string, JobResult>();
+    for (const job of STAGE_JOBS) {
+      process.stdout.write(`  ${job.id} ... `);
+      const result = await seedJob(ctx, ref, parties, job, seeded);
+      seeded.set(job.id, result);
+      console.log(`job card ${result.jobNumber}`);
+    }
+    console.log(`\n${DEMO_TAG}: staged job card jobs done. Running it again changes nothing.`);
+    return;
+  }
 
   // The free fix is active before JC-01 opens, so JC-01 completes it for the Sorento.
   await seedCampaign(ctx, ref, parties, CAMPAIGNS.freeFix);

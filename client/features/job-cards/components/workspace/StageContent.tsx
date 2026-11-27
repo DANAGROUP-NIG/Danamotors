@@ -1,10 +1,7 @@
 "use client";
-import Link from "next/link";
-import { Printer, Receipt } from "lucide-react";
+import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/features/auth/hooks/use-auth";
 import { formatDateTime } from "@/lib/format";
-import { canonicalJobStatus } from "../../types/job-card-status";
 import type { JobCard } from "../../types/job-card.types";
 import type { JobWorkspace } from "../../types/job-workspace.types";
 import type { JobFileTab } from "../../lib/job-frame.logic";
@@ -17,9 +14,8 @@ import { RepairStep } from "../repair/RepairStep";
 import { QualityCheckStep } from "../quality-check/QualityCheckStep";
 import { InvoicesTable } from "./InvoicesTable";
 import { StageCard } from "./StageCard";
-import { CreditApprovalSection, DeliverySection } from "./WorkshopSections";
-
-const ACTIVE_INVOICE = (status: string) => !["CANCELLED", "CANCELED", "VOID"].includes(status.toUpperCase());
+import { BillingStep } from "../billing/BillingStep";
+import { DeliveryWithBilling } from "../billing/DeliveryWithBilling";
 
 /**
  * What the current step shows. Steps not rebuilt yet show the existing sections that serve them,
@@ -63,66 +59,16 @@ export function StageContent({
       // PDI jobs keep their own screens; everything else uses the staged quality check (phase 7).
       return workspace.jobType === "PDI" ? null : <QualityCheckStep job={job} workspace={workspace} bar={bar} />;
     case "BILLING":
-      // TODO(phase 8): replaced by mark ready, storage, estimated against actual, invoice and payment.
-      return (
-        <>
-          <BillingSection job={job} />
-          <CreditApprovalSection job={job} />
-        </>
-      );
+      // PDI jobs keep their own screens; everything else uses the staged billing (phase 8).
+      return workspace.jobType === "PDI" ? null : <BillingStep job={job} workspace={workspace} bar={bar} />;
     case "DELIVERY":
       // TODO(phase 9): replaced by the handover, belongings, signature and gate pass screen.
-      return (
-        <>
-          <DeliverySection job={job} />
-          <BillingSection job={job} />
-          <CreditApprovalSection job={job} />
-        </>
-      );
+      return <DeliveryWithBilling job={job} />;
     case "CLOSED":
       return <DeliveredPanel job={job} onPrintGatePass={onPrintGatePass} />;
     case "CANCELLED":
       return null;
   }
-}
-
-function BillingSection({ job }: { job: JobCard }) {
-  const { hasPermission } = useAuth();
-  const status = canonicalJobStatus(job.status);
-  const invoices = job.invoices ?? [];
-  const activeBill = !!job.billedAt || invoices.some((invoice) => ACTIVE_INVOICE(invoice.status));
-  const canCreate = hasPermission("invoice:job-bill:create");
-  const ready = status === "READY" || (status === "DELIVERED" && !!job.creditApprovedById);
-  const reason = activeBill ? null : !ready ? "Mark the vehicle ready before creating the bill." : null;
-  return (
-    <StageCard
-      title="Bill"
-      actions={
-        canCreate && !activeBill ? (
-          ready ? (
-            <Button asChild>
-              <Link href={`/invoices/new?jobCardId=${job.id}&customerId=${job.customerId}`}>
-                <Receipt aria-hidden="true" />
-                Create job bill
-              </Link>
-            </Button>
-          ) : (
-            <Button type="button" disabled aria-describedby="bill-blocked">
-              <Receipt aria-hidden="true" />
-              Create job bill
-            </Button>
-          )
-        ) : undefined
-      }
-    >
-      {canCreate && reason && (
-        <p id="bill-blocked" className="text-sm text-muted-foreground">
-          {reason}
-        </p>
-      )}
-      <InvoicesTable invoices={invoices} />
-    </StageCard>
-  );
 }
 
 function DeliveredPanel({ job, onPrintGatePass }: { job: JobCard; onPrintGatePass: () => void }) {

@@ -45,6 +45,10 @@ adds customers `DEMO-C51` (main branch) and `DEMO-C52` (second branch) with vehi
 midnight), late by time, on time, exactly on time, not delivered, and one at the second branch. Some have reasons and
 remarks, some none. See `doc/late-deliveries-testing-guide.md`.
 
+Only the staged job card jobs (JC-S01 onward, all at the main branch): `npm run prisma:seed:demo -- --stage-only`. It
+needs staff at the main branch only, so it still runs where the second branch has no service advisor or technician (the
+shared server since 27 Nov 2026).
+
 Only the post-service follow-up demo: `npm run prisma:seed:demo -- --psf-only` (needs the PSF migration). It adds
 customers `DEMO-C61`…`DEMO-C65` (C62 and C65 without a phone, C65 without an address; C64 at the second branch),
 labour `DM-PSF-AC` (followed up), `DM-PSF-ENG` (major) and `DM-PSF-WASH` (not followed up), service type `AC`
@@ -143,9 +147,9 @@ Opening stock enters as a `RECEIVED` stock movement. The seeded job cards then i
 | JC-05 | Sportage / Main | **Open, unassigned** (team only). Repeat of JC-02 | Check-in | Rev 1 **sent back**, rev 2 **pending** | none | **REJECTED** |
 | TEST-01 / TEST-02 | TEST vehicles / Main, Dana Motors Demo | Open | Check-in | none | none | OPEN, empty |
 
-Jobs that start work go through the staged job card: check-in, diagnosis, the warranty check when the vehicle needs it, the estimate, then repair. The cashier records a **₦10,000 advance** (or the suggested amount if lower) before work starts, and the technician presses **Request parts** before the store issues parts (without a store officer at the branch the request time is recorded). Every job that leaves check-in has its walk-around recorded through the check-in service (half a tank, hub caps missing, AC not working, service book seen with 3 stamps, umbrella in boot, a scratch on the rear bumper and a dent on the front right door) and instructions to the technician. Jobs seeded today (the JC-S jobs) are also signed by the owner on screen, with a drawn demo signature. The historical scenario jobs are re-dated after seeding, which would change the opening date the customer signed, so they are recorded like jobs from before signed consent (`TODO(confirm)`).
+Jobs reach ready through **Mark ready and notify customer** (phase 8: a phone call notice, which starts the storage counter), and an invoiced job is sent to Delivery once it is paid or on credit. Where a part runs short, the seed has the store receive what is missing first ("restock for JC-..."). Jobs that start work go through the staged job card: check-in, diagnosis, the warranty check when the vehicle needs it, the estimate, then repair. The cashier records a **₦10,000 advance** (or the suggested amount if lower) before work starts, and the technician presses **Request parts** before the store issues parts (without a store officer at the branch the request time is recorded). Every job that leaves check-in has its walk-around recorded through the check-in service (half a tank, hub caps missing, AC not working, service book seen with 3 stamps, umbrella in boot, a scratch on the rear bumper and a dent on the front right door) and instructions to the technician. Jobs seeded today (the JC-S jobs) are also signed by the owner on screen, with a drawn demo signature. The historical scenario jobs are re-dated after seeding, which would change the opening date the customer signed, so they are recorded like jobs from before signed consent (`TODO(confirm)`).
 
-**Staged job card: one job at every step (JC-S01 to JC-S28)**
+**Staged job card: one job at every step (JC-S01 to JC-S32)**
 
 Customer `DEMO-C05` Adaeze Okafor (fictional) and existing demo customers, all at the main branch, each on its own vehicle. Periodic service labour only, no parts.
 
@@ -159,7 +163,7 @@ Customer `DEMO-C05` Adaeze Okafor (fictional) and existing demo customers, all a
 | JC-S06 | LSR-516ST | Repair | Paused for parts |
 | JC-S07 | LSR-517ST | Quality check | Waiting for the QC result |
 | JC-S08 | LSR-518ST | Billing | QC passed, waiting for the advisor to mark it ready |
-| JC-S09 | LSR-519ST | Delivery | Billed ₦31,550, balance ₦21,550 |
+| JC-S09 | LSR-519ST | Billing (invoiced, unpaid); Delivery on databases seeded before phase 8 | Billed ₦31,550, balance ₦21,550 |
 | JC-S10 | LSR-520ST | Cancelled | Cancelled at the estimate: "Customer took the vehicle elsewhere" |
 | JC-S11 | KJA-521ST (Sportage, in warranty) | Check-in, Customer consent | Details and walk-around done, waiting for Tobi Adeyemi to sign. Last recorded 24,600 km |
 | JC-S12 | LSR-522ST | Check-in, ready to send | Signed by the owner, Lakeside Courier Services Ltd; ready to send to the workshop supervisor |
@@ -179,6 +183,10 @@ Customer `DEMO-C05` Adaeze Okafor (fictional) and existing demo customers, all a
 | JC-S26 | LSR-537ST (Sorento, out of warranty) | Quality check | Phase 7. 50,000 km service and front brake pads, both done and sent for the quality check by the technician. Check-in reading 48,262 km, the road test start the supervisor sees |
 | JC-S27 | LSR-538ST (Sorento, out of warranty) | Repair, returned from the quality check | Phase 7. The supervisor failed the brake pads ("Brake still noisy at low speed. Recheck front left caliper slider."): the job is back with the technician, the brake line reopened and the service line still done |
 | JC-S28 | LSR-539ST (Sorento, out of warranty) | Quality check, second check | Phase 7. Failed once on the brake pads, the technician redid them and sent the job back: the quality check shows the earlier failed check in its history |
+| JC-S29 | LSR-540ST (Sorento, out of warranty) | Billing, quality check passed | Phase 8. 50,000 km service and front brake pads, passed; the advisor has not marked the vehicle ready or told the customer yet |
+| JC-S30 | LSR-541ST (Sorento, out of warranty) | Billing, ready, not invoiced | Phase 8. Marked ready about four days before the seed ran (phone call, then an SMS reminder), washed: storage days are due and proposed when the invoice is created |
+| JC-S31 | LSR-542ST (Sorento, out of warranty) | Billing, invoiced and unpaid | Phase 8. Invoice ₦104,850.00, the ₦10,000.00 advance applied, balance ₦94,850.00 for the cashier; then Send to delivery |
+| JC-S32 | LSR-543ST (Sorento, out of warranty) | Billing, invoiced and unpaid | Phase 8. Same invoice and balance, for the service manager to approve delivery on credit |
 
 Jobs past diagnosis (JC-S04 onward and the scenario jobs) are diagnosed through the services: the workshop supervisor assigns the technician and a bay (bays A1 to A4 are added when missing), the technician records a finding per request with the periodic service labour, and the service engineer confirms. The service engineer is an active Engineer at the branch, or the admin where the branch has none (`TODO(confirm)`); the seed never creates users.
 

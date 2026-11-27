@@ -59,13 +59,5 @@ export function useWorkshopActions(jobCardId: string, jobNumber: string) {
     },
   });
 
-  const approveCredit = useMutation({
-    mutationFn: (remarks: string) => apiPost(`/service/job-cards/${jobCardId}/credit-approval`, { remarks }),
-    onSuccess: async () => {
-      toast.success(`Delivery on credit approved for job ${jobNumber}`);
-      await refresh();
-    },
-  });
-
-  return { assign, saveWorkDone, deliver, approveCredit };
+  return { assign, saveWorkDone, deliver };
 }

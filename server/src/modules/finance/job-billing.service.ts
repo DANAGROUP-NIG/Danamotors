@@ -28,6 +28,32 @@ import { applyJobAdvances } from "./job-advance";
 import { lockParty } from "./party-account.service";
 import { assertJobBillingReady, BILLABLE_STATUSES } from "./job-billing.logic";
 import { QC_PASSED_WHERE, QC_STATE_SELECT, qcStateFrom } from "../service/job-qc-state";
+import {
+  STORAGE_DESCRIPTION,
+  formatNaira,
+  storageCounter,
+  storageStart,
+  type StorageCounter,
+  type StorageDecision,
+} from "../service/job-billing-step.logic";
+
+type Db = Prisma.TransactionClient | typeof prisma;
+
+/**
+ * Terms clause 3 for the jobs on one bill: the storage counter up to `until`, from the latest of the
+ * jobs' first ready notifications. Null when a job was never notified.
+ */
+export async function billStorage(db: Db, jobIds: string[], branchId: string, until: Date): Promise<StorageCounter | null> {
+  const firsts = await Promise.all(
+    jobIds.map((jobCardId) =>
+      db.customerContact.findFirst({ where: { jobCardId }, orderBy: [{ contactedAt: "asc" }, { id: "asc" }], select: { contactedAt: true } }),
+    ),
+  );
+  const start = storageStart(firsts.map((first) => first?.contactedAt ?? null));
+  if (!start) return null;
+  const settings = await getBranchSettings(branchId, db);
+  return storageCounter(start, { freeHours: settings.storageFreeHours, dailyRate: settings.storageDailyRate }, until);
+}
 
 const JOB_BILL_INCLUDE = {
   estimates: latestEstimateQuery,
@@ -204,6 +230,18 @@ export class JobBillingService {
   private getBillLines(
     jobCard: Awaited<ReturnType<JobBillingService["loadJobCard"]>>,
   ) {
+    const lines = this.collectBillLines(jobCard);
+    if (!lines.some((line) => line.customerPaid))
+      throw new BadRequestError(
+        "Record customer-paid parts, labour or a service charge before creating a job bill",
+      );
+    return lines;
+  }
+
+  /** Every chargeable line on the job, customer-paid or not. Throws only for broken records (no retail rate). */
+  private collectBillLines(
+    jobCard: Awaited<ReturnType<JobBillingService["loadJobCard"]>>,
+  ) {
     // The customer pays a line unless the service type is company-paid or the line's
     // charge type (job card lines: warranty, campaign, goodwill, internal) says otherwise.
     // The customer declined all work: the bill is the estimation charge alone (terms clause 4).
@@ -318,10 +356,6 @@ export class JobBillingService {
       ...labourLines,
       ...serviceLines,
     ];
-    if (!lines.some((line) => line.customerPaid))
-      throw new BadRequestError(
-        "Record customer-paid parts, labour or a service charge before creating a job bill",
-      );
     if (lines.some((line) => line.amount < 0 || !Number.isFinite(line.amount)))
       throw new BadRequestError("Invalid job-card line amount");
     return lines;
@@ -329,10 +363,8 @@ export class JobBillingService {
 
   private pricedScope(
     jobCard: Awaited<ReturnType<JobBillingService["loadJobCard"]>>,
+    rawLines = this.getBillLines(jobCard).filter((line) => line.customerPaid),
   ) {
-    const rawLines = this.getBillLines(jobCard).filter(
-      (line) => line.customerPaid,
-    );
     // An estimation charge is billed on the declined estimate; there is no approved scope to compare.
     const review = jobCard.estimationCharge?.status === "ADDED"
       ? estimationChargeReview(jobCard.estimates?.[0]?.id ?? null, rawLines)
@@ -355,6 +387,23 @@ export class JobBillingService {
         : line;
     });
     return { lines, review };
+  }
+
+  /**
+   * What the customer is charged on this job so far, priced as the bill would price it (lines included
+   * in the service charge at zero), before VAT and discounts. Empty when the customer pays nothing.
+   * Billing (phase 8) uses it for estimated against actual and for "nothing to pay"; it never checks readiness.
+   */
+  async actualCustomerLines(jobCardId: string, db: Db = prisma) {
+    const jobCard = await this.loadJobCard(jobCardId, db);
+    const raw = this.collectBillLines(jobCard).filter((line) => line.customerPaid);
+    if (!raw.length) return [];
+    return this.pricedScope(jobCard, raw).lines.map((line) => ({
+      type: line.type,
+      amount: line.amount,
+      /** PART lines: the spare part. */
+      referenceId: line.referenceId ?? null,
+    }));
   }
 
   async listBillableJobCards(branchId?: string) {
@@ -477,7 +526,10 @@ export class JobBillingService {
       partsDiscountPercent: input.partsDiscountPercent,
       labourDiscountPercent: input.labourDiscountPercent,
     });
+    // Terms clause 3: shown for the advisor to accept or remove; the totals above leave it out.
+    const storage = await billStorage(prisma, jobCards.map((card) => card.id), jobCard.branchId, new Date());
     return {
+      storage: storage && storage.days > 0 ? storage : null,
       jobCard,
       jobCards: jobCards.map((card) => ({
         id: card.id,
@@ -505,7 +557,13 @@ export class JobBillingService {
     serviceAdvisorId: string;
     notes?: string;
     actorId?: string;
+    /** Repeating a request returns the bill it already created. */
+    requestId?: string;
+    /** Required when a storage charge is due (terms clause 3): accept it, or remove it with a reason. */
+    storageCharge?: StorageDecision;
   }) {
+    const replay = await this.billForRequest(input.requestId, prisma, input.jobCardId);
+    if (replay) return replay;
     for (let attempt = 0; ; attempt += 1) {
       try {
         return await prisma.$transaction(
@@ -531,7 +589,9 @@ export class JobBillingService {
             await transaction.$queryRaw<Array<{ id: string }>>(
               Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${input.jobCardId} FOR UPDATE`,
             );
-            const { jobCard, jobCards, lines, review } = await this.billScope(
+            const sameRequest = await this.billForRequest(input.requestId, transaction, input.jobCardId);
+            if (sameRequest) return sameRequest;
+            const { jobCard, jobCards, lines: scopeLines, review } = await this.billScope(
               input,
               transaction,
             );
@@ -564,6 +624,26 @@ export class JobBillingService {
 
             if (!review.canBill)
               throw new BadRequestError(review.issues.join(" "));
+            // Terms clause 3: a due storage charge is never added or dropped silently.
+            const storage = await billStorage(transaction, jobCards.map((card) => card.id), jobCard.branchId, new Date());
+            const storageDue = storage && storage.days > 0 ? storage : null;
+            if (storageDue && !input.storageCharge)
+              throw new BadRequestError(
+                `Accept the storage charge of ${formatNaira(storageDue.proposedAmount)} (${storageDue.days} ${storageDue.days === 1 ? "day" : "days"}), or remove it with a reason.`,
+              ).withCode("FIELD_VALIDATION", { field: "storageCharge" });
+            const storageLine =
+              storageDue && input.storageCharge?.decision === "ACCEPT"
+                ? {
+                    type: "SERVICE" as const,
+                    referenceId: undefined,
+                    description: STORAGE_DESCRIPTION(storageDue.days, storageDue.dailyRate),
+                    quantity: storageDue.days,
+                    rate: money(Number(storageDue.dailyRate)),
+                    amount: money(Number(storageDue.proposedAmount)),
+                    customerPaid: true,
+                  }
+                : null;
+            const lines = storageLine ? [...scopeLines, storageLine] : scopeLines;
             const { totals, breakdown } = await this.calculateTotals(
               jobCard,
               lines,
@@ -636,6 +716,7 @@ export class JobBillingService {
                 roundOff: totals.roundOff,
                 serviceAdvisorId: advisor.id,
                 notes: input.notes,
+                requestId: input.requestId,
                 status: totals.total === 0 ? "Paid" : "Unpaid",
                 // Batch line snapshots to avoid one insert round trip per line.
                 lines: {
@@ -695,6 +776,22 @@ export class JobBillingService {
               invoice,
               jobCard.branchId,
             );
+            if (storageDue)
+              await transaction.auditLog.create({
+                data: {
+                  userId: input.actorId ?? input.serviceAdvisorId,
+                  action: storageLine ? "JOB_STORAGE_CHARGE_ADDED" : "JOB_STORAGE_CHARGE_REMOVED",
+                  details: JSON.stringify({
+                    invoiceId: invoice.id,
+                    jobCardIds: jobCards.map((card) => card.id),
+                    days: storageDue.days,
+                    dailyRate: storageDue.dailyRate,
+                    amount: storageDue.proposedAmount,
+                    freeUntil: storageDue.freeUntil.toISOString(),
+                    reason: input.storageCharge?.decision === "REMOVE" ? input.storageCharge.reason : null,
+                  }),
+                },
+              });
             await transaction.auditLog.create({
               data: {
                 userId: input.actorId ?? input.serviceAdvisorId,
@@ -755,6 +852,18 @@ export class JobBillingService {
         throw error;
       }
     }
+  }
+
+  /** The bill a client request already created, in the shape createJobBill returns. */
+  async billForRequest(requestId: string | undefined, db: Db = prisma, jobCardId?: string) {
+    if (!requestId) return null;
+    const bill = await db.invoice.findUnique({
+      where: { requestId },
+      include: { lines: true, customer: true, jobCard: true, serviceAdvisor: true },
+    });
+    if (bill && jobCardId && bill.jobCardId !== jobCardId)
+      throw new ConflictError("This request was already used for another job. Reload the page and try again.");
+    return bill;
   }
 
   // options.pdi: called from the PDI bill service. PDI and service bills are cancelled from their own menus.
