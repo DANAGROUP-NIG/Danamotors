@@ -1,6 +1,9 @@
+import { resolve } from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // The booking customer validator is shared with the API.
+  turbopack: { root: resolve(__dirname, "..") },
   // Moved pages; keep old links, bookmarks and stored notification links working.
   async redirects() {
     return [

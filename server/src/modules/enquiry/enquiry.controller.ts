@@ -119,7 +119,10 @@ export class EnquiryController {
       const { enquiry, appointment } = await this.service.reviewEnquiry(
         req.params.id,
         reviewedById,
-        req.body,
+        {
+          ...req.body,
+          customerDetailsBranchId: canAccessAllBranches(req.user) ? undefined : req.user?.branchId ?? null,
+        },
       );
       const action = req.body.action as "approve" | "reject";
       res.status(200).json({

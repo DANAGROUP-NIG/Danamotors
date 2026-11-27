@@ -5,8 +5,15 @@ import { nextSequenceNumber } from "../../shared/db/documentSequence";
 import {
   BadRequestError,
   ConflictError,
+  ForbiddenError,
   NotFoundError,
 } from "../../shared/errors/appError";
+import {
+  BookingCustomerDetails,
+  bookingCustomerFieldsToComplete,
+  normalizeBookingPhone,
+  validateBookingCustomer,
+} from "../../shared/booking-customer-details";
 import { bookingRequestBody } from "./service.validation";
 import { resolveJobComplaints } from "./job-card-complaints";
 import { bookingView } from "./booking.logic";
@@ -21,6 +28,8 @@ export type BookingFields = {
 };
 export type BookingCreate = BookingFields & {
   customerId: string;
+  customerDetails?: BookingCustomerDetails;
+  customerDetailsBranchId?: string | null;
   vehicleId: string;
   branchId: string;
   createdById?: string;
@@ -101,19 +110,45 @@ export async function createBooking(
   };
   if (data.status && data.status !== "Pending")
     throw new BadRequestError("New bookings must start as booked");
-  const { requests: _requests, ...fields } = data;
+  const {
+    requests: _requests,
+    customerDetails,
+    customerDetailsBranchId,
+    ...fields
+  } = data;
   const write = async (tx: Prisma.TransactionClient) => {
+    // Match the customer merge lock order and keep the customer details stable until commit.
+    await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${data.customerId} FOR NO KEY UPDATE`;
     // The locking read also establishes existence; keep duplicate detection under this lock.
     const vehicles = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "Vehicle" WHERE id = ${data.vehicleId} FOR UPDATE`;
     if (vehicles.length === 0)
       throw new NotFoundError("Vehicle not found");
-    if (
-      !(await tx.customer.findFirst({
-        where: { id: data.customerId, mergedIntoId: null },
-        select: { id: true },
-      }))
-    )
-      throw new NotFoundError("Customer not found");
+    const customer = await tx.customer.findFirst({
+      where: { id: data.customerId, mergedIntoId: null },
+      select: {
+        id: true, branchId: true, tin: true, nin: true, email: true,
+        address: true, postalCode: true, phoneNumber: true,
+      },
+    });
+    if (!customer) throw new NotFoundError("Customer not found");
+
+    const updates: BookingCustomerDetails = {};
+    for (const field of bookingCustomerFieldsToComplete(customer)) {
+      const value = customerDetails?.[field]?.trim();
+      if (!value) continue;
+      updates[field] = field === "email" ? value.toLowerCase()
+        : field === "phoneNumber" ? normalizeBookingPhone(value)
+        : value;
+    }
+    if (Object.keys(updates).length && customerDetailsBranchId !== undefined &&
+        (!customerDetailsBranchId || customer.branchId !== customerDetailsBranchId)) {
+      throw new ForbiddenError("You can only complete customer details for your branch");
+    }
+    const errors = validateBookingCustomer({ ...customer, ...updates });
+    if (Object.keys(errors).length) {
+      throw new BadRequestError("Complete the required customer details")
+        .withCode("FIELD_VALIDATION", { customerDetails: errors });
+    }
     if (
       !(await tx.branch.findFirst({
         where: { id: data.branchId, isActive: true },
@@ -141,6 +176,25 @@ export async function createBooking(
       data.vehicleId,
       data.branchId,
     );
+    const duplicateEmail = () => {
+      const message = "This email address already belongs to another customer";
+      return new ConflictError(message)
+        .withCode("FIELD_VALIDATION", { customerDetails: { email: message } });
+    };
+    if (Object.keys(updates).length) {
+      if (updates.email && await tx.customer.findFirst({
+        where: { id: { not: customer.id }, email: { equals: updates.email, mode: "insensitive" } },
+        select: { id: true },
+      })) throw duplicateEmail();
+      try {
+        await tx.customer.update({ where: { id: customer.id }, data: updates, select: { id: true } });
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+          throw duplicateEmail();
+        }
+        throw error;
+      }
+    }
     // Allocate late so the shared branch/year counter is locked only during writes.
     const number = await nextSequenceNumber(
       tx,

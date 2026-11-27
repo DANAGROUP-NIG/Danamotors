@@ -18,7 +18,7 @@ export async function checkDatabaseSchema(): Promise<void> {
   if (missing.length) {
     throw new Error(
       `Database schema is behind the Prisma client (${missing.length} missing columns): ` +
-      `${missing.slice(0, 10).join(', ')}. Run npm run db:prepare in server before restarting.`,
+      `${missing.join(', ')}. Run npm run db:prepare in server before restarting.`,
     );
   }
 }

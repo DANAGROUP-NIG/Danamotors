@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validateBookingCustomer } from "../../../../server/src/shared/booking-customer-details";
 import { customerCategories } from "../lib/customer-category";
 
 export const customerFields = z.object({
@@ -34,6 +35,8 @@ export const customerFields = z.object({
   preferredFollowupDay: z.enum(["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]).optional(),
   preferredFollowupTime: z.union([z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), z.literal("")]).optional(),
   postalCode: z.string().optional(),
+  tin: z.string().optional(),
+  nin: z.string().optional(),
   tallyPartyCode: z.string().optional(),
   // Legacy Customer/Vendor profile fields.
   segment: z.string().max(20).nullable().optional(),
@@ -59,6 +62,12 @@ export const createCustomerSchema = customerFields.superRefine((v, ctx) => {
     path: ["companyName"],
     message: "Company name is required",
   });
+});
+
+export const createBookingCustomerSchema = createCustomerSchema.superRefine((values, context) => {
+  for (const [field, message] of Object.entries(validateBookingCustomer(values))) {
+    context.addIssue({ code: "custom", path: [field], message });
+  }
 });
 
 export const updateCustomerSchema = customerFields.partial();

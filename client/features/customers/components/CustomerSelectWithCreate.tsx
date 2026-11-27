@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import ModalFame from "@/components/modals/ModalFame";
+import { normalizeBookingPhone } from "../../../../server/src/shared/booking-customer-details";
 import { createPortal } from "react-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,7 +15,7 @@ import { getCustomersRequest } from "@/features/customers/api/customer.api";
 import { useCustomer } from "@/features/customers/hooks/use-customer";
 import { useCreateCustomer } from "@/features/customers/hooks/use-create-customer";
 import {
-  createCustomerSchema,
+  createBookingCustomerSchema,
   type CreateCustomerFormValues,
 } from "@/features/customers/schemas/customer.schema";
 import { useBranchStore } from "@/store/branch.store";
@@ -126,7 +128,7 @@ export function CustomerSelectWithCreate({
     reset: resetCustomerForm,
     formState: { errors: customerErrors },
   } = useForm<CreateCustomerFormValues>({
-    resolver: zodResolver(createCustomerSchema),
+    resolver: zodResolver(createBookingCustomerSchema),
     defaultValues: {
       firstName: searchQuery.split(" ")[0] || "",
       lastName: searchQuery.split(" ").slice(1).join(" ") || "",
@@ -149,30 +151,15 @@ export function CustomerSelectWithCreate({
   function handleCreateInlineCustomer(values: CreateCustomerFormValues) {
     const payload = {
       ...values,
+      tin: values.tin?.trim() || undefined,
+      nin: values.nin?.trim() || undefined,
+      phoneNumber: normalizeBookingPhone(values.phoneNumber),
       branchId: isSuperAdmin ? values.branchId : (activeBranch?.id ?? values.branchId),
     };
     createCustomerMutation.mutate(payload, {
-      onSuccess: (res: any) => {
-        const createdCustomer: Customer = res?.customer || res;
-        if (createdCustomer?.id) {
-          queryClient.setQueriesData({ queryKey: customerKeys.all }, (old: any) => {
-            if (!old) return old;
-            if (Array.isArray(old)) {
-              if (old.some((c) => c?.id === createdCustomer.id)) return old;
-              return [createdCustomer, ...old];
-            }
-            if (typeof old === "object" && Array.isArray(old.customers)) {
-              if (old.customers.some((c: any) => c?.id === createdCustomer.id)) return old;
-              return {
-                ...old,
-                customers: [createdCustomer, ...old.customers],
-              };
-            }
-            return old;
-          });
-          queryClient.invalidateQueries({ queryKey: customerKeys.all });
-          onChange(createdCustomer.id);
-        }
+      onSuccess: (createdCustomer) => {
+        queryClient.setQueryData(customerKeys.detail(createdCustomer.id), createdCustomer);
+        onChange(createdCustomer.id, customerName(createdCustomer));
         setShowInlineCreate(false);
         setIsOpen(false);
         setSearchQuery("");
@@ -338,74 +325,63 @@ export function CustomerSelectWithCreate({
 
       {/* Inner Customer Modal Portal (z-[99999]) */}
       {showInlineCreate && mounted && createPortal(
-        <div
-          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in-50"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            className="fixed inset-0"
-            onClick={() => setShowInlineCreate(false)}
-            aria-hidden="true"
-          />
-          <div className="relative z-[100000] my-auto w-full max-w-md rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-border">
-              <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
-                <UserPlus className="h-4 w-4 text-primary" />
-                Add New Customer
-              </h4>
-              <button
-                type="button"
-                onClick={() => setShowInlineCreate(false)}
-                className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="grid gap-3.5">
+        <ModalFame isOpen nested preventAccidentalClose title="Add new customer"
+          onClose={() => setShowInlineCreate(false)}>
+          <form className="grid gap-3.5" noValidate onSubmit={(event) => {
+            event.stopPropagation();
+            void handleSubmitCustomer(handleCreateInlineCustomer)(event);
+          }}>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="First name" error={customerErrors.firstName?.message}>
+                <Field label="First name" required error={customerErrors.firstName?.message}>
                   <input
                     className={inputCls}
-                    placeholder="Jane"
-                    {...registerCustomer("firstName")}
+                    aria-required="true" aria-invalid={!!customerErrors.firstName} {...registerCustomer("firstName")}
                   />
                 </Field>
-                <Field label="Last name" error={customerErrors.lastName?.message}>
+                <Field label="Last name" required error={customerErrors.lastName?.message}>
                   <input
                     className={inputCls}
-                    placeholder="Doe"
-                    {...registerCustomer("lastName")}
+                    aria-required="true" aria-invalid={!!customerErrors.lastName} {...registerCustomer("lastName")}
                   />
                 </Field>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Email" error={customerErrors.email?.message}>
+                <Field label="Email" required error={customerErrors.email?.message}>
                   <input
                     type="email"
                     className={inputCls}
-                    placeholder="jane@example.com"
-                    {...registerCustomer("email")}
+                    aria-required="true" aria-invalid={!!customerErrors.email} {...registerCustomer("email")}
                   />
                 </Field>
-                <Field label="Phone" error={customerErrors.phoneNumber?.message}>
+                <Field label="Phone number" required error={customerErrors.phoneNumber?.message}>
                   <input
                     className={inputCls}
-                    placeholder="+234 800 000 0000"
-                    {...registerCustomer("phoneNumber")}
+                    type="tel"
+                    aria-required="true" aria-invalid={!!customerErrors.phoneNumber} {...registerCustomer("phoneNumber")}
                   />
                 </Field>
               </div>
 
-              <Field label="Address (optional)" error={customerErrors.address?.message}>
+              <Field label="Address" required error={customerErrors.address?.message}>
                 <input
                   className={inputCls}
-                  placeholder="123 Main St"
-                  {...registerCustomer("address")}
+                  aria-required="true" aria-invalid={!!customerErrors.address} {...registerCustomer("address")}
                 />
               </Field>
+
+              <Field label="Postal code" required error={customerErrors.postalCode?.message}>
+                <input className={inputCls} aria-required="true" aria-invalid={!!customerErrors.postalCode} {...registerCustomer("postalCode")} />
+              </Field>
+              <fieldset className="grid min-w-0 gap-3 sm:grid-cols-2">
+                <legend className="mb-2 text-sm text-muted-foreground">Provide TIN or NIN (at least one)</legend>
+                <Field label="TIN" error={customerErrors.tin?.message}>
+                  <input className={inputCls} aria-invalid={!!customerErrors.tin} {...registerCustomer("tin")} />
+                </Field>
+                <Field label="NIN" error={customerErrors.nin?.message}>
+                  <input className={inputCls} inputMode="numeric" aria-invalid={!!customerErrors.nin} {...registerCustomer("nin")} />
+                </Field>
+              </fieldset>
 
               {isSuperAdmin && (
                 <Field label="Branch" error={customerErrors.branchId?.message}>
@@ -430,10 +406,9 @@ export function CustomerSelectWithCreate({
                   Cancel
                 </Button>
                 <Button
-                  type="button"
+                  type="submit"
                   size="sm"
                   disabled={createCustomerMutation.isPending}
-                  onClick={handleSubmitCustomer(handleCreateInlineCustomer)}
                 >
                   {createCustomerMutation.isPending ? (
                     <>
@@ -441,13 +416,12 @@ export function CustomerSelectWithCreate({
                       Saving…
                     </>
                   ) : (
-                    "Save & Select Customer"
+                    "Save and select customer"
                   )}
                 </Button>
               </div>
-            </div>
-          </div>
-        </div>,
+          </form>
+        </ModalFame>,
         document.body
       )}
     </div>

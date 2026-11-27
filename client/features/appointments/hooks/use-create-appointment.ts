@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { customerKeys } from "@/features/customers/api/customer.keys";
 import { appointmentKeys } from "../api/appointment.keys";
 import { dashboardKeys } from "@/features/dashboard/api/dashboard.keys";
 import { createAppointmentRequest } from "../api/appointment.api";
@@ -14,6 +15,7 @@ export function useCreateAppointment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() });
       queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+      queryClient.invalidateQueries({ queryKey: customerKeys.all });
       toast.success("Appointment booked");
     },
     onError: (error: unknown) => {

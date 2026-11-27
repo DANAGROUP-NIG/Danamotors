@@ -56,10 +56,20 @@ const bookingFields = {
   requests: bookingRequests.optional(),
 };
 
+export const bookingCustomerDetailsBody = z.object({
+  tin: z.string().optional(),
+  nin: z.string().optional(),
+  email: z.string().optional(),
+  address: z.string().optional(),
+  postalCode: z.string().optional(),
+  phoneNumber: z.string().optional(),
+}).strict();
+
 export const createAppointmentSchema = z.object({
   body: z.object({
     ...bookingFields,
     requests: bookingRequests,
+    customerDetails: bookingCustomerDetailsBody.optional(),
     customerId: z.string().uuid("Invalid customer ID"),
     vehicleId: z.string().uuid("Invalid vehicle ID"),
     branchName: z.string().min(1, "Branch name is required"),

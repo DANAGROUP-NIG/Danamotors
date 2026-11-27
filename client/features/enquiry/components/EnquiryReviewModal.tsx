@@ -8,6 +8,7 @@ import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Field, inputCls } from '@/components/forms/FormField';
 import { DateTimeInput } from '@/components/forms/DateTimeInput';
+import { useBookingCustomerDetails } from "@/features/customers/components/BookingCustomerFields";
 import { CustomerSelectWithCreate } from '@/features/customers/components/CustomerSelectWithCreate';
 import { VehicleSelectWithCreate } from '@/features/vehicles/components/VehicleSelectWithCreate';
 import { useServices } from '@/features/services/hooks/use-services';
@@ -138,8 +139,10 @@ export function EnquiryReviewModal({
   });
 
   const selectedCustomerId = watch('customerId');
+  const customerDetails = useBookingCustomerDetails(selectedCustomerId);
 
   function onApproveSubmit(values: ApproveFormValues) {
+    if (!customerDetails.validate()) return;
     setApproveFormValues(values);
     setStep('approve-confirm');
   }
@@ -151,6 +154,7 @@ export function EnquiryReviewModal({
         id: enquiry.id,
         payload: {
           action:       'approve',
+          customerDetails: customerDetails.values,
           customerId:   approveFormValues.customerId,
           vehicleId:    approveFormValues.vehicleId,
           scheduledAt:  new Date(approveFormValues.scheduledAt).toISOString(),
@@ -161,7 +165,12 @@ export function EnquiryReviewModal({
           reviewNotes:  approveFormValues.reviewNotes || undefined,
         },
       },
-      { onSuccess: () => onClose() },
+      {
+        onSuccess: () => onClose(),
+        onError: (error) => {
+          if (customerDetails.applyServerErrors(error)) setStep('approve-form');
+        },
+      },
     );
   }
 
@@ -286,6 +295,7 @@ export function EnquiryReviewModal({
                       phoneNumber: enquiry.phoneNumber,
                     }}
                     onChange={(id, name) => {
+                      customerDetails.reset();
                       setValue('customerId', id, { shouldValidate: true });
                       setValue('vehicleId', '', { shouldValidate: true });
                       setSelectedCustomerName(name ?? '');
@@ -313,6 +323,8 @@ export function EnquiryReviewModal({
                   />
                 </Field>
               </div>
+
+              {customerDetails.fields}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Scheduled Date & Time *" error={errors.scheduledAt?.message}>
@@ -386,7 +398,7 @@ export function EnquiryReviewModal({
             <Button type="button" variant="outline" size="sm" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" form={approvalFormId} size="sm">
+            <Button type="submit" form={approvalFormId} size="sm" disabled={!!selectedCustomerId && !customerDetails.ready}>
               Review &amp; Confirm
             </Button>
           </div>

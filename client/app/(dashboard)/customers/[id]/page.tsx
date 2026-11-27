@@ -103,6 +103,8 @@ export default function CustomerDetailPage() {
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DetailField label="Phone" value={customer.phoneNumber} />
+          <DetailField label="TIN" value={customer.tin ?? "Not provided"} />
+          <DetailField label="NIN" value={customer.nin ?? "Not provided"} />
           <DetailField label="Date of Birth" value={customer.dateOfBirth} />
           <DetailField label="License" value={customer.driverLicenseNumber} />
           <DetailField label="Address" value={customer.address} />

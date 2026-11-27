@@ -424,6 +424,8 @@ export class ServiceRepository {
             companyName: true,
             code: true,
             phoneNumber: true,
+            tin: true,
+            nin: true,
           },
         },
         vehicle: true,

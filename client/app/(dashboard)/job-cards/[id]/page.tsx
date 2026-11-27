@@ -338,6 +338,12 @@ export default function JobCardDetailPage() {
               <p className="text-slate-500">
                 {jobCard.customer?.phoneNumber ?? "No mobile recorded"}
               </p>
+              {jobCard.customer && "tin" in jobCard.customer && (
+                <DetailField label="TIN" value={jobCard.customer.tin ?? "Not provided"} />
+              )}
+              {jobCard.customer && "nin" in jobCard.customer && (
+                <DetailField label="NIN" value={jobCard.customer.nin ?? "Not provided"} />
+              )}
               {jobCard.customer?.email && (
                 <p className="text-slate-500">{jobCard.customer.email}</p>
               )}

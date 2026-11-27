@@ -1,5 +1,5 @@
 import { getPdiSettings } from "../pdi/pdi.settings.service";
-import { BookingFields, bookingRelations } from "./booking.persistence";
+import { BookingCreate, BookingFields, bookingRelations } from "./booking.persistence";
 import {
   assertBookable,
   bookingComplaints,
@@ -104,6 +104,8 @@ export class ServiceService {
       customerId: string;
       vehicleId: string;
       branchName: string;
+      customerDetails?: BookingCreate["customerDetails"];
+      customerDetailsBranchId?: BookingCreate["customerDetailsBranchId"];
       scheduledAt: string;
       serviceId?: string;
       serviceTypeId?: string;
@@ -150,6 +152,8 @@ export class ServiceService {
       acFitted: data.acFitted,
       followUpJobId: data.followUpJobId,
       requests: data.requests,
+      customerDetails: data.customerDetails,
+      customerDetailsBranchId: data.customerDetailsBranchId,
       customerId: data.customerId,
       vehicleId: data.vehicleId,
       branchId: branch.id,

@@ -504,6 +504,8 @@ model Customer {
   firstName              String
   lastName               String
   email                  String?             @unique
+  tin                    String?
+  nin                    String?
   phoneNumber            String?
   dateOfBirth            DateTime?
   driverLicenseNumber    String?

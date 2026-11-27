@@ -1,3 +1,4 @@
+import type { BookingCustomerDetails } from "../../../../server/src/shared/booking-customer-details";
 export type EnquiryStatus = 'Pending' | 'Approved' | 'Rejected' | 'Converted';
 
 export type Enquiry = {
@@ -57,6 +58,7 @@ export type CreateEnquiryResponse = {
 };
 
 export type ReviewEnquiryPayload = {
+  customerDetails?: BookingCustomerDetails;
   action:       'approve' | 'reject';
   reviewNotes?: string;
   // approve-only

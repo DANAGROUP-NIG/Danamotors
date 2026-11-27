@@ -1,3 +1,4 @@
+import type { BookingCreate } from "../service/booking.persistence";
 import prisma from "../../prisma/client";
 import { EnquiryRepository, CreateEnquiryData } from "./enquiry.repository";
 import { NotificationService } from "../notification/notification.service";
@@ -91,6 +92,8 @@ export class EnquiryService {
       action: "approve" | "reject";
       reviewNotes?: string;
       customerId?: string;
+      customerDetails?: BookingCreate["customerDetails"];
+      customerDetailsBranchId?: string | null;
       vehicleId?: string;
       scheduledAt?: string;
       serviceId?: string;
@@ -169,6 +172,8 @@ export class EnquiryService {
 
     const appointment = await this.serviceRepo.createAppointment({
       customerId: customer.id,
+      customerDetails: data.customerDetails,
+      customerDetailsBranchId: data.customerDetailsBranchId,
       vehicleId: vehicle.id,
       branchId: enquiry.branch.id,
       serviceId: data.serviceId,

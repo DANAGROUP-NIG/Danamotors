@@ -1,3 +1,4 @@
+import { bookingCustomerDetailsBody } from "../service/service.validation";
 import { z } from 'zod';
 
 // ─── Online Enquiry (Public — no auth) ───────────────────────────────────────
@@ -46,6 +47,7 @@ export const reviewEnquirySchema = z.object({
     reviewNotes:   z.string().max(500).optional(),
     // Required only when action === 'approve'
     // Staff must link the enquiry to a real customer & vehicle (or create them first)
+    customerDetails: bookingCustomerDetailsBody.optional(),
     customerId:    z.string().uuid('Invalid customer ID').optional(),
     vehicleId:     z.string().uuid('Invalid vehicle ID').optional(),
     scheduledAt:   z.string().datetime({ offset: true }).optional(),

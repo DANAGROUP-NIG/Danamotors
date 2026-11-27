@@ -26,6 +26,19 @@ it('identifies the missing warranty column before requests are served', async ()
   await expect(checkDatabaseSchema()).rejects.toThrow('JobCard.warrantyStatusAtCreation');
 });
 
+it('lists missing columns beyond the first ten', async () => {
+  const missing = [
+    'JobCard.observations', 'JobCard.estimatedParts', 'JobCard.estimatedOil',
+    'JobCard.estimatedLabour', 'JobCard.estimatedCost', 'JobCard.assignedTo',
+    'JobCard.qcStatus', 'JobCard.qcNotes', 'Inspection.findings',
+    'Inspection.passed', 'Inspection.status',
+  ];
+  (prisma.$queryRaw as jest.Mock).mockResolvedValue(columns.filter(column =>
+    !missing.includes(`${column.table_name}.${column.column_name}`),
+  ));
+  await expect(checkDatabaseSchema()).rejects.toThrow(missing.join(', '));
+});
+
 it('does not treat an unavailable database as healthy', async () => {
   (prisma.$queryRaw as jest.Mock).mockRejectedValue(new Error('Connection unavailable'));
   await expect(checkDatabaseSchema()).rejects.toThrow('Connection unavailable');

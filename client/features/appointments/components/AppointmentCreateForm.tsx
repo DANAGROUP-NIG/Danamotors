@@ -19,6 +19,7 @@ import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useCreateAppointment } from "../hooks/use-create-appointment";
 import { useServices } from "@/features/services/hooks/use-services";
+import { useBookingCustomerDetails } from "@/features/customers/components/BookingCustomerFields";
 import { CustomerSelectWithCreate } from "@/features/customers/components/CustomerSelectWithCreate";
 import { VehicleSelectWithCreate } from "@/features/vehicles/components/VehicleSelectWithCreate";
 import {
@@ -70,8 +71,10 @@ export function AppointmentCreateForm({
 
   const selectedCustomerId = watch("customerId");
   const selectedVehicleId = watch("vehicleId");
+  const customerDetails = useBookingCustomerDetails(selectedCustomerId ?? "");
 
   function onSubmit(values: CreateAppointmentFormValues) {
+    if (!customerDetails.validate()) return;
     if (!bookingRequestsValid(extra.requests)) {
       setRequestError("Add the customer request");
       return;
@@ -80,14 +83,17 @@ export function AppointmentCreateForm({
     const payload = {
       ...values,
       ...extra,
+      customerDetails: customerDetails.values,
       requests: bookingRequestPayload(extra.requests),
       serviceId: values.serviceId || undefined,
       serviceTypeId: values.serviceTypeId || undefined,
       scheduledAt: lagosIso(values.scheduledAt),
     };
     create.mutate(payload, {
+      onError: customerDetails.applyServerErrors,
       onSuccess: () => {
         reset();
+        customerDetails.reset();
         setExtra({ requests: "" });
         onSuccess?.();
       },
@@ -97,12 +103,13 @@ export function AppointmentCreateForm({
   const earliestScheduledAt = lagosInput(new Date().toISOString());
 
   return (
-    <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
+    <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)} noValidate>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Customer" error={errors.customerId?.message}>
           <CustomerSelectWithCreate
             value={selectedCustomerId}
             onChange={(customerId) => {
+              customerDetails.reset();
               setValue("customerId", customerId, { shouldValidate: true });
               setValue("vehicleId", "", { shouldValidate: true });
             }}
@@ -127,6 +134,7 @@ export function AppointmentCreateForm({
           />
         </Field>
       </div>
+      {customerDetails.fields}
       <details>
         <summary className="cursor-pointer text-sm text-muted-foreground">
           Vehicle summary
@@ -240,7 +248,7 @@ export function AppointmentCreateForm({
           />
         </Field>
       </details>
-      <Button type="submit" disabled={create.isPending} className="mt-1">
+      <Button type="submit" disabled={create.isPending || (!!selectedCustomerId && !customerDetails.ready)} className="mt-1">
         {create.isPending ? "Booking…" : "Book appointment"}
       </Button>
     </form>

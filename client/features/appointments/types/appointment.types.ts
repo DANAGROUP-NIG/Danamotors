@@ -1,3 +1,4 @@
+import type { BookingCustomerDetails } from "../../../../server/src/shared/booking-customer-details";
 import type { CreateJobCardFormValues } from '@/features/job-cards/schemas/job-card.schema';
 export type BookingRequest = CreateJobCardFormValues['complaints'][number];
 export type BookingExtra = { mileage?: number; acFitted?: boolean; followUpJobId?: string | null; requests?: string | BookingRequest[] };
@@ -66,6 +67,7 @@ export type Appointment = {
 };
 
 export type CreateAppointmentPayload = BookingExtra & {
+  customerDetails?: BookingCustomerDetails;
   customerId: string;
   vehicleId: string;
   branchName: string;

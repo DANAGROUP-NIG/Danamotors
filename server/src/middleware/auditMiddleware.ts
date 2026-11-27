@@ -186,29 +186,24 @@ function deriveAction(method: string, originalUrl: string): string {
 }
 
 /**
- * Return a shallow copy of the request body with sensitive fields
+ * Serialize the request body with sensitive fields
  * replaced by `[REDACTED]`.  Returns `undefined` when the body is
  * empty or not an object.
  */
-function sanitizeDetails(body: any): string | undefined {
+function sanitizeDetails(body: unknown): string | undefined {
   if (!body || typeof body !== 'object' || Object.keys(body).length === 0) {
     return undefined;
   }
 
   const SENSITIVE_FIELDS = [
     'password', 'passwordHash', 'token', 'refreshToken',
-    'resetTokenHash', 'accessToken', 'newPassword', 'currentPassword',
+    'resetTokenHash', 'accessToken', 'newPassword', 'currentPassword', 'tin', 'nin',
   ];
 
-  const sanitized = { ...body };
-  for (const field of SENSITIVE_FIELDS) {
-    if (field in sanitized) {
-      sanitized[field] = '[REDACTED]';
-    }
-  }
-
   try {
-    return JSON.stringify(sanitized);
+    return JSON.stringify(body, (key, value: unknown) =>
+      SENSITIVE_FIELDS.includes(key) ? '[REDACTED]' : value,
+    );
   } catch {
     return '[Unserializable body]';
   }

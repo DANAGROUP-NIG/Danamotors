@@ -44,6 +44,8 @@ export type Customer = {
   city?: string;
   state?: string;
   postalCode?: string;
+  tin?: string | null;
+  nin?: string | null;
   country?: string;
   preferredContactMethod?: string;
   branchId: string;
@@ -75,6 +77,8 @@ export type CreateCustomerPayload = {
   city?: string;
   state?: string;
   postalCode?: string;
+  tin?: string | null;
+  nin?: string | null;
   country?: string;
   preferredContactMethod?: string;
   branchId: string;

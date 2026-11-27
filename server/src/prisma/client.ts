@@ -108,7 +108,6 @@ function createClient(): PrismaClient {
     log: [
       { emit: "event", level: "query" },
       { emit: "stdout", level: "warn" },
-      { emit: "stdout", level: "error" },
     ],
   });
 

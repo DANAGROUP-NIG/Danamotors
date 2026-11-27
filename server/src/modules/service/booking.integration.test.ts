@@ -69,7 +69,11 @@ suite("booking transactions on disposable localhost", () => {
     ).id;
     customerId = (
       await db.customer.create({
-        data: { firstName: "Synthetic", lastName: "Booking", branchId },
+        data: {
+          firstName: "Synthetic", lastName: "Booking", branchId,
+          tin: "TEST-BOOKING", email: `customer-${run}@example.test`,
+          phoneNumber: "08012345678", address: "Synthetic address", postalCode: "100001",
+        },
       })
     ).id;
     modelId = (
@@ -116,6 +120,7 @@ suite("booking transactions on disposable localhost", () => {
           vin: `BOOKING-${run}-${++sequence}`,
           customerId,
           catalogueId: modelId,
+          customModel: "Synthetic booking model",
         },
       })
     ).id;
@@ -247,6 +252,58 @@ suite("booking transactions on disposable localhost", () => {
       before,
     );
   });
+  it("rolls back completion with the booking and excludes identifiers from the change log", async () => {
+    const legacyCustomer = await db.customer.create({
+      data: { firstName: "Synthetic", lastName: "Legacy", branchId },
+    });
+    expect(legacyCustomer.tin).toBeNull();
+    expect(legacyCustomer.nin).toBeNull();
+    const vehicle = await db.vehicle.create({
+      data: { vin: `LEGACY-${run}`, customerId: legacyCustomer.id, catalogueId: modelId, customModel: "Synthetic booking model" },
+    });
+    const data: BookingCreate = {
+      customerId: legacyCustomer.id, vehicleId: vehicle.id, branchId, createdById: advisorId,
+      scheduledAt: new Date(Date.now() + 86400000), requests: [{ description: "Synthetic request" }],
+      customerDetails: {
+        tin: "TEST-LEGACY", nin: "00000000001", email: `legacy-${run}@example.test`,
+        address: "Ogunlana Avenue, Surulere, Lagos (\u00c0d\u00e9g\u00f2k\u00e8 junction)",
+        postalCode: "100001", phoneNumber: "+234 801 234 5678",
+      },
+    };
+    await expect(db.$transaction(async (tx) => {
+      await createBooking(data, tx);
+      throw new Error("Abort after booking");
+    })).rejects.toThrow("Abort after booking");
+    expect(await db.customer.findUnique({ where: { id: data.customerId } })).toMatchObject({
+      tin: null, nin: null, email: null, address: null, postalCode: null, phoneNumber: null,
+    });
+    expect(await db.serviceAppointment.count({ where: { vehicleId: vehicle.id } })).toBe(0);
+
+    await expect(createBooking({
+      ...data,
+      customerDetails: { ...data.customerDetails, email: `customer-${run}@example.test` },
+    })).rejects.toMatchObject({
+      statusCode: 409,
+      details: { customerDetails: { email: "This email address already belongs to another customer" } },
+    });
+
+    const booked = await createBooking(data);
+    expect(booked.customerId).toBe(data.customerId);
+    expect(await db.customer.findUnique({ where: { id: data.customerId } })).toMatchObject({
+      ...data.customerDetails, phoneNumber: "08012345678",
+    });
+    const changes = await db.changeLog.findMany({
+      where: { entity: "Customer", recordId: data.customerId, action: "UPDATE" },
+      select: { changes: true },
+    });
+    expect(changes).not.toHaveLength(0);
+    expect(JSON.stringify(changes)).not.toMatch(/TEST-LEGACY|00000000001|"tin"|"nin"/);
+    const profileService = new (await import("../customer/customer.service.js")).CustomerService();
+    expect(await profileService.getCustomer(data.customerId)).toMatchObject({
+      tin: "TEST-LEGACY", nin: "00000000001",
+    });
+  });
+
   it("edits requests with derived totals and does not record booking mileage as actual mileage", async () => {
     const booking = await createBooking(await input());
     const edited = await service.updateAppointment(booking.id, {

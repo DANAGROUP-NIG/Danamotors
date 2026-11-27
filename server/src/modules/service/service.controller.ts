@@ -199,6 +199,7 @@ export class ServiceController {
       const result = await this.serviceService.createAppointment({
         ...req.body,
         createdById,
+        customerDetailsBranchId: canAccessAllBranches(req.user) ? undefined : req.user?.branchId,
       });
       res.status(201).json({
         status: "success",

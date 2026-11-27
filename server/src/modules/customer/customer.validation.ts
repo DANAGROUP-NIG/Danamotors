@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isValidBookingNin, isValidBookingTin } from '../../shared/booking-customer-details';
 
 export const customerIdParamSchema = z.object({
   params: z.object({
@@ -23,6 +24,8 @@ export const customerBody = z.object({
   lastName: z.string().trim().max(100).default(''),
   email: z.preprocess(v => v === '' ? null : v, z.string().trim().toLowerCase().email().nullable().optional()),
   phoneNumber: z.string().trim().min(1).max(30),
+  tin: z.string().trim().refine(isValidBookingTin, 'Enter a valid TIN').nullable().optional(),
+  nin: z.string().trim().refine(isValidBookingNin, 'Enter exactly 11 digits for NIN').nullable().optional(),
   code: z.string().trim().min(1).max(50).optional(),
   creditDays: z.number().int().min(0).max(3650).nullable().optional(),
   partyStatus: z.enum(['CUSTOMER','DEALER','FA_PARTY','VENDOR']).optional(),

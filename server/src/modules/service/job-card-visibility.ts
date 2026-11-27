@@ -8,6 +8,7 @@ export function scopeJobCard<T extends object>(card: T, permissions: readonly st
   if (value instanceof Date || value === null || typeof value !== 'object') return value;
   if (Array.isArray(value)) return value.map(scope);
   return Object.fromEntries(Object.entries(value).filter(([key]) =>
+   (!['tin', 'nin'].includes(key) || permissions.includes(PERMISSIONS.CUSTOMER_READ)) &&
    (key !== 'advanceReceipts' || permissions.includes(PERMISSIONS.RECEIPT_READ)) &&
    (key !== 'advanceSummary' || estimateRead || invoiceRead || permissions.includes(PERMISSIONS.RECEIPT_READ)) &&
    (key !== 'estimates' || estimateRead) && (!['invoices', 'consolidatedInvoices'].includes(key) || invoiceRead) &&

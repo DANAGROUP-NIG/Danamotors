@@ -86,6 +86,8 @@ export type JobCardCustomer = {
   companyName?: string | null;
   code?: string | null;
   phoneNumber?: string | null;
+  tin?: string | null;
+  nin?: string | null;
 };
 
 export type JobCardVehicle = {
