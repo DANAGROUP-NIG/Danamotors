@@ -34,10 +34,10 @@ Step 8 of a job card, **Delivery**, is rebuilt for the moment the customer colle
 
 | Plate | Job number | Where it is | Used in section |
 |---|---|---|---|
-| LSR-544ST | S33_SERVER (2026000049) | Delivery. Paid. Owner Adaeze Okafor. The air filter was declined; a rear wiper blade was added during the repair. Two estimates approved by phone, not signed yet | A, B, C, D, J |
-| LSR-545ST | S34_SERVER (2026000050) | Delivery. On credit (Lakeside Courier Services Ltd). The promised time has passed | E, G |
-| LSR-546ST | S35_SERVER (2026000051) | Delivery. Paid. Owner Tobi Adeyemi; his brother Kunle Adeyemi signed the job card at check-in | F |
-| LSR-547ST | S36_SERVER (2026000052) | Closed. Already delivered to Adaeze Okafor | H, I |
+| LSR-544ST | 2026000067 (2026000049) | Delivery. Paid. Owner Adaeze Okafor. The air filter was declined; a rear wiper blade was added during the repair. Two estimates approved by phone, not signed yet | A, B, C, D, J |
+| LSR-545ST | 2026000068 (2026000050) | Delivery. On credit (Lakeside Courier Services Ltd). The promised time has passed | E, G |
+| LSR-546ST | 2026000069 (2026000051) | Delivery. Paid. Owner Tobi Adeyemi; his brother Kunle Adeyemi signed the job card at check-in | F |
+| LSR-547ST | 2026000070 (2026000052) | Closed. Already delivered to Adaeze Okafor | H, I |
 
 Sections A to F change their jobs. After testing, ask the developer to reload the demo data before you test them again.
 
