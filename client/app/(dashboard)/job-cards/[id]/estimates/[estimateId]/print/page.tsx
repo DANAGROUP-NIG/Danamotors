@@ -10,6 +10,11 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { moneyText } from "@/features/service-transactions/transaction.logic";
+import { payerSections } from "@/features/job-cards/lib/estimate.logic";
+import type { EstimatePayer } from "@/features/job-cards/types/job-estimate.types";
+import { formatDateTime } from "@/lib/format";
+
+const TYPE_LABEL: Record<string, string> = { PART: "Part", LABOUR: "Labour", SERVICE: "Service" };
 type PrintData = {
   estimate: {
     version: number;
@@ -18,6 +23,9 @@ type PrintData = {
     estimateDate: string;
     currency: string;
     total: number;
+    vatRate: number;
+    totals: { customerSubtotal: number; vat: number; customerTotal: number; otherPayerTotal: number; approvedTotal: number };
+    phoneApproval: { approverName: string | null; approverPhone: string | null; approvedAt: string | null; signatureDueAtDelivery: boolean } | null;
     upfrontPaymentPercent?: number;
     upfrontAmount?: number;
     supersededBy: number | null;
@@ -29,6 +37,8 @@ type PrintData = {
       quantity: number;
       rate: number;
       amount: number;
+      payer: EstimatePayer;
+      customerDecision: "APPROVED" | "DECLINED" | null;
     }[];
     signature: {
       imageReference: string;
@@ -145,42 +155,76 @@ export default function EstimatePrintPage() {
           ))}
         </ul>
       </section>
-      {[
-        ["PART", "Parts"],
-        ["LABOUR", "Labour"],
-        ["SERVICE", "Service charge"],
-      ].map(([type, title]) => (
-        <section key={type}>
+      {payerSections(estimate.lines).map(({ payer, title, lines }) => (
+        <section key={payer} className="break-inside-avoid">
           <h3 className="font-semibold">{title}</h3>
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b">
-                <th>Code / part number</th>
+                <th>Code or part number</th>
                 <th>Description</th>
-                <th>Quantity / hours</th>
-                <th>Rate</th>
-                <th>Amount</th>
+                <th>Type</th>
+                <th className="text-right">Quantity or hours</th>
+                <th className="text-right">Rate</th>
+                <th className="text-right">Amount</th>
               </tr>
             </thead>
             <tbody>
-              {estimate.lines
-                .filter((line) => line.type === type)
-                .map((line, index) => (
+              {lines.length === 0 ? (
+                <tr>
+                  <td colSpan={6}>No items.</td>
+                </tr>
+              ) : (
+                lines.map((line, index) => (
                   <tr className="border-b" key={index}>
-                    <td>{line.code}</td>
-                    <td>{line.description}</td>
-                    <td>{line.quantity}</td>
-                    <td>{money(line.rate)}</td>
-                    <td>{money(line.amount)}</td>
+                    <td>{line.code || "Not provided"}</td>
+                    <td>
+                      {line.description}
+                      {line.customerDecision === "DECLINED" ? " (Recommended, declined)" : ""}
+                    </td>
+                    <td>{TYPE_LABEL[line.type] ?? "Other"}</td>
+                    <td className="text-right tabular-nums">{line.quantity.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</td>
+                    <td className="text-right tabular-nums">{money(line.rate)}</td>
+                    <td className="text-right tabular-nums">{money(line.amount)}</td>
                   </tr>
-                ))}
+                ))
+              )}
             </tbody>
           </table>
         </section>
       ))}
-      <p className="text-right text-lg font-bold">
-        Total: {money(estimate.total)}
-      </p>
+      <dl className="ml-auto w-full max-w-sm space-y-1 text-sm">
+        <div className="flex justify-between gap-4">
+          <dt>Customer subtotal</dt>
+          <dd className="tabular-nums">{money(estimate.totals.customerSubtotal)}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt>VAT ({estimate.vatRate}%)</dt>
+          <dd className="tabular-nums">{money(estimate.totals.vat)}</dd>
+        </div>
+        <div className="flex justify-between gap-4 text-lg font-bold">
+          <dt>Customer total</dt>
+          <dd className="tabular-nums">{money(estimate.totals.customerTotal)}</dd>
+        </div>
+        {estimate.lines.some((line) => line.customerDecision) && (
+          <div className="flex justify-between gap-4 font-semibold">
+            <dt>Approved by the customer, with VAT</dt>
+            <dd className="tabular-nums">{money(estimate.totals.approvedTotal)}</dd>
+          </div>
+        )}
+        {estimate.totals.otherPayerTotal > 0 && (
+          <div className="flex justify-between gap-4">
+            <dt>Warranty and other payers (not charged to the customer)</dt>
+            <dd className="tabular-nums">{money(estimate.totals.otherPayerTotal)}</dd>
+          </div>
+        )}
+      </dl>
+      {estimate.phoneApproval && (
+        <p className="text-sm">
+          Approved by phone by {estimate.phoneApproval.approverName ?? "Not provided"}, {estimate.phoneApproval.approverPhone ?? "Not provided"}, {formatDateTime(estimate.phoneApproval.approvedAt)}.
+          {estimate.phoneApproval.signatureDueAtDelivery ? " The customer signs at delivery." : ""}
+        </p>
+      )}
       {typeof estimate.upfrontAmount === "number" &&
         Number.isFinite(estimate.upfrontAmount) && (
           <section className="space-y-1 text-right text-sm">

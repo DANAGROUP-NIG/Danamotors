@@ -3,7 +3,7 @@ import { belongingsText, damageSentence, fuelLabel } from "./check-in.logic";
 import type { StatusTone } from "@/components/ui/table-components/StatusBadge";
 import { NOT_PROVIDED, formatDateTime, formatKm, formatMoney, formatRelative } from "@/lib/format";
 import { COVERAGE_LABELS, CASE_STATUS_LABELS } from "@/features/warranty/lib/warranty-format";
-import { toEstimateViewModel } from "../components/repair-workspace-helpers";
+import { estimateStateLabel } from "./estimate.logic";
 import { WORKSPACE_COPY } from "../components/repair-workspace-copy";
 import type { JobCard } from "../types/job-card.types";
 import type {
@@ -156,11 +156,10 @@ export function stageDetails(stage: JobStep, job: JobCard): DetailRow[] {
     case "ESTIMATE": {
       const latest = job.estimates?.[0];
       if (!latest) return [{ label: "Estimate", value: NOT_PROVIDED }];
-      const view = toEstimateViewModel(latest);
       return [
-        { label: "Estimate", value: `Revision ${view.version}` },
-        { label: "Customer decision", value: WORKSPACE_COPY.estimateStates[view.status] },
-        { label: "Estimate total", value: formatMoney(view.total) },
+        { label: "Estimate", value: `Revision ${latest.version}` },
+        { label: "Customer decision", value: estimateStateLabel(latest) },
+        { label: "Customer total, with VAT", value: formatMoney(latest.customerTotal) },
       ];
     }
     case "REPAIR":

@@ -283,7 +283,20 @@ export interface StageFacts {
   billed: boolean;
   creditApproved: boolean;
   unansweredCampaigns: number;
+  /** Estimate step only (phase 5): where the latest revision is. Absent elsewhere. */
+  estimate?: EstimateStageFacts | null;
 }
+
+export interface EstimateStageFacts {
+  hasEstimate: boolean;
+  presented: boolean;
+  decided: boolean;
+  outcome: "APPROVED" | "PARTIAL" | "ALL_DECLINED" | null;
+  /** Terms clause 4 charge when everything was declined. */
+  charge: "NONE" | "ADDED" | "WAIVER_REQUESTED" | "WAIVED";
+}
+
+const allDeclined = (facts: StageFacts) => facts.estimate?.outcome === "ALL_DECLINED";
 
 export interface StageActor {
   id: string;
@@ -298,6 +311,7 @@ export const STAGE_ACTIONS = [
   "RETURN_TO_TECHNICIAN",
   "WARRANTY_TO_ADVISOR",
   "RELEASE_TO_REPAIR",
+  "SEND_DECLINED_TO_BILLING",
   "PAUSE_FOR_PARTS",
   "RESUME_REPAIR",
   "SEND_TO_QC",
@@ -392,10 +406,26 @@ export const ACTION_RULES: Record<StageAction, ActionRule> = {
     toStatus: "IN_PROGRESS",
     roles: RELEASERS,
     kind: "handoff",
+    when: (facts) => !allDeclined(facts),
     gates: (facts) => [
       ...TECHNICIAN_GATE(facts),
       ...problems(facts.openingSignatureProblem, facts.approvalProblem, facts.depositProblem),
     ],
+  },
+  // The customer declined all work: the estimation charge (terms clause 4) is billed, no repair or QC.
+  SEND_DECLINED_TO_BILLING: {
+    from: ["ESTIMATE"],
+    to: "BILLING",
+    toStatus: "READY",
+    roles: [ROLES.SERVICE_ADVISOR],
+    kind: "handoff",
+    when: (facts) => allDeclined(facts) && facts.estimate?.charge !== "WAIVED",
+    gates: (facts) => {
+      const charge = facts.estimate?.charge;
+      if (charge === "ADDED") return [];
+      if (charge === "WAIVER_REQUESTED") return ["A manager has not answered the waiver request yet."];
+      return ["Add the estimation charge, or request a waiver."];
+    },
   },
   PAUSE_FOR_PARTS: {
     from: ["REPAIR"],
@@ -573,6 +603,8 @@ export type SubStep =
   | "FINDINGS"
   | "ENGINEER_REVIEW"
   | "WARRANTY_REVIEW"
+  | "ESTIMATE_PREPARE"
+  | "ESTIMATE_DECLINED"
   | "ESTIMATE_APPROVAL"
   | "ADVANCE_PAYMENT"
   | "RELEASE"
@@ -597,9 +629,14 @@ export function currentSubStep(facts: StageFacts): SubStep | null {
       return facts.diagnosisSubmitted ? "ENGINEER_REVIEW" : "FINDINGS";
     case "WARRANTY":
       return "WARRANTY_REVIEW";
-    case "ESTIMATE":
+    case "ESTIMATE": {
+      const estimate = facts.estimate;
+      if (estimate?.outcome === "ALL_DECLINED") return "ESTIMATE_DECLINED";
+      if (estimate && !estimate.decided) return estimate.presented ? "ESTIMATE_APPROVAL" : "ESTIMATE_PREPARE";
+      if (estimate && !estimate.hasEstimate) return "ESTIMATE_PREPARE";
       if (facts.approvalProblem) return "ESTIMATE_APPROVAL";
       return facts.depositProblem ? "ADVANCE_PAYMENT" : "RELEASE";
+    }
     case "REPAIR":
       return status === "WAITING_PARTS" ? "WAITING_PARTS" : "WORK";
     case "QUALITY_CHECK":

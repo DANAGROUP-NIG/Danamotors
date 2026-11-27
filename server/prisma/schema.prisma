@@ -305,6 +305,12 @@ model User {
   diagnosesConfirmed          JobDiagnosis[]          @relation("DiagnosisConfirmedBy")
   jobFindingsCreated          JobFinding[]            @relation("JobFindingCreatedBy")
   findingItemsDecided         JobFindingItem[]        @relation("FindingItemDecidedBy")
+  advanceExemptionsGranted    JobCard[]               @relation("JobAdvanceExemptedBy")
+  phoneApprovalsRecorded      CustomerApproval[]      @relation("ApprovalRecordedBy")
+  estimationChargesCreated    EstimationCharge[]      @relation("EstimationChargeCreatedBy")
+  estimationWaiversRequested  EstimationCharge[]      @relation("EstimationChargeWaiverRequestedBy")
+  estimationChargesDecided    EstimationCharge[]      @relation("EstimationChargeDecidedBy")
+  jobPartsRequests            JobPartsRequest[]       @relation("JobPartsRequestCreatedBy")
   externalServicesAdded       ExternalServiceRecord[] @relation("ExternalServiceAddedBy")
   externalServicesRemoved     ExternalServiceRecord[] @relation("ExternalServiceRemovedBy")
   qualityInspectorAssignments JobCard[]               @relation("QualityInspectorAssignments")
@@ -801,25 +807,31 @@ model JobCard {
   jobNumber   String @unique
   description String
 
-  status          String          @default("OPEN")
+  status                 String            @default("OPEN")
   // Where the job is in the staged job card. Written only by the stage service (job-stage.service.ts).
-  stage           JobStage        @default(CHECK_IN)
-  stageOwnerId    String?
-  stageOwner      User?           @relation("JobStageOwner", fields: [stageOwnerId], references: [id], onDelete: SetNull)
-  stageOwnerRole  String?
-  stageEnteredAt  DateTime        @default(now())
-  stageEvents     JobStageEvent[]
-  estimatedHours  Float?
-  tyres           Json?
-  batteryMake     String?
-  batteryNumber   String?
-  customField1    String?
-  acType          String?
-  estimatedParts  Float?
-  estimatedOil    Float?
-  estimatedLabour Float?
-  serviceCharge   Float?
-  estimatedCost   Float?
+  stage                  JobStage          @default(CHECK_IN)
+  stageOwnerId           String?
+  stageOwner             User?             @relation("JobStageOwner", fields: [stageOwnerId], references: [id], onDelete: SetNull)
+  stageOwnerRole         String?
+  stageEnteredAt         DateTime          @default(now())
+  stageEvents            JobStageEvent[]
+  estimatedHours         Float?
+  tyres                  Json?
+  batteryMake            String?
+  batteryNumber          String?
+  customField1           String?
+  acType                 String?
+  /// The agreed service charge for the job's service type (model rate), set when the estimate is approved.
+  serviceCharge          Decimal?          @db.Decimal(18, 2)
+  /// Why no advance is needed before work starts (job card revamp phase 5). Null: an advance is needed,
+  /// unless the approved estimate has nothing for the customer to pay.
+  advanceExemption       AdvanceExemption?
+  advanceExemptionReason String?
+  advanceExemptedById    String?
+  advanceExemptedBy      User?             @relation("JobAdvanceExemptedBy", fields: [advanceExemptedById], references: [id], onDelete: SetNull)
+  advanceExemptedAt      DateTime?
+  estimationCharge       EstimationCharge?
+  partsRequests          JobPartsRequest[]
 
   progress Int? @default(0)
 
@@ -960,10 +972,17 @@ model Estimate {
   jobCardId String?
   jobCard   JobCard? @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
 
-  description String
-  amount      Float
-  currency    String @default("NGN")
-  status      String @default("Pending")
+  description      String
+  /// Sum of every line, all payers (before VAT). Customer totals come from the lines (job-estimate.logic.ts).
+  amount           Decimal           @db.Decimal(18, 2)
+  currency         String            @default("NGN")
+  status           String            @default("Pending")
+  /// VAT percentage on the customer's lines, taken from branch settings when the revision is created.
+  vatRate          Decimal           @default(7.5) @db.Decimal(5, 2)
+  /// When the advisor presented this revision to the customer. Editing the draft clears it.
+  presentedAt      DateTime?
+  partsRequest     JobPartsRequest?
+  estimationCharge EstimationCharge?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -975,9 +994,23 @@ model Estimate {
 }
 
 model CustomerApproval {
-  signatureRequired Boolean            @default(true)
-  overrideReason    String?
-  signature         EstimateSignature?
+  signatureRequired      Boolean            @default(true)
+  overrideReason         String?
+  signature              EstimateSignature?
+  /// COUNTER (signed on the tablet) or PHONE (recorded by the advisor; the customer signs at delivery).
+  channel                String             @default("COUNTER")
+  /// The estimate content (version 2 hash, line decisions included) this decision covers.
+  contentHash            String?
+  /// Client request ID: a retried submission returns the first decision.
+  requestId              String?            @unique
+  /// PHONE only: who approved, on which number and when, and the advisor who took the call.
+  approverName           String?
+  approverPhone          String?
+  approvedAt             DateTime?
+  recordedById           String?
+  recordedBy             User?              @relation("ApprovalRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+  /// PHONE only: the customer still has to sign this revision at delivery (phase 9 clears it).
+  signatureDueAtDelivery Boolean            @default(false)
 
   id String @id @default(uuid())
 
@@ -2443,10 +2476,12 @@ model JobComplaint {
   complaintCode   WorkshopMaster? @relation(fields: [complaintCodeId], references: [id], onDelete: Restrict)
   description     String
   defectCode      String?
-  spare           Float           @default(0)
-  oil             Float           @default(0)
-  labour          Float           @default(0)
+  /// PDI defect estimate amounts (the PDI flow). Service jobs price work on the staged estimate instead.
+  spare           Decimal         @default(0) @db.Decimal(18, 2)
+  oil             Decimal         @default(0) @db.Decimal(18, 2)
+  labour          Decimal         @default(0) @db.Decimal(18, 2)
   findings        JobFinding[]
+  estimateLines   EstimateLine[]
 
   @@index([jobCardId])
 }
@@ -2607,19 +2642,105 @@ model LabourRate {
 }
 
 model EstimateLine {
-  id          String   @id @default(uuid())
-  estimateId  String
-  estimate    Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
-  type        String
-  referenceId String?
+  id               String          @id @default(uuid())
+  estimateId       String
+  estimate         Estimate        @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  type             String
+  referenceId      String?
   // Part lines: the part source code the rate was priced from. Internal only; never shown to the customer.
-  partSource  String?
-  description String
-  quantity    Float    @default(1)
-  rate        Float    @default(0)
-  amount      Float    @default(0)
+  partSource       String?
+  description      String
+  quantity         Decimal         @default(1) @db.Decimal(12, 2)
+  rate             Decimal         @default(0) @db.Decimal(18, 2)
+  amount           Decimal         @default(0) @db.Decimal(18, 2)
+  /// Who pays: from the warranty check (finding item payer); CUSTOMER when nobody decided otherwise.
+  payer            FindingPayer    @default(CUSTOMER)
+  /// The customer's answer for a customer-pay line on this revision. Null until decided; other payers stay null.
+  customerDecision LineDecision?
+  /// The diagnosed item this line was drafted from. Null for lines the advisor added.
+  findingItemId    String?
+  findingItem      JobFindingItem? @relation(fields: [findingItemId], references: [id], onDelete: SetNull)
+  /// The customer request (complaint) the line answers, for the customer's view grouped by request.
+  complaintId      String?
+  complaint        JobComplaint?   @relation(fields: [complaintId], references: [id], onDelete: SetNull)
+  sortOrder        Int             @default(0)
 
   @@index([estimateId])
+  @@index([findingItemId])
+}
+
+/// A customer's answer to one estimate line.
+enum LineDecision {
+  APPROVED
+  DECLINED
+}
+
+/// Why a job may start work without an advance (terms: cashier records the advance).
+enum AdvanceExemption {
+  WARRANTY_ONLY
+  FREE_SERVICE
+  CAMPAIGN
+  INTERNAL
+  CREDIT_APPROVED
+}
+
+enum EstimationChargeStatus {
+  ADDED
+  WAIVER_REQUESTED
+  WAIVED
+}
+
+/// Terms clause 4: the customer declined all work, so the estimation charge is billed unless a
+/// manager waives it. One per job; it follows the latest fully declined revision.
+model EstimationCharge {
+  id                  String                 @id @default(uuid())
+  jobCardId           String                 @unique
+  jobCard             JobCard                @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  estimateId          String                 @unique
+  estimate            Estimate               @relation(fields: [estimateId], references: [id], onDelete: Restrict)
+  amount              Decimal                @db.Decimal(18, 2)
+  status              EstimationChargeStatus
+  createdById         String
+  createdBy           User                   @relation("EstimationChargeCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  waiverReason        String?
+  waiverRequestedById String?
+  waiverRequestedBy   User?                  @relation("EstimationChargeWaiverRequestedBy", fields: [waiverRequestedById], references: [id], onDelete: SetNull)
+  waiverRequestedAt   DateTime?
+  decidedById         String?
+  decidedBy           User?                  @relation("EstimationChargeDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt           DateTime?
+  decisionNote        String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+}
+
+enum JobPartsRequestStatus {
+  SENT
+  FAILED
+}
+
+/// The store request made automatically from an approved estimate revision's customer-approved and
+/// other-payer part lines. One per revision; a retry reuses it, so the store is told once.
+model JobPartsRequest {
+  id          String                @id @default(uuid())
+  jobCardId   String
+  jobCard     JobCard               @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  estimateId  String                @unique
+  estimate    Estimate              @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  /// Part lines requested: [{ sparePartId, description, quantity }]. Stock is not touched.
+  lines       Json
+  itemCount   Int
+  status      JobPartsRequestStatus
+  /// Why the last attempt failed, in plain words.
+  failure     String?
+  attempts    Int                   @default(1)
+  sentAt      DateTime?
+  createdById String
+  createdBy   User                  @relation("JobPartsRequestCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([jobCardId])
 }
 
 model VehicleCatalogMake {
@@ -4564,8 +4685,12 @@ model EstimateSignature {
   capturedBy       User?            @relation(fields: [capturedByUserId], references: [id], onDelete: Restrict)
   deviceOrIp       String
   estimateVersion  Int
-  totalSigned      Float
+  totalSigned      Decimal          @db.Decimal(18, 2)
   contentHash      String
+  /// 1: the original hash (all lines, no decisions). 2: the staged estimate hash with payers, line decisions and VAT.
+  hashVersion      Int              @default(1)
+  /// A representative's phone number. Null for the owner and older signatures.
+  signerPhone      String?
   signedAt         DateTime         @default(now())
   channel          String           @default("COUNTER")
   consentStatement String?
@@ -4741,9 +4866,13 @@ model BranchSettings {
   booksClosedUpTo DateTime? @db.Date
 
   // Billing
-  labourVatPercent Float @default(7.5)
+  labourVatPercent        Float   @default(7.5)
   // Job bills are rounded down to a multiple of this (legacy RoundOffValue).
-  roundOffValue    Int   @default(10)
+  roundOffValue           Int     @default(10)
+  /// Terms clause 4: when the customer declines all work, the larger of this amount and
+  /// estimationChargePercent of the estimate's customer total is proposed.
+  estimationChargeMinimum Decimal @default(25000) @db.Decimal(18, 2)
+  estimationChargePercent Decimal @default(10) @db.Decimal(5, 2)
 
   // Workshop rules. A job is a repeat when it is within either limit of the vehicle's last billed job.
   repeatWindowDays Int     @default(15)
@@ -5367,23 +5496,24 @@ model JobFinding {
 
 /// Work or a part the technician says is needed. No prices: the estimate prices them later.
 model JobFindingItem {
-  id          String             @id @default(uuid())
-  findingId   String
-  finding     JobFinding         @relation(fields: [findingId], references: [id], onDelete: Cascade)
-  kind        JobFindingItemKind
+  id            String             @id @default(uuid())
+  findingId     String
+  finding       JobFinding         @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  kind          JobFindingItemKind
   /// LabourItem id for LABOUR, SparePart id for PART and OIL.
-  referenceId String
-  description String
-  quantity    Decimal            @db.Decimal(12, 2)
-  sortOrder   Int
+  referenceId   String
+  description   String
+  quantity      Decimal            @db.Decimal(12, 2)
+  sortOrder     Int
   /// Who pays, decided by the warranty officer at the warranty check. Null until decided.
-  payer       FindingPayer?
-  decidedById String?
-  decidedBy   User?              @relation("FindingItemDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
-  decidedAt   DateTime?
+  payer         FindingPayer?
+  decidedById   String?
+  decidedBy     User?              @relation("FindingItemDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt     DateTime?
   /// CAMPAIGN only: the linked campaign that pays.
-  campaignId  String?
-  campaign    Campaign?          @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignId    String?
+  campaign      Campaign?          @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  estimateLines EstimateLine[]
 
   @@index([findingId, sortOrder])
 }

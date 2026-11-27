@@ -8,7 +8,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from "../../shared/errors/appError";
-import { assertDepositPaid } from "./job-deposit.service";
+import { assertAdvanceOrExempt } from "./job-deposit.service";
 import { assertSignedJobOpening } from "./job-opening-signature.service";
 import { assertApprovedOperation } from "./estimate-approval";
 import { JobCardWorkflowService } from "./job-card-workflow.service";
@@ -16,6 +16,7 @@ import { loadCheckInGates } from "./job-check-in.service";
 import { canWorkDiagnosis, diagnosisRoute, diagnosisSubStep } from "./job-diagnosis.logic";
 import { applyDiagnosisAction, diagnosisEventNote, loadDiagnosisFacts } from "./job-diagnosis.service";
 import { applyWarrantyHandoff, loadWarrantyFacts } from "./job-warranty.service";
+import { loadEstimateStageFacts, vehicleDeclinedItems } from "./job-estimate.service";
 import { moveStage } from "./job-stage.writer";
 import {
   ACTION_RULES,
@@ -86,11 +87,12 @@ async function stageFacts(tx: Prisma.TransactionClient, job: WorkspaceJob, now: 
   const checkInGates = job.stage === "CHECK_IN" ? await loadCheckInGates(tx, job.id, now) : null;
   const diagnosis = job.stage === "DIAGNOSIS" ? await loadDiagnosisFacts(tx, job.id) : null;
   const warrantyProblems = job.stage === "WARRANTY" && job.jobType !== JobCardType.PDI ? await loadWarrantyFacts(tx, job.id) : [];
+  const estimate = job.stage === "ESTIMATE" && job.jobType !== JobCardType.PDI ? await loadEstimateStageFacts(tx, job.id) : null;
   const [openingSignatureProblem, approvalProblem, depositProblem] = gated
     ? await Promise.all([
         job.openingSignatureRequired ? gateProblem(() => assertSignedJobOpening(tx, job.id)) : null,
         gateProblem(() => assertApprovedOperation(tx, job.id, job.customerId, [])),
-        gateProblem(() => assertDepositPaid(tx, job.id)),
+        gateProblem(() => assertAdvanceOrExempt(tx, job.id)),
       ])
     : [null, null, null];
   return {
@@ -119,6 +121,7 @@ async function stageFacts(tx: Prisma.TransactionClient, job: WorkspaceJob, now: 
       [...job.invoices, ...job.consolidatedInvoices].some((invoice) => ACTIVE_INVOICE(invoice.status)),
     creditApproved: !!job.creditApprovedById,
     unansweredCampaigns: job.campaigns.filter((campaign) => campaign.attended === null).length,
+    estimate,
   };
 }
 
@@ -203,6 +206,8 @@ export class JobStageService {
             note: event.note,
           })),
           previousVisits: await previousVisits(tx, job),
+          // Recommended work the customer declined on earlier visits (Visit history tab, check-in).
+          declinedItems: job.vehicleId ? await vehicleDeclinedItems(tx, job.vehicleId, job.id) : [],
         };
       },
       { maxWait: 5000, timeout: 15000 },

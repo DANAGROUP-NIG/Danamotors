@@ -1,33 +1,45 @@
 import { jobScope } from "../reports/report.repository";
 import prisma from '../../prisma/client';
 import {
+  Prisma,
   Vehicle,
   JobCard,
   ServiceAppointment,
   Invoice,
+  type FindingPayer,
+  type LineDecision,
 } from '@prisma/client';
+
+/** The estimate fields the portal needs to work out what the customer pays (lines, decisions, VAT). */
+type PortalEstimateLines = { vatRate: Prisma.Decimal; lines: { payer: FindingPayer; amount: Prisma.Decimal; customerDecision: LineDecision | null }[] };
 
 export type VehicleWithJobs = Vehicle & {
   images: { id: string; url: string; type: string | null }[];
-  jobCards: JobCard[];
+  jobCards: (JobCard & { estimates: PortalEstimateLines[] })[];
 };
 
 export type JobCardWithRelations = JobCard & {
   vehicle: { id: string; make: string | null; model: string | null; year: number | null; registrationNumber: string | null } | null;
   branch: { id: string; name: string };
-  estimates: {
+  estimates: (PortalEstimateLines & {
     id: string;
     description: string;
-    amount: number;
+    amount: Prisma.Decimal;
     currency: string;
     status: string;
     createdAt: Date;
     approvals: { id: string; approved: boolean | null; decisionDate: Date | null; comments: string | null; status: string }[];
-  }[];
+  })[];
   consolidatedInvoices?: { id: string; invoiceNumber: string; status: string; total: number; issuedDate: Date }[];
   invoices: { id: string; invoiceNumber: string; status: string; total: number; issuedDate: Date }[];
   inspections: { id: string; findings: string; status: string; passed: boolean | null }[];
 };
+
+const PORTAL_LATEST_ESTIMATE = {
+  orderBy: [{ version: 'desc' }, { createdAt: 'desc' }],
+  take: 1,
+  select: { vatRate: true, lines: { select: { payer: true, amount: true, customerDecision: true } } },
+} satisfies Prisma.EstimateFindManyArgs;
 
 export class PortalRepository {
   async findCustomerProfile(customerId: string) {
@@ -45,7 +57,7 @@ export class PortalRepository {
       orderBy: { createdAt: 'desc' },
       include: {
         images: { select: { id: true, url: true, type: true } },
-        jobCards: { where:jobScope({}), orderBy: { createdAt: 'desc' } },
+        jobCards: { where: jobScope({}), orderBy: { createdAt: 'desc' }, include: { estimates: PORTAL_LATEST_ESTIMATE } },
       },
     }) as Promise<VehicleWithJobs[]>;
   }
@@ -55,7 +67,7 @@ export class PortalRepository {
       where: { id: vehicleId, customerId },
       include: {
         images: { select: { id: true, url: true, type: true } },
-        jobCards: { where:jobScope({}), orderBy: { createdAt: 'desc' } },
+        jobCards: { where: jobScope({}), orderBy: { createdAt: 'desc' }, include: { estimates: PORTAL_LATEST_ESTIMATE } },
       },
     }) as Promise<VehicleWithJobs | null>;
   }
@@ -84,6 +96,7 @@ export class PortalRepository {
         estimates: {
           orderBy: { createdAt: 'desc' },
           include: {
+            lines: { select: { payer: true, amount: true, customerDecision: true } },
             approvals: {
               select: {
                 id: true,
@@ -135,6 +148,7 @@ export class PortalRepository {
         estimates: {
           orderBy: { createdAt: 'desc' },
           include: {
+            lines: { select: { payer: true, amount: true, customerDecision: true } },
             approvals: {
               select: {
                 id: true,

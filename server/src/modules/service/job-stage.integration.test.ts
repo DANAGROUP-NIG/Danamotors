@@ -232,7 +232,7 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
 
     const noAdvance = await job('ESTIMATE', 'OPEN');
     await db.receipt.deleteMany({ where: { advanceJobCardId: noAdvance.id } });
-    await expect(act(noAdvance.id, 'RELEASE_TO_REPAIR', 'advisor')).rejects.toHaveProperty('details.reasons', ['Record a positive advance payment before starting work']);
+    await expect(act(noAdvance.id, 'RELEASE_TO_REPAIR', 'advisor')).rejects.toHaveProperty('details.reasons', ['Ask the cashier to record the advance before work starts']);
     await expectAt(noAdvance.id, 'ESTIMATE', 'OPEN');
 
     const repair = await job('REPAIR', 'IN_PROGRESS');

@@ -289,7 +289,13 @@ export class ServiceDocumentService {
             remarks: estimate.remarks,
           },
           vehicle,
-          ...projectPickingLines(estimate.lines, parts),
+          // The store picks what the customer approved (declined lines stay off the list).
+          ...projectPickingLines(
+            estimate.lines
+              .filter((line) => line.customerDecision !== "DECLINED")
+              .map((line) => ({ ...line, quantity: line.quantity.toNumber(), rate: line.rate.toNumber(), amount: line.amount.toNumber() })),
+            parts,
+          ),
           printedAt: new Date().toISOString(),
           timeZone: "Africa/Lagos",
         };

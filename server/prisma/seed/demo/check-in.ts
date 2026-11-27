@@ -77,7 +77,7 @@ async function recordWalkAround(fx: JobFixture, jobCardId: string, advisorId: st
         mileage: job.mileage,
         serviceTypeId: job.serviceTypeId,
         promisedAt: job.promisedAt?.toISOString(),
-        complaints: job.complaints.map((row) => ({ description: row.description, complaintCodeId: row.complaintCodeId, spare: row.spare, oil: row.oil, labour: row.labour })),
+        complaints: job.complaints.map((row) => ({ description: row.description, complaintCodeId: row.complaintCodeId, spare: Number(row.spare), oil: Number(row.oil), labour: Number(row.labour) })),
         instructionsToTechnician: `Check each customer request: ${fx.complaints.join("; ")}.`,
       },
       actor,

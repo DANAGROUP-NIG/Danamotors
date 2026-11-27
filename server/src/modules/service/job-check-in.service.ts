@@ -1,7 +1,6 @@
 import { JobCardType, Prisma } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../shared/errors/appError";
-import { sumMoney } from "../finance/money";
 import { ServiceTypeService } from "../workshop/service-type.service";
 import { resolveJobComplaints, withOrderedIds } from "./job-card-complaints";
 import {
@@ -44,9 +43,6 @@ const editJob = {
   serviceTypeId: true,
   promisedAt: true,
   serviceCharge: true,
-  estimatedParts: true,
-  estimatedOil: true,
-  estimatedLabour: true,
   warrantySnapshot: true,
 } satisfies Prisma.JobCardSelect;
 type EditJob = Prisma.JobCardGetPayload<{ select: typeof editJob }>;
@@ -241,11 +237,8 @@ export class JobCheckInService {
             throw error;
           }
           // The service charge follows the service type, as at opening.
-          // TODO(confirm): JobCard.serviceCharge and the opening estimate move to Decimal with the estimate in phase 5.
-          const serviceCharge = option.serviceCharge ?? null;
           data.serviceTypeId = body.serviceTypeId;
-          data.serviceCharge = serviceCharge;
-          data.estimatedCost = sumMoney([job.estimatedParts ?? 0, job.estimatedOil ?? 0, job.estimatedLabour ?? 0, serviceCharge ?? 0]);
+          data.serviceCharge = option.serviceCharge ?? null;
           changed.push("serviceTypeId");
         }
 

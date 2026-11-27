@@ -1,30 +1,36 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
-import { ROLES } from '../../shared/constants/roles';
 import { BadRequestError, NotFoundError } from '../../shared/errors/appError';
-import { enqueueWorkshopNotification } from '../notification/workshop-notification-outbox';
+import { branchStoreRecipients, enqueueWorkshopNotification } from '../notification/workshop-notification-outbox';
 import { canonicalNotificationStatus } from '../notification/jobcard-notification-policy';
 
-/** Notification only: no requisition, part issuance or lifecycle mutation. */
+/** The branch store staff who receive a parts request (the actor is left out). */
+export function branchStoreManagers(tx: Prisma.TransactionClient, branchId: string, actorId: string) {
+  return branchStoreRecipients(tx, branchId, actorId || undefined);
+}
+
+/**
+ * Tells the branch store that this job needs parts. Notification only: no requisition, part issuance
+ * or stock change. Call while holding the job row lock. The occurrence makes it idempotent: the same
+ * occurrence (a client request ID, or an estimate revision) is announced once.
+ */
+export async function notifyStoreOfParts(tx: Prisma.TransactionClient, jobCardId: string, branchId: string, actorId: string, occurrence: string) {
+  const card = await tx.jobCard.findFirst({ where: { id: jobCardId, branchId }, include: { customer: true, vehicle: true } });
+  if (!card) throw new NotFoundError('Job card not found');
+  if (card.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalNotificationStatus(card.status)))
+    throw new BadRequestError('Parts cannot be requested for a billed or closed job card');
+  // This targets this branch only; the separate requisition notification keeps its GeneralStoreManager recipients.
+  const recipients = await branchStoreManagers(tx, card.branchId, actorId);
+  if (!recipients.length) throw new BadRequestError('No store manager is active in this branch. Ask an administrator to add one, then retry the parts request.');
+  await enqueueWorkshopNotification(tx, 'PART_REQUESTED', card, occurrence, actorId, true);
+  await tx.jobCard.update({ where: { id: card.id }, data: { partsRequestedAt: card.partsRequestedAt ?? new Date() } });
+  return recipients;
+}
+
+/** The "Request part" button: a client request ID makes a double click send one notice. */
 export async function requestJobcardParts(jobCardId: string, branchId: string, actorId: string, requestId: string) {
   await prisma.$transaction(async tx => {
     await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobCardId} AND "branchId" = ${branchId} FOR UPDATE`);
-    const card = await tx.jobCard.findFirst({
-      where: { id: jobCardId, branchId },
-      include: { customer: true, vehicle: true },
-  });
-  if (!card) throw new NotFoundError('Job card not found');
-  if (card.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalNotificationStatus(card.status))) {
-    throw new BadRequestError('Parts cannot be requested for a billed or closed job card');
-  }
-  // This button targets this branch only; the separate requisition notification
-  // retains its existing GeneralStoreManager recipients.
-  const recipients = await tx.user.findMany({
-    where: { branchId: card.branchId, isActive: true, role: { name: ROLES.BRANCH_STORE_MANAGER }, id: { not: actorId } },
-    select: { id: true },
-  });
-  if (!recipients.length) throw new BadRequestError('No other active Store Manager is available in this branch');
-  await enqueueWorkshopNotification(tx, 'PART_REQUESTED', card, `button:${requestId}`, actorId, true);
-  await tx.jobCard.update({ where: { id: card.id }, data: { partsRequestedAt: card.partsRequestedAt ?? new Date() } });
+    await notifyStoreOfParts(tx, jobCardId, branchId, actorId, `button:${requestId}`);
   });
 }

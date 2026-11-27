@@ -19,7 +19,8 @@ import { useVehicleWarranty } from "@/features/warranty/hooks/use-warranty";
 import { WarrantyCoverageCard } from "@/features/warranty/components/WarrantyCoverageCard";
 import { OpenCampaignsCard } from "@/features/warranty/components/OpenCampaignsCard";
 import { FilterPills, PageState, Pill, SectionCard, tdCls, thCls } from "@/features/warranty/components/ui";
-import { COVERAGE_LABELS, COVERAGE_TONES, fmtDate, fmtKm, fmtNaira } from "@/features/warranty/lib/warranty-format";
+import { COVERAGE_LABELS, COVERAGE_TONES, fmtDate, fmtKm } from "@/features/warranty/lib/warranty-format";
+import { NOT_PROVIDED } from "@/lib/format";
 
 type HistoryFilter = "" | "warranty" | "customer" | "repeat";
 
@@ -155,7 +156,6 @@ export default function VehicleDetailPage() {
                   <th className={thCls}>Mileage</th>
                   <th className={thCls}>Warranty at creation</th>
                   <th className={thCls}>Status</th>
-                  <th className={`${thCls} text-right`}>Est. cost (₦)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -173,13 +173,12 @@ export default function VehicleDetailPage() {
                       {j.warrantyStatusAtCreation ? (
                         <Pill status={COVERAGE_LABELS[j.warrantyStatusAtCreation]} tone={COVERAGE_TONES[j.warrantyStatusAtCreation]} />
                       ) : (
-                        <span className="text-slate-300">—</span>
+                        <span className="text-muted-foreground">{NOT_PROVIDED}</span>
                       )}
                     </td>
                     <td className={tdCls}>
                       <Pill status={String(j.status).replace(/_/g, " ")} tone="gray" className="capitalize" />
                     </td>
-                    <td className={`${tdCls} text-right`}>{j.estimatedCost ? fmtNaira(j.estimatedCost) : "—"}</td>
                   </tr>
                 ))}
               </tbody>

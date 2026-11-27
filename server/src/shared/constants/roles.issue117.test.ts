@@ -26,6 +26,8 @@ const cases: [string, string[]][] = [
     [
       P.JOBCARD_CREATE,
       P.JOBLABOUR_UPDATE,
+      // Phase 5: the advisor prepares and edits the staged estimate.
+      P.ESTIMATE_CREATE,
       P.ESTIMATE_REVISE,
       P.ESTIMATE_PRINT,
       P.ESTIMATE_SIGN,
@@ -39,6 +41,8 @@ const cases: [string, string[]][] = [
       P.JOBCARD_CREATE,
       P.JOBCARD_UPDATE,
       P.JOBLABOUR_UPDATE,
+      // Phase 5: the advisor prepares and edits the staged estimate.
+      P.ESTIMATE_CREATE,
       P.ESTIMATE_REVISE,
       P.ESTIMATE_PRINT,
       P.ESTIMATE_SIGN,

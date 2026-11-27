@@ -38,7 +38,7 @@ export async function history(input: ReportInput): Promise<ReportResult> {
         sections.push({ title: 'Parts and oil', rows: lines.filter(l => l.kind === 'PART'), totals: totals(lines.filter(l => l.kind === 'PART'), ['amount']), pageBreak: true });
     if (input.labour === 'true') {
         const labour = lines.filter(l => l.kind === 'LABOUR');
-        const charges = jobs.filter(j => j.serviceCharge != null).map(j => ({ jobNumber: j.jobNumber, description: 'Service charge', amount: j.serviceCharge! }));
+        const charges = jobs.filter(j => j.serviceCharge != null).map(j => ({ jobNumber: j.jobNumber, description: 'Service charge', amount: Number(j.serviceCharge) }));
         sections.push({ title: 'Labour and service charges', rows: [...labour, ...charges], totals: totals([...labour, ...charges], ['amount']), pageBreak: true });
     }
     sections.push({ title: 'Expenses by service type', rows: groups(expenses, 'serviceType', ['amount']).map(g => ({ serviceType: g.title, ...g.totals })), totals: totals(expenses, ['amount']), pageBreak: true });

@@ -1,9 +1,13 @@
 import {
+  approvedCustomerTotal,
   signatureState,
   type SignedContent,
   type SignatureEvidence,
 } from "./estimate-signature";
 import { upfrontAmount } from "./estimate-advance";
+import { estimateTotals } from "./job-estimate.logic";
+
+const num = (value: number | { toString(): string }) => Number(String(value));
 type PrintEstimate = SignedContent & {
   id: string;
   estimateNumber: string | null;
@@ -17,6 +21,12 @@ type PrintEstimate = SignedContent & {
     approved: boolean | null;
     signatureRequired: boolean;
     overrideReason: string | null;
+    channel?: string;
+    approverName?: string | null;
+    approverPhone?: string | null;
+    approvedAt?: Date | null;
+    signatureDueAtDelivery?: boolean;
+    contentHash?: string | null;
     signature:
       | (SignatureEvidence & {
           consentStatement?: string | null;
@@ -37,30 +47,49 @@ export function projectEstimatePrint(
     estimate.approvals.find((a) => a.signature) ?? estimate.approvals[0];
   const state = approval ? signatureState(estimate, approval) : null;
   const signature = approval?.signature;
+  const lines = estimate.lines.map((line) => ({ ...line, payer: line.payer ?? "CUSTOMER", customerDecision: line.customerDecision ?? null }));
+  const totals = estimateTotals(
+    lines.map((line) => ({ payer: line.payer, amount: String(line.amount), customerDecision: line.customerDecision })),
+    String(estimate.vatRate ?? 7.5),
+  );
   return {
     id: estimate.id,
     version: estimate.version ?? 1,
     estimateNumber: estimate.estimateNumber,
     estimateDate: estimate.estimateDate ?? estimate.createdAt,
     currency: estimate.currency ?? "NGN",
-    total: estimate.amount,
+    total: num(estimate.amount),
+    vatRate: num(estimate.vatRate ?? 7.5),
+    totals: {
+      customerSubtotal: Number(totals.customerSubtotal),
+      vat: Number(totals.vat),
+      customerTotal: Number(totals.customerTotal),
+      otherPayerTotal: Number(totals.otherPayerTotal),
+      approvedTotal: Number(totals.approvedTotal),
+    },
     supersededBy: estimate.successor?.version ?? null,
     customerRemarks: estimate.customerRemarks ?? null,
     upfrontPaymentPercent: Number(estimate.upfrontPaymentPercent ?? 60),
     upfrontAmount: upfrontAmount(
-      estimate.amount,
-      Number(estimate.upfrontPaymentPercent ?? 60),
+      Number(approvedCustomerTotal(estimate)),
+      Number(String(estimate.upfrontPaymentPercent ?? 60)),
     ),
-    lines: estimate.lines
+    lines: lines
       .filter((line) => line.type !== "COMPLAINT")
       .map((line) => ({
         type: line.type.replace("INCLUDED_", ""),
         code: codes.get(line.referenceId ?? "") ?? "",
         description: line.description,
-        quantity: line.quantity,
-        rate: line.rate,
-        amount: line.amount,
+        quantity: num(line.quantity),
+        rate: num(line.rate),
+        amount: num(line.amount),
+        payer: line.payer,
+        customerDecision: line.customerDecision,
       })),
+    phoneApproval:
+      approval?.channel === "PHONE"
+        ? { approverName: approval.approverName ?? null, approverPhone: approval.approverPhone ?? null, approvedAt: approval.approvedAt ?? null, signatureDueAtDelivery: !!approval.signatureDueAtDelivery }
+        : null,
     signatureState: state,
     signature: signature
       ? {
@@ -70,7 +99,7 @@ export function projectEstimatePrint(
           consentStatement: signature.consentStatement,
           signedAt: signature.signedAt,
           estimateVersion: signature.estimateVersion,
-          totalSigned: signature.totalSigned,
+          totalSigned: num(signature.totalSigned),
         }
       : null,
   };

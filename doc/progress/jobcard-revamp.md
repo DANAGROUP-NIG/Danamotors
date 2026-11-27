@@ -195,3 +195,35 @@ Built on Jayking (no phase branch, at the owner's request).
 - Booking requests came back in random order (same creation time, random ids); they now get ascending ids like job card requests.
 - Stepper captions overlapped their neighbours instead of truncating.
 - A "—" fallback in Workshop masters; middle dot and ellipsis on the warranty settings page.
+
+## Phase 5: Estimate and approval (27 Nov 2026)
+
+Built on Jayking (no phase branch, at the owner's request).
+
+### Plan
+
+1. Data: estimate money to Decimal (with the JobCard service charge and the JobComplaint request amounts, which PDI still uses); payer, customer decision, finding and request on estimate lines; VAT rate and presented time on the estimate; phone approval fields and request ID on approvals; `EstimationCharge`, `JobPartsRequest`, advance exemption on the job; branch estimation charge settings; the four opening estimate totals on JobCard dropped in a separate migration.
+2. Server: pure `job-estimate.logic.ts` (totals and VAT, decisions, version 2 hash, estimation charge, advance requirement, inputs); `addEstimate` and `addApproval` reshaped, not forked (draft saved in place, decisions per line, phone channel, idempotent); `job-estimate.service.ts` and routes under `/service/job-cards/:id/estimate`; advance gate honours exemptions; `SEND_DECLINED_TO_BILLING` (OPEN to READY with the estimation charge only); parts request once per revision.
+3. Client: `lib/estimate.logic.ts` (same totals, tested on the same fixtures), `hooks/use-job-estimate.ts`, `components/estimate/` (EstimateStep, EstimatePrepare, CustomerApproval, PhoneApprovalDialog, DeclinedAll, AdvanceRelease, EstimateReadOnly, DeclinedItemsCard); old estimate, approval, signature and advance components deleted.
+4. Demo seed: JC-S19 to JC-S22.
+5. Tests: logic (server and client, shared fixtures), integration, updated unit tests, Playwright phase 5.
+
+### Status
+
+- [x] Migrations `20261127090000_jobcard_estimate_approval` (conversions and additions), `20261127090100_estimate_create_permission`, `20261127090200_jobcard_drop_opening_estimate`. Checked on a copy of the phase 4 demo database: totals identical before and after (estimates 1,061,100.00, request amounts 102,000.00).
+- [x] Server, client, demo seed, docs (`doc/job-cards.md` "Estimate and approval (phase 5)", `doc/demo-data.md`), manual test guide `doc/testing/jobcard-revamp/phase-5-manual-test.md`.
+- [x] Server database (27 Nov 2026, owner's decision): `20261127090000` and `20261127090100` applied from a copy of the migrations folder without the held drops. **Pending:** `20261127090200_jobcard_drop_opening_estimate` (and phase 3's `20261126125424_jobcard_drop_observations`), held until other branches stop reading those columns. The demo seed was run there (JC-S19 onwards).
+
+### Tests (27 Nov 2026)
+
+- Server: new logic tests 30 (totals and VAT on the shared fixtures, decisions, version 2 hash and signature states, estimation charge, advance requirement, inputs) and integration 4 (prepare, draft save and stale save, payer lock, present, partial approval with signature and idempotent retry, parts request once with no stock change, declined items for the next visit, advance gate and notify cashier, release to IN_PROGRESS; all declined with waiver request, manager decline and billing with the charge only; phone approval for a warranty-only job with a failed then retried parts request; manager exemption). Touched modules (service, finance, PDI, portal, requisition, notification, settings, reports, warranty, shared, middleware) on a local test database: 1,505 passed, 66 failed, 8 skipped (1,579). The 66 failures are in 9 old integration suites with the known causes: vehicles without a model (booking, labour slip, service documents, workshop, part source), negative line amounts and synthetic audit-trigger failures (requisition, return slip), a busy-database retry (party account), the Jest dynamic-import limit, and the 2 warranty tests without an advance that also fail on the base commit. Typecheck clean, including the seed folder.
+- Client: 142 of 143 (`issue117-components` bill heads test, missing `BillHeads`, as before). New `test/estimate.test.mjs` (13, including parity with the server fixtures). Typecheck clean, lint 0 errors (74 old warnings), production build passes.
+- Browser (Playwright): phase 5 suite 8 of 8 (prepare and present with quantity errors, tablet approval with a decline and every signer error, the cashier's receipt and release to Repair, phone approval with outside click and Esc, all declined with the waiver declined by the service manager and Send to billing, free service with warranty repair and offline save, read-only and refused technician, 390 and 1024 px with the bar fully visible). Phases 4 and 5 together: phase 4 11 of 11. All phases in one run: 65 passed; phase 4 J failed only because phase 2 had moved KJA-482TX on first (passes alone).
+
+### Found and fixed in passing
+
+- The job bill's service charge line read "Full service ? service charge" (a lost dash): now "Full service, service charge".
+- The advance receipt dialog closed on an outside click and said "Saving receipt...".
+- Steps that draw their own bar (check-in, diagnosis, warranty, estimate): on a phone the bar's second row sat under the bottom menu until you scrolled. The step section no longer limits the sticky bar.
+- The customer and vehicle pages showed an "Est. cost" column that was never filled ("—" or "$"); removed with the old opening estimate.
+- Service advisors and service managers had no `estimate:create`, so they could not create estimates from the old screen either.

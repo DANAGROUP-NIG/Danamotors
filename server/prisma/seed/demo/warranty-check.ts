@@ -15,7 +15,7 @@ import { ROLES } from "../../../src/shared/constants/roles";
 import { CampaignService } from "../../../src/modules/campaign/campaign.service";
 import { JobWarrantyService } from "../../../src/modules/service/job-warranty.service";
 import { DemoContext, Reference } from "./context";
-import { CAMPAIGNS, DEMO_TAG, jobKey, VEHICLES, type VehicleKey } from "./fixtures";
+import { CAMPAIGNS, DEMO_TAG, jobKey, LABOUR, PARTS, VEHICLES, type FindingFixture, type LabourKey, type PartKey, type VehicleKey } from "./fixtures";
 import type { Parties } from "./parties";
 import { daysAgo } from "./retime";
 import { stageColumns } from "./stage";
@@ -99,13 +99,21 @@ export async function prepareWarrantyDemo(ctx: DemoContext, ref: Reference, part
 
 /**
  * A job passing through the warranty check on its way to the estimate: the warranty officer
- * decides customer pay for every item (nothing on these visits is warranty), as on screen.
+ * decides who pays for every item, as on screen. Items the fixture names are warranty; the rest
+ * are customer pay.
  */
-export async function decideCustomerPay(ctx: DemoContext, jobCardId: string) {
+export async function decideCustomerPay(ctx: DemoContext, jobCardId: string, findings: FindingFixture[] = []) {
   const officer = { id: ctx.warrantyOfficer.id, role: ROLES.WARRANTY_OFFICER };
   const access = { canUpdate: true, canDecide: true };
   const service = new JobWarrantyService();
+  // Items carry the catalogue description they were diagnosed with.
+  const warranty = new Set(
+    findings.flatMap((finding) => (finding.warranty ?? []).map((key) => (key in LABOUR ? LABOUR[key as LabourKey].description : PARTS[key as PartKey].name))),
+  );
   const check = await service.get(jobCardId, officer, access);
   const open = check.items.filter((item) => !item.payer);
-  if (open.length) await service.saveDecisions(jobCardId, { items: open.map((item) => ({ itemId: item.id, payer: "CUSTOMER" as const })) }, officer, access);
+  if (!open.length) return;
+  const items = open.map((item) => ({ itemId: item.id, payer: warranty.has(item.description) ? ("WARRANTY" as const) : ("CUSTOMER" as const) }));
+  const reason = items.some((item) => item.payer === "WARRANTY") ? { reason: "Vehicle is new; the first service is not due yet." } : {};
+  await service.saveDecisions(jobCardId, { items, ...reason }, officer, access);
 }

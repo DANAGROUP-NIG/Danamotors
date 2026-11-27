@@ -151,7 +151,7 @@ export async function ensureReference(ctx: DemoContext): Promise<Reference> {
   const bays = [bay.id];
   for (const code of ["A2", "A3", "A4"]) bays.push((await master("BAY", code, `Bay ${code}`, { category: "A" })).id);
   const serviceTypes = {} as Reference["serviceTypes"];
-  for (const code of ["RG", "RR"] as const) {
+  for (const code of ["RG", "RR", "1F"] as const) {
     const row = await prisma.workshopMaster.findFirst({ where: { kind: "SERVICE_TYPE", code, active: true } });
     if (!row) throw new Error(`Service type ${code} is missing or inactive.`);
     serviceTypes[code] = row.id;

@@ -42,17 +42,20 @@ export function pdiRegistrationFromVin(vin: string): string {
   return clean.slice(-6);
 }
 
-export type DefectAmounts = { spare?: number | null; oil?: number | null; labour?: number | null };
+/** Stored as Decimal; inputs and older callers pass numbers. */
+type Amount = number | { toNumber(): number } | null | undefined;
+export type DefectAmounts = { spare?: Amount; oil?: Amount; labour?: Amount };
+const amount = (value: Amount) => (value == null ? 0 : typeof value === 'number' ? value : value.toNumber());
 
 export function defectLineTotal(line: DefectAmounts): number {
-  return sumMoney([line.spare ?? 0, line.oil ?? 0, line.labour ?? 0]);
+  return sumMoney([amount(line.spare), amount(line.oil), amount(line.labour)]);
 }
 
 export function defectTotals(lines: DefectAmounts[]) {
   return {
-    spare: sumMoney(lines.map(line => line.spare ?? 0)),
-    oil: sumMoney(lines.map(line => line.oil ?? 0)),
-    labour: sumMoney(lines.map(line => line.labour ?? 0)),
+    spare: sumMoney(lines.map(line => amount(line.spare))),
+    oil: sumMoney(lines.map(line => amount(line.oil))),
+    labour: sumMoney(lines.map(line => amount(line.labour))),
     total: sumMoney(lines.map(defectLineTotal)),
   };
 }

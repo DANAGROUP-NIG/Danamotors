@@ -13,6 +13,8 @@ type Company = { name: string; tin: string | null; rcNumber: string | null; deal
 type BranchSettings = {
   labourVatPercent: number;
   roundOffValue: number;
+  estimationChargeMinimum: number;
+  estimationChargePercent: number;
   repeatWindowDays: number;
   repeatWindowKm: number | null;
   printRepeatBlock: boolean;
@@ -42,6 +44,14 @@ const NUMBER_GROUPS: { title: string; note: string; fields: [NumberKey, string, 
     fields: [
       ["labourVatPercent", "VAT on labour and service (%)", "0.01"],
       ["roundOffValue", "Round bills down to a multiple of (₦)", "1"],
+    ],
+  },
+  {
+    title: "Estimation charge",
+    note: "Terms clause 4. When a customer declines all the work on an estimate, the larger of these two is proposed as the estimation charge. A manager can waive it with a reason.",
+    fields: [
+      ["estimationChargeMinimum", "Minimum estimation charge (₦)", "0.01"],
+      ["estimationChargePercent", "Estimation charge, share of the estimate total (%)", "0.01"],
     ],
   },
   {

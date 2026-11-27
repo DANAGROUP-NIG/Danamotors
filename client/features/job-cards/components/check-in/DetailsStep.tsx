@@ -23,6 +23,8 @@ import { OpeningDatePicker, OpeningField, OpeningTimePicker, openingInput } from
 import { ServiceTypePicker } from "../ServiceTypePicker";
 import { WorkshopPicker, customerLabel, customerOption, type PickerRecord } from "../WorkshopPicker";
 import { DetailList, StageCard } from "../workspace/StageCard";
+import type { DeclinedItem } from "../../types/job-estimate.types";
+import { DeclinedItemsCard } from "../estimate/DeclinedItemsCard";
 
 /**
  * Check-in Details: who and what, the visit details, the customer's requests and the
@@ -33,6 +35,7 @@ export function DetailsStep({
   job,
   checkIn,
   lastVisit,
+  declinedItems,
   editable,
   onSubmit,
   serverErrors,
@@ -42,6 +45,8 @@ export function DetailsStep({
   job: JobCard;
   checkIn: JobCheckIn;
   lastVisit: PreviousVisit | null;
+  /** Recommended work the customer declined on earlier visits, to offer again. */
+  declinedItems: DeclinedItem[];
   editable: boolean;
   onSubmit: (values: DetailsValues) => void;
   /** Field errors from the last save, shown beside their fields. */
@@ -72,6 +77,7 @@ export function DetailsStep({
 
   return (
     <div className="space-y-4">
+      {declinedItems.length > 0 && <DeclinedItemsCard items={declinedItems} description="The customer declined this work on an earlier visit. Ask whether they want it done this time." />}
       {alerts.length > 0 && (
         <ul className="space-y-2" aria-label="Notes for this visit">
           {alerts.map((alert) => {

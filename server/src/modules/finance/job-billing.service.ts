@@ -26,10 +26,11 @@ import { nextDocumentNumber } from "./document-number";
 import { lineAmount, money, sumMoney } from "./money";
 import { applyJobAdvances } from "./job-advance";
 import { lockParty } from "./party-account.service";
-import { assertJobBillingReady, BILLABLE_STATUSES } from "./job-billing.logic";
+import { assertJobBillingReady, BILLABLE_STATUSES, QC_NOT_REQUIRED } from "./job-billing.logic";
 
 const JOB_BILL_INCLUDE = {
   estimates: latestEstimateQuery,
+  estimationCharge: { select: { id: true, status: true, amount: true } },
   customer: true,
   serviceType: true,
   service: { select: { name: true } },
@@ -82,6 +83,21 @@ const JOB_BILL_INCLUDE = {
 
 function isActiveBillStatus(status: string) {
   return !["CANCELLED", "CANCELED", "VOID"].includes(status.toUpperCase());
+}
+
+export const ESTIMATION_CHARGE_DESCRIPTION = "Estimation charge (terms clause 4)";
+
+/** The review shape for a bill that is only the estimation charge: nothing approved, nothing to exceed. */
+function estimationChargeReview(estimateId: string | null, lines: { type: string; referenceId?: string | null; description: string; quantity: number; amount: number }[]) {
+  return {
+    estimateId,
+    status: "Declined",
+    canBill: true,
+    issues: [] as string[],
+    rows: lines.map((line) => ({ type: line.type, referenceId: line.referenceId ?? null, partSource: null, description: line.description, approvedQuantity: 0, actualQuantity: line.quantity, approvedAmount: 0, actualAmount: line.amount, difference: line.amount, included: false, reason: null })),
+    approvedSubtotal: 0,
+    actualSubtotal: sumMoney(lines.map((line) => line.amount)),
+  };
 }
 
 export class JobBillingService {
@@ -174,7 +190,7 @@ export class JobBillingService {
   ) {
     if (jobCard.jobType === "PDI")
       throw new BadRequestError("PDI jobs are billed from the PDI menu");
-    assertJobBillingReady(jobCard);
+    assertJobBillingReady({ ...jobCard, estimationChargeAdded: jobCard.estimationCharge?.status === "ADDED" });
     if (
       jobCard.billedAt ||
       jobCard.invoices.some((invoice) => isActiveBillStatus(invoice.status))
@@ -188,6 +204,21 @@ export class JobBillingService {
   ) {
     // The customer pays a line unless the service type is company-paid or the line's
     // charge type (job card lines: warranty, campaign, goodwill, internal) says otherwise.
+    // The customer declined all work: the bill is the estimation charge alone (terms clause 4).
+    if (jobCard.estimationCharge?.status === "ADDED") {
+      const amount = money(Number(jobCard.estimationCharge.amount));
+      return [
+        {
+          type: "SERVICE" as const,
+          referenceId: jobCard.estimationCharge.id,
+          description: ESTIMATION_CHARGE_DESCRIPTION,
+          quantity: 1,
+          rate: amount,
+          amount,
+          customerPaid: true,
+        },
+      ];
+    }
     const companyPaid = jobCard.serviceType?.chargedTo === "COMPANY";
     const customerPays = (chargeLine: { chargeType: string } | null) =>
       !companyPaid && (chargeLine?.chargeType ?? "CUSTOMER") === "CUSTOMER";
@@ -252,11 +283,11 @@ export class JobBillingService {
               type: "SERVICE" as const,
               referenceId: serviceChargeReference(jobCard),
               description: jobCard.service?.name
-                ? `${jobCard.service.name} ? service charge`
+                ? `${jobCard.service.name}, service charge`
                 : serviceChargeDescription(jobCard),
               quantity: 1,
-              rate: money(jobCard.serviceCharge),
-              amount: money(jobCard.serviceCharge),
+              rate: money(Number(jobCard.serviceCharge)),
+              amount: money(Number(jobCard.serviceCharge)),
               customerPaid: !companyPaid,
             },
           ];
@@ -300,11 +331,14 @@ export class JobBillingService {
     const rawLines = this.getBillLines(jobCard).filter(
       (line) => line.customerPaid,
     );
-    const review = reviewApprovedScope(
-      jobCard.estimates?.[0],
-      rawLines,
-      jobCard.customerId ?? jobCard.appointment?.customerId,
-    );
+    // An estimation charge is billed on the declined estimate; there is no approved scope to compare.
+    const review = jobCard.estimationCharge?.status === "ADDED"
+      ? estimationChargeReview(jobCard.estimates?.[0]?.id ?? null, rawLines)
+      : reviewApprovedScope(
+          jobCard.estimates?.[0],
+          rawLines,
+          jobCard.customerId ?? jobCard.appointment?.customerId,
+        );
     const lines = rawLines.map((line) => {
       const row = review.rows.find(
         (row) => row.type === line.type && row.referenceId === line.referenceId,
@@ -333,7 +367,14 @@ export class JobBillingService {
         ],
         billedAt: null,
         jobType: "SERVICE",
-        qcStatus: { equals: "PASSED", mode: "insensitive" },
+        AND: [
+          {
+            OR: [
+              { qcStatus: { equals: "PASSED", mode: "insensitive" } },
+              { qcStatus: QC_NOT_REQUIRED, estimationCharge: { status: "ADDED" } },
+            ],
+          },
+        ],
         ...(branchId ? { branchId } : {}),
         invoices: {
           none: {

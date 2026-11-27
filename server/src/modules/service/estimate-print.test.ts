@@ -12,10 +12,12 @@ it("prints the decimal-rounded recommendation for the saved estimate revision", 
     status: "Pending",
     currency: "NGN",
     amount: 100.01,
+    // VAT 0 keeps the customer total at 100.01, so the advance is 60% of it.
+    vatRate: 0,
     upfrontPaymentPercent: new Prisma.Decimal(60),
     successor: null,
     approvals: [],
-    lines: [],
+    lines: [{ type: "PART", referenceId: "part", description: "Filter", quantity: 1, rate: 100.01, amount: 100.01 }],
   };
   expect(projectEstimatePrint(source, new Map())).toMatchObject({
     upfrontPaymentPercent: 60,

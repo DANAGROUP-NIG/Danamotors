@@ -984,6 +984,8 @@ const existingRolePermissions = {
     PERMISSIONS.ESTIMATE_REVISE,
     PERMISSIONS.ESTIMATE_PRINT,
     PERMISSIONS.ESTIMATE_SIGN,
+    // The advisor prepares and edits the staged estimate (job card revamp phase 5).
+    PERMISSIONS.ESTIMATE_CREATE,
     PERMISSIONS.JOBCARD_UPDATE,
     PERMISSIONS.FPC_VEHICLES_READ,
   ],
@@ -1038,6 +1040,8 @@ const existingRolePermissions = {
     PERMISSIONS.ESTIMATE_REVISE,
     PERMISSIONS.ESTIMATE_PRINT,
     PERMISSIONS.ESTIMATE_SIGN,
+    // The advisor prepares and edits the staged estimate (job card revamp phase 5).
+    PERMISSIONS.ESTIMATE_CREATE,
     PERMISSIONS.FPC_VEHICLES_READ,
     PERMISSIONS.FPC_ANALYSIS_READ,
   ],

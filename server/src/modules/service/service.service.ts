@@ -15,10 +15,19 @@ import {
   advanceReceiptDateLimit,
 } from "../finance/job-advance";
 import {
+  approvedCustomerTotal,
   assertSignaturePng,
   estimateContentHash,
   signatureState,
+  stagedContentHash,
 } from "./estimate-signature";
+import {
+  ESTIMATE_HASH_VERSION,
+  estimateOutcome,
+  estimateTotals,
+  resolveDecisions,
+  withDecisions,
+} from "./job-estimate.logic";
 import { planEstimateRevision } from "./estimate-revision";
 import { scopeJobCard } from "./job-card-visibility";
 import { nextDocumentNumber } from "../finance/document-number";
@@ -29,7 +38,7 @@ import {
   serviceChargeReference,
 } from "./job-service-charge";
 import { lineAmount, sumMoney } from "../finance/money";
-import { Prisma, WarrantyCoverageStatus } from "@prisma/client";
+import { Prisma, WarrantyCoverageStatus, type LineDecision } from "@prisma/client";
 import {
   canonicalJobStatus,
   jobStatusFilter,
@@ -770,6 +779,14 @@ export class ServiceService {
             receipt.advanceAmount >= 0.01 &&
             receipt.issuedAt <= advanceReceiptDateLimit(),
         ),
+        serviceCharge: card.serviceCharge == null ? null : Number(card.serviceCharge),
+        // Request amounts (PDI defects; booking estimates on service jobs) as numbers, as the screens send them back.
+        complaints: card.complaints.map((complaint) => ({
+          ...complaint,
+          spare: Number(complaint.spare),
+          oil: Number(complaint.oil),
+          labour: Number(complaint.labour),
+        })),
         advanceSummary: (() => {
           const advances = card.advanceReceipts.filter(
             (receipt) =>
@@ -791,7 +808,9 @@ export class ServiceService {
           );
           const total = bills.length
             ? sumMoney(bills.map((invoice) => invoice.total))
-            : (card.estimates[0]?.amount ?? 0);
+            : card.estimates[0]
+              ? Number(approvedCustomerTotal(card.estimates[0]))
+              : 0;
           const received = bills.length
             ? sumMoney(
                 bills.map((invoice) =>
@@ -824,17 +843,30 @@ export class ServiceService {
           role,
           actorId ? { actorId, technicianId: card.technicianId } : undefined,
         ),
+        // Money as numbers for the client; the staged estimate screens read GET /job-cards/:id/estimate.
         estimates: card.estimates.map((estimate) => ({
           ...estimate,
+          amount: estimate.amount.toNumber(),
+          customerTotal: Number(approvedCustomerTotal(estimate)),
+          vatRate: estimate.vatRate.toNumber(),
+          lines: estimate.lines.map((line) => ({
+            ...line,
+            quantity: line.quantity.toNumber(),
+            rate: line.rate.toNumber(),
+            amount: line.amount.toNumber(),
+          })),
           upfrontPaymentPercent:
             estimate.upfrontPaymentPercent?.toNumber() ?? 60,
           upfrontAmount: upfrontAmount(
-            estimate.amount,
+            Number(approvedCustomerTotal(estimate)),
             estimate.upfrontPaymentPercent ?? 60,
           ),
-          contentHash: estimateContentHash(estimate),
+          contentHash: stagedContentHash(estimate),
           approvals: estimate.approvals.map((approval) => ({
             ...approval,
+            signature: approval.signature
+              ? { ...approval.signature, totalSigned: approval.signature.totalSigned.toNumber() }
+              : approval.signature,
             signatureState: signatureState(estimate, approval),
           })),
         })),
@@ -883,11 +915,18 @@ export class ServiceService {
     });
   }
 
+  /**
+   * Creates the next estimate revision, or (draft: true) saves the undecided draft revision in place.
+   * Prices come from the catalogue: parts at retail rate, labour at the vehicle model's rate, the
+   * service charge by the existing rule. Each line keeps who pays (the warranty check's decision for
+   * diagnosed items) and the request it answers.
+   */
   async addEstimate(
     jobCardId: string,
     input: z.infer<typeof estimateBody>,
     actorId?: string,
     supersedesId?: string,
+    options: { draft?: { estimateId: string; updatedAt: Date } } = {},
   ) {
     const data = estimateBody.parse(input);
     return prisma.$transaction(
@@ -899,7 +938,7 @@ export class ServiceService {
         const card = await tx.jobCard.findUnique({
           where: { id: jobCardId },
           include: {
-            serviceType: { select: { description: true } },
+            serviceType: { select: { description: true, chargedTo: true } },
             vehicle: { include: { catalogue: true } },
           },
         });
@@ -913,6 +952,9 @@ export class ServiceService {
           throw new BadRequestError(
             "Estimates can only be added to unbilled jobs",
           );
+        // A service type the company pays for (free services) is not charged to the customer, as on the bill.
+        // TODO(confirm): free-service charge shown at zero on the customer's estimate.
+        const companyPaidService = card.serviceType?.chargedTo === "COMPANY";
         const billable = data.lines.filter((line) => line.type !== "COMPLAINT");
         // Each part record once: a used or local version of a part is its own record (source record).
         if (
@@ -949,8 +991,21 @@ export class ServiceService {
           throw new BadRequestError(
             "Package inclusions require the selected service line",
           );
+        // Who pays for a diagnosed item was decided at the warranty check; the estimate keeps it.
+        const itemIds = data.lines.flatMap((line) => (line.findingItemId ? [line.findingItemId] : []));
+        const items = itemIds.length
+          ? await tx.jobFindingItem.findMany({
+              where: { id: { in: itemIds }, finding: { jobCardId } },
+              select: { id: true, payer: true, finding: { select: { complaintId: true } } },
+            })
+          : [];
+        const itemMap = new Map(items.map((item) => [item.id, item]));
+        const complaintIds = data.lines.flatMap((line) => (line.complaintId ? [line.complaintId] : []));
+        const knownComplaints = complaintIds.length
+          ? new Set((await tx.jobComplaint.findMany({ where: { id: { in: complaintIds }, jobCardId }, select: { id: true } })).map((row) => row.id))
+          : new Set<string>();
         const lines = [];
-        for (const line of data.lines) {
+        for (const [index, line] of data.lines.entries()) {
           let description = line.description ?? "";
           let rate = 0;
           let quantity = line.quantity;
@@ -964,7 +1019,7 @@ export class ServiceService {
             if (!part) throw new BadRequestError("Select a part");
             if (part.retailRate == null)
               throw new BadRequestError(
-                `Retail rate is not set for ${part.partNumber}`,
+                `Retail rate is not set for ${part.partNumber}. Ask the store to set it, then try again.`,
               );
             // Snapshot of the chosen record's source (part flag), kept for reporting.
             partSource = part.partFlag;
@@ -990,7 +1045,7 @@ export class ServiceService {
           } else if (line.type === "SERVICE") {
             if (card.serviceTypeId && line.referenceId === card.serviceTypeId) {
               description = serviceChargeDescription(card);
-              rate = card.serviceCharge ?? 0;
+              rate = companyPaidService || card.serviceCharge == null ? 0 : Number(card.serviceCharge);
             } else {
               const service = line.referenceId
                 ? await tx.service.findFirst({
@@ -1000,7 +1055,7 @@ export class ServiceService {
               if (!service)
                 throw new BadRequestError("Select an active service");
               description = service.name;
-              rate = card.serviceCharge ?? service.price;
+              rate = (card.serviceCharge == null ? service.price : Number(card.serviceCharge));
             }
           } else if (line.referenceId) {
             const complaint = await tx.jobComplaint.findFirst({
@@ -1012,7 +1067,22 @@ export class ServiceService {
           }
           if (!description)
             throw new BadRequestError("Complaint description is required");
-          const { includedInService, ...fields } = line;
+          const item = line.findingItemId ? itemMap.get(line.findingItemId) : undefined;
+          if (line.findingItemId && !item)
+            throw new BadRequestError(`${description}: the diagnosed item is no longer on this job. Reload the estimate.`);
+          const decided = item?.payer ?? "CUSTOMER";
+          const payer = line.payer ?? decided;
+          // TODO(confirm): only the warranty officer changes who pays; lines the advisor adds are customer pay.
+          if (payer !== decided)
+            throw new BadRequestError(
+              item
+                ? `${description}: who pays was decided at the warranty check. Ask the warranty officer to change it.`
+                : `${description}: lines you add are paid by the customer. Warranty items come from the warranty check.`,
+            );
+          const complaintId = line.complaintId ?? item?.finding.complaintId ?? null;
+          if (line.complaintId && !knownComplaints.has(line.complaintId))
+            throw new BadRequestError(`${description}: the customer request is no longer on this job. Reload the estimate.`);
+          const { includedInService, findingItemId: _item, complaintId: _complaint, payer: _payer, ...fields } = line;
           lines.push({
             ...fields,
             partSource,
@@ -1021,6 +1091,54 @@ export class ServiceService {
             rate: includedInService ? 0 : rate,
             quantity,
             amount: includedInService ? 0 : lineAmount(quantity, rate),
+            payer,
+            findingItemId: line.findingItemId ?? null,
+            complaintId,
+            sortOrder: index,
+          });
+        }
+        const amount = sumMoney(lines.map((line) => line.amount));
+        const previous = (
+          await tx.estimate.findMany({
+            where: { jobCardId },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: 1,
+            include: { lines: true, approvals: { select: { id: true } } },
+          })
+        )?.[0];
+        if (options.draft) {
+          // The undecided draft is edited in place: same revision, presentation cleared.
+          if (!previous || previous.id !== options.draft.estimateId)
+            throw new ConflictError("This estimate has a newer revision. Reload the estimate.");
+          if (previous.approvals.length || previous.status !== "Pending")
+            throw new ConflictError("The customer has already answered this estimate. Reload the estimate.");
+          if (previous.updatedAt.getTime() !== options.draft.updatedAt.getTime())
+            throw new ConflictError("Someone else saved this estimate after you opened it. Reload the estimate to see their changes.");
+          await tx.estimateLine.deleteMany({ where: { estimateId: previous.id } });
+          if (actorId)
+            await tx.auditLog.create({
+              data: {
+                userId: actorId,
+                action: "ESTIMATE_DRAFT_SAVED",
+                details: JSON.stringify({
+                  jobCardId,
+                  estimateId: previous.id,
+                  version: previous.version,
+                  before: { amount: previous.amount.toNumber(), lines: previous.lines.length, upfrontPaymentPercent: previous.upfrontPaymentPercent.toNumber() },
+                  after: { amount, lines: lines.length, upfrontPaymentPercent: data.upfrontPaymentPercent ?? 60 },
+                }),
+              },
+            });
+          return tx.estimate.update({
+            where: { id: previous.id },
+            data: {
+              description: data.description,
+              amount,
+              upfrontPaymentPercent: data.upfrontPaymentPercent ?? 60,
+              presentedAt: null,
+              lines: { createMany: { data: lines } },
+            },
+            include: { lines: true },
           });
         }
         // A new scope needs a fresh QC result and fresh credit authorization.
@@ -1049,19 +1167,11 @@ export class ServiceService {
         });
         // A ready job reopened for approval and QC goes back to the quality check step.
         await syncStage(tx, jobCardId, actorId ?? card.createdById ?? null);
-        const previous = (
-          await tx.estimate.findMany({
-            where: { jobCardId },
-            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-            take: 1,
-            include: { lines: true },
-          })
-        )?.[0];
-        const revision = planEstimateRevision(previous, supersedesId, {
-          description: data.description,
-          amount: sumMoney(lines.map((line) => line.amount)),
-          lines,
-        });
+        const revision = planEstimateRevision(
+          previous && { ...previous, amount: Number(previous.amount) },
+          supersedesId,
+          { description: data.description, amount, lines },
+        );
         if (previous)
           await tx.estimate.update({
             where: { id: previous.id },
@@ -1084,6 +1194,7 @@ export class ServiceService {
         const createdAt = new Date(
           Math.max(Date.now(), (previous?.createdAt?.getTime() ?? 0) + 1),
         );
+        const settings = await getBranchSettings(card.branchId, tx);
         return tx.estimate.create({
           data: {
             createdAt,
@@ -1096,7 +1207,8 @@ export class ServiceService {
             description: data.description,
             currency: "NGN",
             status: "Pending",
-            amount: sumMoney(lines.map((line) => line.amount)),
+            amount,
+            vatRate: settings.labourVatPercent,
             lines: { createMany: { data: lines } },
           },
           include: { lines: true },
@@ -1106,6 +1218,13 @@ export class ServiceService {
     );
   }
 
+  /**
+   * Records the customer's decision on the latest revision. With `decisions`, each customer-pay line is
+   * approved or declined (the staged estimate); without, every customer line takes the overall answer
+   * (customer portal). COUNTER decisions carry a signature (version 2 hash with the decisions); PHONE
+   * decisions carry who approved, on which number and when, and the customer signs at delivery.
+   * A retry with the same requestId returns the first decision.
+   */
   async addApproval(
     estimateId: string,
     data: {
@@ -1119,8 +1238,13 @@ export class ServiceService {
       expectedHash?: string;
       signerName?: string;
       relationship?: string;
+      signerPhone?: string;
       signatureImage?: string;
       overrideReason?: string;
+      decisions?: { lineId: string; decision: LineDecision }[];
+      channel?: "COUNTER" | "PHONE";
+      phone?: { approverName: string; approverPhone: string; approvedAt: Date };
+      requestId?: string;
     },
     actorId?: string,
     capture?: { deviceOrIp: string; allowOverride?: boolean },
@@ -1132,11 +1256,20 @@ export class ServiceService {
     if (!identity?.jobCardId)
       throw new NotFoundError("Job-linked estimate not found");
     const approvalJobCardId = identity.jobCardId;
+    const phone = data.channel === "PHONE";
     return prisma.$transaction(
       async (tx) => {
         await tx.$queryRaw(
           Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${identity.jobCardId} FOR UPDATE`,
         );
+        if (data.requestId) {
+          const replay = await tx.customerApproval.findUnique({ where: { requestId: data.requestId } });
+          if (replay) {
+            if (replay.estimateId !== estimateId)
+              throw new ConflictError("This request was already used for another estimate. Reload the page.");
+            return replay;
+          }
+        }
         const estimates = await tx.estimate.findMany({
           where: { jobCardId: identity.jobCardId },
           ...latestEstimateQuery,
@@ -1166,57 +1299,77 @@ export class ServiceService {
           throw new ConflictError(
             "This revision already has a decision. Create a new revision to change scope.",
           );
-        if (!data.approved && !data.comments?.trim())
+        if (!data.decisions && !data.approved && !data.comments?.trim())
           throw new BadRequestError("A decline reason is required");
-        const hash = estimateContentHash(estimate);
+        // The content the customer was shown: either hash form is accepted (older screens send version 1).
         if (
-          data.expectedVersion !== estimate.version ||
-          data.expectedHash !== hash
+          (data.expectedVersion !== undefined && data.expectedVersion !== estimate.version) ||
+          (data.expectedHash !== estimateContentHash(estimate) && data.expectedHash !== stagedContentHash(estimate))
         )
           throw new ConflictError(
-            "Estimate changed; reload the signature summary",
+            "The estimate changed. Reload it and show the customer the latest version.",
           );
-        const override = !!data.overrideReason?.trim();
+        const staged = !!data.decisions;
+        let decisionMap: Map<string, LineDecision | null>;
+        if (staged) {
+          const resolved = resolveDecisions(estimate.lines, data.decisions!);
+          if (resolved.problems.length)
+            throw new BadRequestError(resolved.problems[0].message).withCode("FIELD_VALIDATION", { field: "decisions", lineId: resolved.problems[0].lineId });
+          decisionMap = resolved.decisions;
+        } else {
+          decisionMap = new Map(estimate.lines.map((line) => [line.id, line.payer === "CUSTOMER" ? (data.approved ? "APPROVED" : "DECLINED") : null]));
+        }
+        const decided = withDecisions(
+          estimate.lines.map((line) => ({ ...line, customerDecision: line.customerDecision ?? null })),
+          decisionMap,
+        );
+        const outcome = estimateOutcome(decided);
+        const approved = outcome !== "ALL_DECLINED";
+        const override = !phone && !!data.overrideReason?.trim();
         if (override && !capture?.allowOverride)
           throw new BadRequestError("Only Admin may override with a reason");
-        if (!override) {
+        if (!override && !phone) {
           if (!data.signatureImage || !data.signerName?.trim() || !actorId)
             throw new BadRequestError(
               "A customer signature and signer name are required; portal capture is not yet available",
             );
           assertSignaturePng(data.signatureImage);
-          if (data.approved && !data.consentAccepted)
+          if (approved && !data.consentAccepted)
             throw new BadRequestError(
               "Accept the estimate terms before approving",
             );
-          const customer = await tx.customer.findUniqueOrThrow({
-            where: { id: card.customerId! },
-          });
-          const customerName =
-            `${customer.firstName} ${customer.lastName}`.trim();
-          if (
-            data.signerName.trim().toLowerCase() !==
-              customerName.toLowerCase() &&
-            !data.relationship?.trim()
-          )
-            throw new BadRequestError(
-              "Relationship is required when signing for the customer",
-            );
+          if (!staged) {
+            const customer = await tx.customer.findUniqueOrThrow({
+              where: { id: card.customerId! },
+            });
+            const customerName =
+              `${customer.firstName} ${customer.lastName}`.trim();
+            if (
+              data.signerName.trim().toLowerCase() !==
+                customerName.toLowerCase() &&
+              !data.relationship?.trim()
+            )
+              throw new BadRequestError(
+                "Relationship is required when signing for the customer",
+              );
+          }
         }
-        const status = data.approved ? "Approved" : "Declined";
-        if (data.approved) {
+        const status = approved ? "Approved" : "Declined";
+        if (approved) {
           const services = estimate.lines.filter(
-            (line) => line.type === "SERVICE",
+            (line) => line.type === "SERVICE" && decisionMap.get(line.id) !== "DECLINED",
           );
           const chargeReference = serviceChargeReference(card);
           if (
             chargeReference &&
             (services.length !== 1 ||
               services[0].referenceId !== chargeReference ||
-              services[0].quantity !== 1)
+              Number(services[0].quantity) !== 1)
           )
             throw new BadRequestError(
-              "Revise the estimate to include the selected service exactly once",
+              staged
+                ? `Approve the ${serviceChargeDescription(card)} line, or ask the advisor to remove the service type before the customer approves`
+                : "Revise the estimate to include the selected service exactly once",
             );
           if (services.length)
             await tx.jobCard.update({
@@ -1224,6 +1377,14 @@ export class ServiceService {
               data: { serviceCharge: services[0].amount },
             });
         }
+        for (const line of estimate.lines) {
+          const decision = decisionMap.get(line.id) ?? null;
+          if ((line.customerDecision ?? null) !== decision)
+            await tx.estimateLine.update({ where: { id: line.id }, data: { customerDecision: decision } });
+        }
+        const signedContent = { ...estimate, lines: decided };
+        const hash = stagedContentHash(signedContent);
+        const totals = estimateTotals(decided, estimate.vatRate);
         await tx.estimate.update({
           where: { id: estimateId },
           data: { status },
@@ -1232,14 +1393,20 @@ export class ServiceService {
           await tx.auditLog.create({
             data: {
               userId: actorId,
-              action: "ESTIMATE_DECISION_RECORDED",
+              action: phone ? "ESTIMATE_PHONE_APPROVAL_RECORDED" : "ESTIMATE_DECISION_RECORDED",
               details: JSON.stringify({
                 jobCardId: card.id,
                 estimateId,
+                version: estimate.version,
                 customerId: data.customerId,
                 status,
+                outcome,
+                channel: phone ? "PHONE" : "COUNTER",
+                approvedTotal: totals.approvedTotal,
+                decisions: decided.filter((line) => line.customerDecision).map((line) => ({ lineId: line.id, description: line.description, decision: line.customerDecision })),
                 comments: data.comments,
                 overrideReason: data.overrideReason,
+                ...(phone ? { approverName: data.phone!.approverName, approverPhone: data.phone!.approverPhone, approvedAt: data.phone!.approvedAt } : {}),
                 contentHash: hash,
               }),
             },
@@ -1248,16 +1415,28 @@ export class ServiceService {
           data: {
             estimateId,
             customerId: data.customerId,
-            approved: data.approved,
+            approved,
             signatureRequired: true,
             overrideReason: override ? data.overrideReason!.trim() : null,
-            decisionDate: new Date(),
+            decisionDate: phone ? data.phone!.approvedAt : new Date(),
             comments: data.comments,
             status,
+            channel: phone ? "PHONE" : "COUNTER",
+            contentHash: hash,
+            requestId: data.requestId,
+            ...(phone
+              ? {
+                  approverName: data.phone!.approverName,
+                  approverPhone: data.phone!.approverPhone,
+                  approvedAt: data.phone!.approvedAt,
+                  recordedById: actorId,
+                  signatureDueAtDelivery: true,
+                }
+              : {}),
           },
         });
         const terms =
-          data.approved && !override
+          approved && !override && !phone
             ? await tx.documentTerms.findFirst({
                 where: {
                   type: "JOB_ESTIMATE",
@@ -1266,10 +1445,10 @@ export class ServiceService {
                 orderBy: { branchId: { sort: "asc", nulls: "last" } },
               })
             : null;
-        if (!override)
+        if (!override && !phone)
           await tx.estimateSignature.create({
             data: {
-              consentStatement: data.approved
+              consentStatement: approved
                 ? [
                     "I approve this estimate and accept its terms and conditions.",
                     ...(terms?.terms ?? []),
@@ -1280,11 +1459,13 @@ export class ServiceService {
               imageReference: data.signatureImage!,
               signerName: data.signerName!.trim(),
               relationship: data.relationship?.trim(),
+              signerPhone: data.signerPhone,
               capturedByUserId: actorId,
               deviceOrIp: capture?.deviceOrIp ?? "unknown",
               estimateVersion: estimate.version,
-              totalSigned: estimate.amount,
+              totalSigned: totals.approvedTotal,
               contentHash: hash,
+              hashVersion: ESTIMATE_HASH_VERSION,
             },
           });
         return approval;

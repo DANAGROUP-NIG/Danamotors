@@ -186,12 +186,8 @@ export const jobOpeningBody = z
     batteryNumber: z.string().trim().toUpperCase().max(100).optional(),
     customField1: z.string().trim().max(500).optional(),
     acType: z.enum(["FACTORY", "DEALER", "NONE"]).optional(),
-    estimatedParts: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
-    estimatedOil: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
-    estimatedLabour: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
     serviceCharge: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
     estimatedHours: z.number().nonnegative().optional(),
-    estimatedCost: z.number().nonnegative().optional(),
   })
   .strict()
   .superRefine((data, ctx) => {
@@ -284,6 +280,10 @@ export const estimateBody = z
             description: z.string().trim().max(2000).optional(),
             quantity: z.number().finite().positive().max(1e6).default(1),
             includedInService: z.boolean().optional(),
+            /** Staged estimate: who pays, and the diagnosed item and customer request the line comes from. */
+            payer: z.enum(["CUSTOMER", "WARRANTY", "GOODWILL", "CAMPAIGN"]).optional(),
+            findingItemId: z.string().uuid().nullable().optional(),
+            complaintId: z.string().uuid().nullable().optional(),
           })
           .strict(),
       )

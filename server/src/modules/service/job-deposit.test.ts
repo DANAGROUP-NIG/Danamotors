@@ -58,6 +58,8 @@ beforeEach(() => {
     version: 1,
     estimateNumber: "E1",
     amount: 100,
+    vatRate: new Prisma.Decimal(0),
+    lines: [{ payer: "CUSTOMER", amount: new Prisma.Decimal(100), customerDecision: null }],
     upfrontPaymentPercent: new Prisma.Decimal(60),
   });
   (prisma.receipt.findUnique as jest.Mock).mockResolvedValue(receipt);
@@ -113,7 +115,7 @@ it.each([0.01, 10, 60, 80, 120])(
 it("requires an active positive non-cheque receipt on every start and does not consult the suggested percentage", async () => {
   (prisma.receipt.findFirst as jest.Mock).mockResolvedValue(null);
   await expect(assertDepositPaid(prisma, "job")).rejects.toThrow(
-    "positive advance",
+    "Ask the cashier to record the advance",
   );
   expect(prisma.receipt.findFirst).toHaveBeenCalledWith({
     where: {

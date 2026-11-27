@@ -27,7 +27,7 @@ integration('Job advances in disposable local PostgreSQL', () => {
       await tx.estimate.create({ data: { jobCardId: job.id, description: 'Synthetic estimate', amount: 500 } });
       const spy = jest.spyOn(prisma, '$transaction').mockImplementation(((callback: (client: Prisma.TransactionClient) => Promise<unknown>) => callback(tx)) as typeof prisma.$transaction);
       try {
-        await expect(assertDepositPaid(tx, job.id)).rejects.toThrow('positive advance');
+        await expect(assertDepositPaid(tx, job.id)).rejects.toThrow('Ask the cashier to record the advance');
         const service = new ReceiptService();
         const input = { customerId: customer.id, branchId: branch.id, advanceJobCardId: job.id, amount: 200, mode: 'CASH' as const, category: 'SERVICE_PARTS' as const, issuedById: actor.id, allocations: [], idempotencyKey: randomUUID() };
         const first = await service.createReceipt(input);

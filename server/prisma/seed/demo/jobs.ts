@@ -38,6 +38,8 @@ import {
 } from "./fixtures";
 import { needsRetime, retimeJob } from "./retime";
 import { completeCheckIn } from "./check-in";
+import { JobEstimateService, type EstimateActor } from "../../../src/modules/service/job-estimate.service";
+import { estimateTotals } from "../../../src/modules/service/job-estimate.logic";
 
 const services = {
   service: new ServiceService(),
@@ -51,7 +53,14 @@ const services = {
   warranty: new WarrantyCaseService(),
   stages: new JobStageService(),
   diagnosis: new JobDiagnosisService(),
+  estimates: new JobEstimateService(),
 };
+
+/** The service advisor with the permissions of the role, as the estimate screens send them. */
+async function estimateActor(userId: string): Promise<EstimateActor> {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { role: { include: { permissions: { include: { permission: true } } } } } });
+  return { id: user.id, role: user.role.name, permissions: user.role.permissions.map((row) => row.permission.name) };
+}
 
 const RANK: Record<string, number> = { OPEN: 0, IN_PROGRESS: 1, QC: 2, READY: 3, BILLED: 4, DELIVERED: 5 };
 const TARGET_STATUS: Record<JobFixture["target"], string> = {
@@ -323,8 +332,9 @@ async function walkToEstimate(ctx: DemoContext, ref: Reference, fx: JobFixture, 
       await diagnose(ctx, ref, fx, id, fx.diagnosis?.stop === "confirmed" ? fx.diagnosis : null);
     } else {
       // The warranty officer decides who pays for every item first (phase 4).
-      await decideCustomerPay(ctx, id);
-      await stageAction(fx, id, "WARRANTY_TO_ADVISOR", ctx.warrantyOfficer.id, "No warranty items on this visit");
+      await decideCustomerPay(ctx, id, fx.diagnosis?.findings);
+      const onWarranty = fx.diagnosis?.findings.some((finding) => finding.warranty?.length);
+      await stageAction(fx, id, "WARRANTY_TO_ADVISOR", ctx.warrantyOfficer.id, onWarranty ? "AC compressor repair approved under warranty" : "No warranty items on this visit");
     }
   }
   // A job that stays at check-in shows the step the fixture names.
@@ -332,6 +342,12 @@ async function walkToEstimate(ctx: DemoContext, ref: Reference, fx: JobFixture, 
     await completeCheckIn(fx, id, staff.advisor.id, fx.checkIn ?? "opened");
   if (fx.stop === "CANCELLED" && (await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true } })).stage === "ESTIMATE")
     await stageAction(fx, id, "CANCEL", staff.advisor.id, "Customer took the vehicle elsewhere");
+  // Phase 5: the advisor prepares the estimate from the findings, and presents it, as on screen.
+  if (fx.estimateStep && (await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true } })).stage === "ESTIMATE") {
+    const advisor = await estimateActor(staff.advisor.id);
+    const step = await services.estimates.prepare(id, advisor);
+    if (fx.estimateStep === "presented" && step.estimate && !step.estimate.presentedAt) await services.estimates.presentToCustomer(id, advisor, step.estimate.id);
+  }
 }
 
 const actorOf = async (userId: string) => {
@@ -412,13 +428,14 @@ async function recordAdvance(ctx: DemoContext, fx: JobFixture, id: string) {
   const estimate = await prisma.estimate.findFirst({
     where: { jobCardId: id },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    select: { amount: true, upfrontPaymentPercent: true },
+    select: { vatRate: true, upfrontPaymentPercent: true, lines: { select: { payer: true, amount: true, customerDecision: true } } },
   });
   if (!estimate) throw new Error(`${fx.id} needs an estimate before work starts.`);
+  const payable = Number(estimateTotals(estimate.lines, estimate.vatRate).approvedTotal);
   await services.receipts.createReceipt({
     customerId: job.customerId!, branchId: job.branchId, idempotencyKey: demoUuid(`advance:${fx.id}`),
     issuedById: ctx.staff[fx.branch].billing.id, mode: "CASH", category: "SERVICE_PARTS",
-    amount: Math.min(DEMO_ADVANCE, upfrontAmount(estimate.amount, estimate.upfrontPaymentPercent)),
+    amount: Math.min(DEMO_ADVANCE, upfrontAmount(payable, estimate.upfrontPaymentPercent)),
     narration: `Advance for job card ${job.jobNumber}`, advanceJobCardId: id, allocations: [],
   });
 }

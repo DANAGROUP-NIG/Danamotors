@@ -18,6 +18,21 @@ export function stageHandoffRecipients(branchId: string, handoff: { stageOwnerId
 }
 export type DurableWorkshopEvent = typeof DURABLE_WORKSHOP_EVENTS[number];
 
+/**
+ * Who in the branch receives a parts request: the branch store officers, or the branch's general store
+ * manager when the branch has no store officer. TODO(confirm) the fallback with the store lead.
+ */
+export async function branchStoreRecipients(tx: Prisma.TransactionClient, branchId: string, excludeId?: string) {
+  const find = (role: string) =>
+    tx.user.findMany({
+      where: { branchId, isActive: true, role: { name: role }, ...(excludeId ? { id: { not: excludeId } } : {}) },
+      select: { id: true, firstName: true, lastName: true },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
+  const officers = await find(ROLES.BRANCH_STORE_MANAGER);
+  return officers.length ? officers : find(ROLES.GENERAL_STORE_MANAGER);
+}
+
 export function workshopRecipients(event: WorkshopEvent, card: { branchId: string; serviceAdvisorId: string | null; technicianId: string | null; qualityInspectorId: string | null }, signerId?: string | null) {
   const ids: string[] = [];
   const roles: string[] = [];
@@ -66,9 +81,9 @@ export async function deliverWorkshopNotification(tx: Prisma.TransactionClient, 
     await tx.jobcardNotificationAudit.createMany({ data: [{ jobCardId: card.id, eventId: row.id, eventType: event, recipientId: 'obsolete-parts', status: 'SUPPRESSED_STALE_ACTION', createdAt: now }], skipDuplicates: true });
     return;
   }
-  const where = handoff ? stageHandoffRecipients(card.branchId, handoff)
-    : branchStoreOnly ? { isActive: true, branchId: card.branchId, role: { name: ROLES.BRANCH_STORE_MANAGER } } : workshopRecipients(event, live, row.actorId);
-  const users = await tx.user.findMany({ where, select: { id: true } });
+  const users = branchStoreOnly && !handoff
+    ? await branchStoreRecipients(tx, card.branchId)
+    : await tx.user.findMany({ where: handoff ? stageHandoffRecipients(card.branchId, handoff) : workshopRecipients(event, live, row.actorId), select: { id: true } });
   if (!users.length && !isReceipt && !handoff) throw new Error('No active parts notification recipient');
   const recipients = users.filter(user => isReceipt || user.id !== row.actorId);
   const notification = workshopNotification(event, { dedupeKey: `${card.id}:${occurrence}`, jobCardId: card.id, jobNumber: live.jobNumber, branchId: live.branchId,

@@ -20,8 +20,16 @@ it('delivers button requests only to active branch store managers, excluding the
   const { tx, mocks } = database();
   const row = { id: 'event', jobCardId: 'job', actorId: 'actor', after: job, before: null, createdAt: new Date(), processedAt: null };
   await deliverWorkshopNotification(tx, row, 'PART_REQUESTED', job, 'button:request', true, new Date());
-  expect(mocks.user.findMany).toHaveBeenCalledWith({ where: { isActive: true, branchId: 'branch', role: { name: ROLES.BRANCH_STORE_MANAGER } }, select: { id: true } });
+  expect(mocks.user.findMany).toHaveBeenCalledWith({ where: { branchId: 'branch', isActive: true, role: { name: ROLES.BRANCH_STORE_MANAGER } }, select: { id: true, firstName: true, lastName: true }, orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }] });
   expect(mocks.notification.createMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ userId: 'manager', dedupeKey: 'PART_REQUESTED:job:button:request', message: 'Parts requested: J1, Test Customer, SYNTHETIC' })], skipDuplicates: true });
+});
+it('falls back to the branch general store manager when the branch has no store officer', async () => {
+  const { tx, mocks } = database();
+  mocks.user.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 'general-store' }]);
+  const row = { id: 'event', jobCardId: 'job', actorId: 'actor', after: job, before: null, createdAt: new Date(), processedAt: null };
+  await deliverWorkshopNotification(tx, row, 'PART_REQUESTED', job, 'estimate:1', true, new Date());
+  expect(mocks.user.findMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: { branchId: 'branch', isActive: true, role: { name: ROLES.GENERAL_STORE_MANAGER } } }));
+  expect(mocks.notification.createMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ userId: 'general-store' })], skipDuplicates: true });
 });
 it('suppresses obsolete requests after job completion and refuses silent loss when no recipient exists', async () => {
   const { tx, mocks } = database();

@@ -102,7 +102,6 @@ suite("service document actions on disposable localhost", () => {
         workDone: "Original work done",
         status,
         mileage: 1234,
-        estimatedCost: 10.3,
       },
     });
     const estimate = await db.estimate.create({
@@ -171,7 +170,6 @@ suite("service document actions on disposable localhost", () => {
         customerRemarks: "Customer explanation",
         status,
         workDone: job.workDone,
-        estimatedCost: job.estimatedCost,
         mileage: job.mileage,
         qcStatus: job.qcStatus,
       });

@@ -2,12 +2,12 @@ jest.mock('../../prisma/client', () => ({ __esModule: true, default: { documentT
   $transaction: jest.fn(), $queryRaw: jest.fn(),
   estimate: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
   jobCard: { findUniqueOrThrow: jest.fn(), update: jest.fn() },
-  customerApproval: { create: jest.fn() }, customer:{findUniqueOrThrow:jest.fn()}, estimateSignature:{create:jest.fn()}, auditLog:{create:jest.fn()},
+  customerApproval: { create: jest.fn(), findUnique: jest.fn() }, estimateLine: { update: jest.fn() }, customer:{findUniqueOrThrow:jest.fn()}, estimateSignature:{create:jest.fn()}, auditLog:{create:jest.fn()},
 } }));
 import prisma from '../../prisma/client';
 import { ServiceService } from './service.service';
-import { estimateContentHash } from './estimate-signature';
-const latest = { id: 'latest', version: 1, status: 'Pending', amount: 500, approvals: [], lines: [{ type: 'SERVICE', referenceId: 'service', description:'Service', quantity: 1, rate: 500, amount: 500 }] };
+import { estimateContentHash, stagedContentHash } from './estimate-signature';
+const latest = { id: 'latest', version: 1, status: 'Pending', amount: 500, vatRate: 7.5, upfrontPaymentPercent: 60, approvals: [], lines: [{ id: 'line', type: 'SERVICE', referenceId: 'service', description:'Service', quantity: 1, rate: 500, amount: 500, payer: 'CUSTOMER' as const, customerDecision: null }] };
 beforeEach(() => {
   jest.resetAllMocks();
   (prisma.$transaction as jest.Mock).mockImplementation(cb => cb(prisma));
@@ -64,7 +64,7 @@ it('saves signature and approval under the shared transaction with exact signed 
  (prisma.customer.findUniqueOrThrow as jest.Mock).mockResolvedValue({firstName:'Test',lastName:'Customer'});
  const signatureImage='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
  await new ServiceService().addApproval('latest',{customerId:'customer',approved:true,consentAccepted:true,expectedVersion:1,expectedHash:estimateContentHash(latest),signerName:'Test Customer',signatureImage},'actor',{deviceOrIp:'test-device'});
- expect(prisma.estimateSignature.create).toHaveBeenCalledWith({data:expect.objectContaining({approvalId:'approval',capturedByUserId:'actor',deviceOrIp:'test-device',estimateVersion:1,totalSigned:500,contentHash:estimateContentHash(latest),imageReference:signatureImage})});
+ expect(prisma.estimateSignature.create).toHaveBeenCalledWith({data:expect.objectContaining({approvalId:'approval',capturedByUserId:'actor',deviceOrIp:'test-device',estimateVersion:1,totalSigned:'537.50',hashVersion:2,contentHash:stagedContentHash({...latest,lines:latest.lines.map(line=>({...line,customerDecision:'APPROVED' as const}))}),imageReference:signatureImage})});
  expect(jest.mocked(prisma.estimateSignature.create).mock.calls[0][0].data.consentStatement).toContain('I approve this estimate');
  expect(jest.mocked(prisma.estimateSignature.create).mock.calls[0][0].data.consentStatement).not.toContain('approve this job card');
 });

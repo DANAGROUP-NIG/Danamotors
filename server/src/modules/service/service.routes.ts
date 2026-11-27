@@ -4,6 +4,7 @@ import { jobOpeningSignatureRoutes } from "./job-opening-signature.routes";
 import { jobCheckInRoutes, jobPhotoRoutes } from "./job-check-in.routes";
 import { jobDiagnosisRoutes } from "./job-diagnosis.routes";
 import { jobWarrantyRoutes } from "./job-warranty.routes";
+import { jobEstimateRoutes } from "./job-estimate.routes";
 import { loadOpeningConsent } from "./job-opening-consent";
 import { assertBookable } from "./booking.logic";
 import { projectEstimatePrint } from "./estimate-print";
@@ -60,6 +61,7 @@ router.use("/job-cards/:id/check-in", jobCheckInRoutes);
 router.use("/job-cards/:id/photos", jobPhotoRoutes);
 router.use("/job-cards/:id/diagnosis", jobDiagnosisRoutes);
 router.use("/job-cards/:id/warranty", jobWarrantyRoutes);
+router.use("/job-cards/:id/estimate", jobEstimateRoutes);
 router.get(
   "/staff",
   requirePermission(PERMISSIONS.JOBCARD_READ),

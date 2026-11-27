@@ -87,7 +87,7 @@ it('loads signature evidence through the operation gate without loading the imag
   await expect(assertApprovedOperation(tx, 'job', 'customer', [service, part, labour])).resolves.toMatchObject({ canBill: true });
   expect(findMany).toHaveBeenCalledWith({ where: { jobCardId: 'job' }, ...latestEstimateQuery });
   expect(latestEstimateQuery.orderBy[0]).toEqual({ version: 'desc' });
-  expect(latestEstimateQuery.include.approvals.include.signature.select).toEqual({ estimateVersion: true, totalSigned: true, contentHash: true });
+  expect(latestEstimateQuery.include.approvals.include.signature.select).toEqual({ estimateVersion: true, totalSigned: true, contentHash: true, hashVersion: true });
   estimate.lines = [{ ...service, description: 'Tampered' }, part, labour];
   await expect(assertApprovedOperation(tx, 'job', 'customer', [])).rejects.toThrow('Estimate signature is invalid');
 });

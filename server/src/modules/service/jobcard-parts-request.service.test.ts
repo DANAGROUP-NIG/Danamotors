@@ -19,7 +19,7 @@ beforeEach(() => {
 it('notifies only active branch Store Managers, excludes the actor and follows the existing message pattern', async () => {
   await requestJobcardParts('job', 'branch', 'actor', 'request-1');
   expect(prisma.jobCard.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'job', branchId: 'branch' } }));
-  expect(prisma.user.findMany).toHaveBeenCalledWith({ where: { branchId: 'branch', isActive: true, role: { name: ROLES.BRANCH_STORE_MANAGER }, id: { not: 'actor' } }, select: { id: true } });
+  expect(prisma.user.findMany).toHaveBeenCalledWith({ where: { branchId: 'branch', isActive: true, role: { name: ROLES.BRANCH_STORE_MANAGER }, id: { not: 'actor' } }, select: { id: true, firstName: true, lastName: true }, orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }] });
   expect(prisma.jobcardNotificationEvent.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'workshop:job:PART_REQUESTED:button:request-1' }, create: expect.objectContaining({ actorId: 'actor', after: expect.objectContaining({ workshopEvent: 'PART_REQUESTED', branchStoreOnly: true }) }) }));
   expect(prisma.notification.createMany).not.toHaveBeenCalled();
   expect(prisma.jobCard.update).toHaveBeenCalledWith({ where: { id: 'job' }, data: { partsRequestedAt: expect.any(Date) } });
@@ -48,7 +48,7 @@ it('rejects a billed job even when its legacy status is Ready', async () => {
 
 it('returns a clear error if no eligible Store Manager exists instead of broadcasting', async () => {
   (prisma.user.findMany as jest.Mock).mockResolvedValue([]);
-  await expect(requestJobcardParts('job', 'branch', 'actor', 'request-1')).rejects.toThrow('Store Manager');
+  await expect(requestJobcardParts('job', 'branch', 'actor', 'request-1')).rejects.toThrow('No store manager is active in this branch');
   expect(prisma.notification.createMany).not.toHaveBeenCalled();
 });
 

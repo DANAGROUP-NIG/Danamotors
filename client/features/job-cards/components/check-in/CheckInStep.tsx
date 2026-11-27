@@ -245,6 +245,7 @@ function CheckInLoaded({
             job={job}
             checkIn={checkIn}
             lastVisit={workspace.previousVisits[0] ?? null}
+            declinedItems={workspace.declinedItems ?? []}
             editable={editable}
             onSubmit={submitDetails}
             serverErrors={serverErrors}

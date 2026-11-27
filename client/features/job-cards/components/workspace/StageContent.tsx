@@ -10,15 +10,13 @@ import { canonicalJobStatus, hasJobBill } from "../../types/job-card-status";
 import type { JobCard } from "../../types/job-card.types";
 import type { JobWorkspace } from "../../types/job-workspace.types";
 import type { JobFileTab } from "../../lib/job-frame.logic";
-import { JobAdvanceSection } from "../JobAdvanceSection";
-import { JobCardEstimateSection } from "../JobCardEstimateSection";
 import { JobCardLabourSection } from "../JobCardLabourSection";
 import { JobCardPartsSection } from "../JobCardPartsSection";
 import { CheckInStep, type StageBarProps } from "../check-in/CheckInStep";
 import { ConsentCatchUp } from "../check-in/ConsentCatchUp";
 import { DiagnosisStep } from "../diagnosis/DiagnosisStep";
 import { WarrantyStep } from "../warranty/WarrantyStep";
-import { WORKSPACE_COPY } from "../repair-workspace-copy";
+import { EstimateStep } from "../estimate/EstimateStep";
 import { InvoicesTable } from "./InvoicesTable";
 import { StageCard } from "./StageCard";
 import {
@@ -53,8 +51,13 @@ export function StageContent({
     case "CHECK_IN":
       return <CheckInStep job={job} workspace={workspace} bar={bar} onOpenTab={onOpenTab} />;
     case "ESTIMATE":
-      // TODO(phase 5): replaced by the estimate, item approval, advance and release screens.
-      return <OpeningEstimateAdvance job={job} workspace={workspace} />;
+      // PDI jobs keep their own screens; everything else uses the staged estimate.
+      return workspace.jobType === "PDI" ? null : (
+        <>
+          {!workspace.readOnly && <ConsentCatchUp jobCardId={job.id} editable />}
+          <EstimateStep job={job} bar={bar} readOnly={workspace.readOnly} />
+        </>
+      );
     case "DIAGNOSIS":
       // PDI jobs keep their own screens; everything else uses the staged diagnosis.
       return workspace.jobType === "PDI" ? null : <DiagnosisStep job={job} bar={bar} />;
@@ -102,24 +105,6 @@ export function StageContent({
     case "CANCELLED":
       return null;
   }
-}
-
-function OpeningEstimateAdvance({ job, workspace }: { job: JobCard; workspace: JobWorkspace }) {
-  const status = canonicalJobStatus(job.status);
-  const closed = hasJobBill(job) || ["BILLED", "DELIVERED", "CANCELLED"].includes(status);
-  return (
-    <>
-      {!closed && <ConsentCatchUp jobCardId={job.id} editable={!workspace.readOnly} />}
-      {job.estimates ? (
-        <JobCardEstimateSection jobCard={job} />
-      ) : (
-        <StageCard title="Estimate">
-          <p className="text-sm text-muted-foreground">{WORKSPACE_COPY.noAccess}</p>
-        </StageCard>
-      )}
-      {(job.advanceSummary || job.advanceReceipts) && <JobAdvanceSection jobCard={job} open={!closed} />}
-    </>
-  );
 }
 
 function RequestPartsBar({ job }: { job: JobCard }) {

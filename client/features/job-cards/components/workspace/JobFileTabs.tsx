@@ -24,8 +24,9 @@ import type { JobCard } from "../../types/job-card.types";
 import type { PreviousVisit, StageActivity } from "../../types/job-workspace.types";
 import { JobCardLinesCard } from "../JobCardLinesCard";
 import { LinkedCampaignsCard, WarrantySnapshotCard } from "../JobCardWarrantyCards";
-import { toEstimateViewModel } from "../repair-workspace-helpers";
-import { WORKSPACE_COPY } from "../repair-workspace-copy";
+import { estimateStateLabel } from "../../lib/estimate.logic";
+import type { DeclinedItem } from "../../types/job-estimate.types";
+import { DeclinedItemsCard } from "../estimate/DeclinedItemsCard";
 import { InvoicesTable } from "./InvoicesTable";
 import { DetailList, StageCard } from "./StageCard";
 
@@ -36,14 +37,7 @@ const linkCls = "font-medium text-primary underline underline-offset-2 focus-vis
 
 export function CustomerVehicleTab({ job }: { job: JobCard }) {
   const tyres = (job.tyres ?? []).filter((tyre) => tyre.make || tyre.number);
-  const opening = (
-    [
-      ["Opening estimate, parts", job.estimatedParts],
-      ["Opening estimate, oil", job.estimatedOil],
-      ["Opening estimate, labour", job.estimatedLabour],
-      ["Service charge", job.serviceCharge],
-    ] as const
-  ).filter(([, amount]) => amount !== undefined);
+
   return (
     <>
       <StageCard
@@ -91,7 +85,7 @@ export function CustomerVehicleTab({ job }: { job: JobCard }) {
             { label: "Delivered by", value: job.deliveryAdvisor ? person(job.deliveryAdvisor) : "Not delivered yet" },
             { label: "A/C fitted", value: yesNo(job.acFitted) },
             { label: "In-house vehicle", value: yesNo(job.inHouse) },
-            ...opening.map(([label, amount]) => ({ label, value: formatMoney(amount) })),
+            ...(job.serviceCharge !== undefined ? [{ label: "Service charge", value: formatMoney(job.serviceCharge) }] : []),
             ...tyres.map((tyre, index) => ({ label: `Tyre ${index + 1}`, value: `${text(tyre.make)}, ${text(tyre.number)}` })),
             ...(job.batteryMake || job.batteryNumber ? [{ label: "Battery", value: `${text(job.batteryMake)}, ${text(job.batteryNumber)}` }] : []),
             ...(job.customField1 ? [{ label: "Custom field", value: job.customField1 }] : []),
@@ -105,7 +99,7 @@ export function CustomerVehicleTab({ job }: { job: JobCard }) {
   );
 }
 
-export function VisitHistoryTab({ job, visits }: { job: JobCard; visits: PreviousVisit[] }) {
+export function VisitHistoryTab({ job, visits, declinedItems }: { job: JobCard; visits: PreviousVisit[]; declinedItems: DeclinedItem[] }) {
   return (
     <>
       <StageCard title="Last two visits" description="Earlier visits of this vehicle at any branch, newest first.">
@@ -137,6 +131,7 @@ export function VisitHistoryTab({ job, visits }: { job: JobCard; visits: Previou
           </ul>
         )}
       </StageCard>
+      <DeclinedItemsCard items={declinedItems} />
       <JobCardRepeatPanel jobCardId={job.id} enabled={Boolean(job.repeatRecord || job.isRepeat)} />
     </>
   );
@@ -199,25 +194,22 @@ export function DocumentsTab({ job, onPrintGatePass }: { job: JobCard; onPrintGa
           <p className="text-sm text-muted-foreground">No estimate has been prepared yet.</p>
         ) : (
           <ul className="divide-y divide-border text-sm">
-            {job.estimates.map((estimate) => {
-              const view = toEstimateViewModel(estimate);
-              return (
-                <li key={estimate.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                  <span>
-                    Revision {view.version}, {WORKSPACE_COPY.estimateStates[view.status]}
-                  </span>
-                  <span className="flex items-center gap-3">
-                    <span className="tabular-nums">{formatMoney(view.total)}</span>
-                    {canPrintEstimate && (
-                      <Link href={`/job-cards/${job.id}/estimates/${estimate.id}/print`} className={linkCls}>
-                        Print
-                        <span className="sr-only"> revision {view.version}</span>
-                      </Link>
-                    )}
-                  </span>
-                </li>
-              );
-            })}
+            {job.estimates.map((estimate) => (
+              <li key={estimate.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <span>
+                  Revision {estimate.version}, {estimateStateLabel(estimate)}
+                </span>
+                <span className="flex items-center gap-3">
+                  <span className="tabular-nums">{formatMoney(estimate.customerTotal)}</span>
+                  {canPrintEstimate && (
+                    <Link href={`/job-cards/${job.id}/estimates/${estimate.id}/print`} className={linkCls}>
+                      Print
+                      <span className="sr-only"> revision {estimate.version}</span>
+                    </Link>
+                  )}
+                </span>
+              </li>
+            ))}
           </ul>
         )}
       </StageCard>

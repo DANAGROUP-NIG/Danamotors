@@ -1,3 +1,4 @@
+import { estimateTotals } from '../service/job-estimate.logic';
 import { Prisma } from '@prisma/client';
 import { BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
 import { money, sumMoney } from './money';
@@ -40,11 +41,13 @@ export async function prepareJobAdvance(tx: Prisma.TransactionClient, jobCardId:
   if (!job) throw new NotFoundError('Job card not found');
   if (job.customerId !== customerId || job.branchId !== branchId) throw new BadRequestError('Advance must belong to the job customer and branch');
   if (job.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED', 'Closed', 'Cancelled'].includes(job.status)) throw new BadRequestError('Receive payment against the final bill for a billed job; closed jobs cannot receive advances');
-  const estimate = await tx.estimate.findFirst({ where: { jobCardId }, orderBy: [{ version: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] });
+  const estimate = await tx.estimate.findFirst({ where: { jobCardId }, orderBy: [{ version: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }], include: { lines: { select: { payer: true, amount: true, customerDecision: true } } } });
   if (!estimate) throw new BadRequestError('Prepare an estimate before receiving an advance');
   if (estimate.currency && estimate.currency !== 'NGN') throw new BadRequestError('Job advances require an NGN estimate');
   const receipts = await tx.receipt.findMany({ where: { advanceJobCardId: jobCardId, status: 'ACTIVE', mode: { not: 'CHEQUE' }, issuedAt: { lte: advanceReceiptDateLimit() } }, select: { advanceAmount: true } });
-  const coverage = advanceCoverage(estimate.amount, sumMoney([...receipts.map(row => row.advanceAmount), amount]));
+  // What the customer pays on the estimate, with VAT (the approved lines once the customer has answered).
+  const estimateTotal = Number(estimateTotals(estimate.lines, estimate.vatRate).approvedTotal);
+  const coverage = advanceCoverage(estimateTotal, sumMoney([...receipts.map(row => row.advanceAmount), amount]));
   return {
     jobNumber: job.jobNumber, registrationNumber: job.vehicle?.registrationNumber ?? null,
     customerName: job.customer?.companyName || [job.customer?.firstName, job.customer?.lastName].filter(Boolean).join(' '),
@@ -52,7 +55,7 @@ export async function prepareJobAdvance(tx: Prisma.TransactionClient, jobCardId:
     // Keep the receipt voucher stable even if it is exported after final billing.
     tallyAsAdvance: true,
     estimateId: estimate.id, estimateNumber: estimate.estimateNumber, estimateVersion: estimate.version,
-    estimateTotal: money(estimate.amount), suggestedPercent: estimate.upfrontPaymentPercent.toNumber(),
+    estimateTotal, suggestedPercent: estimate.upfrontPaymentPercent.toNumber(),
     ...coverage,
   } satisfies Prisma.InputJsonObject;
 }

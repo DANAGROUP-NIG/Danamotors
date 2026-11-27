@@ -24,6 +24,9 @@ const DEFAULT_COMPANY: CompanyProfile = { name: 'Dana Motors Limited', tin: null
 export const branchSettingsSchema = z.object({
   labourVatPercent: z.number().min(0).max(100),
   roundOffValue: z.number().int().min(1).max(1000),
+  // Terms clause 4: the estimation charge when a customer declines all work (larger of the two).
+  estimationChargeMinimum: z.number({ invalid_type_error: 'Enter the minimum estimation charge as a number' }).min(0, 'The minimum estimation charge cannot be negative').max(10_000_000, 'The minimum estimation charge must be 10,000,000 or less').multipleOf(0.01, 'Use at most 2 decimal places for the minimum estimation charge'),
+  estimationChargePercent: z.number({ invalid_type_error: 'Enter the estimation charge percentage as a number' }).min(0, 'The estimation charge percentage must be between 0 and 100').max(100, 'The estimation charge percentage must be between 0 and 100').multipleOf(0.01, 'Use at most 2 decimal places for the estimation charge percentage'),
   repeatWindowDays: z.number().int().min(1).max(3650),
   repeatWindowKm: z.number().int().min(1).max(1_000_000).nullable(),
   printRepeatBlock: z.boolean().default(true),
@@ -48,6 +51,8 @@ export function defaultBranchSettings(): BranchSettingsValues {
   return {
     labourVatPercent: config.JOB_BILL_VAT_RATE,
     roundOffValue: 10,
+    estimationChargeMinimum: 25000,
+    estimationChargePercent: 10,
     repeatWindowDays: Number(process.env.JOB_REPEAT_WINDOW_DAYS ?? 15),
     repeatWindowKm: 500,
     printRepeatBlock: true,
@@ -69,8 +74,8 @@ export async function getBranchSettings(branchId: string, db: Db = prisma): Prom
   const row = await db.branchSettings.findUnique({ where: { branchId } });
   if (!row)
     return defaultBranchSettings();
-  const { branchId: _branchId, updatedAt: _updatedAt, ...values } = row;
-  return values as BranchSettingsValues;
+  const { branchId: _branchId, updatedAt: _updatedAt, estimationChargeMinimum, estimationChargePercent, ...values } = row;
+  return { ...values, estimationChargeMinimum: Number(estimationChargeMinimum), estimationChargePercent: Number(estimationChargePercent) } as BranchSettingsValues;
 }
 
 export async function getCompanyProfile(db: Db = prisma): Promise<CompanyProfile> {

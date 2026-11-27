@@ -1,3 +1,4 @@
+import type { DeclinedItem } from "./job-estimate.types";
 /** The staged job card, as returned by GET /service/job-cards/:id/workspace. */
 
 export type JobStage =
@@ -20,6 +21,7 @@ export type StageAction =
   | "RETURN_TO_TECHNICIAN"
   | "WARRANTY_TO_ADVISOR"
   | "RELEASE_TO_REPAIR"
+  | "SEND_DECLINED_TO_BILLING"
   | "PAUSE_FOR_PARTS"
   | "RESUME_REPAIR"
   | "SEND_TO_QC"
@@ -38,6 +40,8 @@ export type SubStep =
   | "FINDINGS"
   | "ENGINEER_REVIEW"
   | "WARRANTY_REVIEW"
+  | "ESTIMATE_PREPARE"
+  | "ESTIMATE_DECLINED"
   | "ESTIMATE_APPROVAL"
   | "ADVANCE_PAYMENT"
   | "RELEASE"
@@ -94,6 +98,8 @@ export interface JobWorkspace {
   activity: StageActivity[];
   /** The vehicle's last two earlier visits (any branch), newest first. */
   previousVisits: PreviousVisit[];
+  /** Work the customer declined on earlier visits of this vehicle ("Recommended, declined"). */
+  declinedItems: DeclinedItem[];
 }
 
 export interface StageActivity {

@@ -146,7 +146,7 @@ test("finished steps show the recorded facts in plain words", () => {
     },
     damageMarks: [{ id: "m", type: "SCRATCH", x: "50.00", y: "95.00" }],
     qcStatus: "PASSED",
-    estimates: [{ id: "e", version: 2, status: "Approved", amount: 152112.5, currency: "NGN", description: "Estimate", approvals: [], lines: [] }],
+    estimates: [{ id: "e", version: 2, status: "Approved", amount: 152112.5, customerTotal: 152112.5, currency: "NGN", description: "Estimate", approvals: [], lines: [] }],
   };
   const checkIn = Object.fromEntries(frame.stageDetails("CHECK_IN", job).map((row) => [row.label, row.value]));
   assert.equal(checkIn["Received by"], "Chidi Eze");
@@ -162,7 +162,7 @@ test("finished steps show the recorded facts in plain words", () => {
   assert.deepEqual(plain(frame.stageDetails("ESTIMATE", job)), [
     { label: "Estimate", value: "Revision 2" },
     { label: "Customer decision", value: "Approved" },
-    { label: "Estimate total", value: "₦152,112.50" },
+    { label: "Customer total, with VAT", value: "₦152,112.50" },
   ]);
   assert.equal(frame.stageDetails("QUALITY_CHECK", job)[0].value, "Passed");
 });

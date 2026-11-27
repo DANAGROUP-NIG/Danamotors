@@ -81,7 +81,7 @@ function ReceiptSession({ onClose, invoiceId, job }: { onClose: () => void; invo
     }, { onSuccess: (result) => { if (job) setSavedReceiptId(result.receipt.id); else onClose(); } });
   }
 
-  return <ModalFame isOpen onClose={() => { if (!create.isPending) onClose(); }} title={job ? "Advance payment receipt" : "Payment receipt"}>
+  return <ModalFame isOpen onClose={() => { if (!create.isPending) onClose(); }} title={job ? "Advance payment receipt" : "Payment receipt"} preventAccidentalClose>
     {savedReceiptId ? <div className="space-y-4"><p>Advance received and reserved for job {job?.jobNumber}.</p><Button asChild><Link href={`/finance/receipts/${savedReceiptId}/print`}>View and print receipt</Link></Button><Button type="button" variant="outline" onClick={onClose}>Done</Button></div> : <form className="grid gap-4" onSubmit={submit} inert={create.isPending}>
       {job ? <p className="text-sm font-medium">Advance for job {job.jobNumber}. Confirm payment has been received before saving.</p> : invoiceId ? <div><p className="text-sm font-medium">Customer</p><p>{linkedInvoice.data?.customer.companyName || [linkedInvoice.data?.customer.firstName, linkedInvoice.data?.customer.lastName].filter(Boolean).join(" ")}</p>{linkedInvoice.isPending && <p role="status">Loading bill...</p>}{linkedInvoice.isError && <p role="alert">Could not load bill. <button type="button" onClick={() => linkedInvoice.refetch()}>Retry</button></p>}</div> : <WorkshopPicker label="Customer" required endpoint="/customers" collection="customers" formatLabel={customerLabel} renderOption={customerOption} value={customerId} onChange={(id) => { setCustomerId(id); setAllocations({}); }} />}
       {!job && customerId && hasPermission("receipt:adjust") && <Link className="text-sm font-medium text-primary hover:underline" href={"/finance/receipts/advance-adjustment?customerId="+customerId}>Use existing advances or credits</Link>}
@@ -104,7 +104,7 @@ function ReceiptSession({ onClose, invoiceId, job }: { onClose: () => void; invo
       <Field label="Narration"><textarea className={inputCls} maxLength={1000} value={narration} onChange={(event) => setNarration(event.target.value)} /></Field>
       <div className="flex justify-between border-t pt-3 text-sm"><span>Advance</span><span>{currency.format(Math.max((Number.isFinite(receivedAmount) ? receivedAmount : 0) - allocatedCents / 100, 0))}</span></div>
       {(overAllocated || invalidAllocation) && <p role="alert" className="text-sm text-destructive">Review allocations: they must not exceed the receipt amount or current bill balances.</p>}
-      <Button type="submit" disabled={create.isPending || blocked}>{create.isPending ? "Saving receipt..." : "Save receipt"}</Button>
+      <Button type="submit" disabled={create.isPending || blocked}>{create.isPending ? "Saving receipt" : "Save receipt"}</Button>
     </form>}
   </ModalFame>;
 }

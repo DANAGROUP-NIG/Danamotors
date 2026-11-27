@@ -242,6 +242,9 @@ export class PdiService {
     const open = !job.billedAt && !CLOSED.includes(status);
     return {
       ...job,
+      // Money as numbers for the PDI screens.
+      serviceCharge: job.serviceCharge?.toNumber() ?? null,
+      complaints: job.complaints.map(line => ({ ...line, spare: line.spare.toNumber(), oil: line.oil.toNumber(), labour: line.labour.toNumber() })),
       status,
       customerName: customerName(job.customer),
       defectTotals: defectTotals(job.complaints),
@@ -295,10 +298,8 @@ export class PdiService {
       if (input.tyres) data.tyres = await resolveTyres(tx, input.tyres) as unknown as Prisma.InputJsonValue;
       if (input.defects) {
         const lines = await resolveJobComplaints(tx, input.defects.map(({ defectId, ...line }) => ({ ...line, complaintCodeId: defectId })), 'PDI_DEFECT');
-        const totals = defectTotals(lines);
         await tx.jobComplaint.deleteMany({ where: { jobCardId: id } });
         await tx.jobComplaint.createMany({ data: lines.map(line => ({ ...line, jobCardId: id })) });
-        Object.assign(data, { estimatedParts: totals.spare, estimatedOil: totals.oil, estimatedLabour: totals.labour, estimatedCost: sumMoney([totals.total, job.serviceCharge ?? 0]) });
       }
       await tx.jobCard.update({ where: { id }, data });
       if (job.vehicleId && (input.tyres || input.batteryMakeId !== undefined || input.batteryNumber !== undefined))

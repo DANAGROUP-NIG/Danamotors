@@ -15,6 +15,7 @@ import { useAppointments } from "@/features/appointments/hooks/use-appointments"
 import { useJobCards } from "@/features/job-cards/hooks/use-job-cards";
 import { useInvoices } from "@/features/invoices/hooks/use-invoices";
 import { useBranchStore } from "@/store/branch.store";
+import { NOT_PROVIDED } from "@/lib/format";
 import {
   ArrowLeft,
   Loader2,
@@ -160,7 +161,7 @@ export default function CustomerDetailPage() {
                       </span>
                     </td>
                     <td className="max-w-xs truncate py-2 pr-4 text-slate-500">
-                      {a.notes ?? "—"}
+                      {a.notes ?? NOT_PROVIDED}
                     </td>
                     <td className="py-2 pr-4">
                       <Link
@@ -206,19 +207,19 @@ export default function CustomerDetailPage() {
                       {v.vin}
                     </td>
                     <td className="py-2 pr-4 text-slate-700">
-                      {v.make ?? "—"}
+                      {v.make ?? NOT_PROVIDED}
                     </td>
                     <td className="py-2 pr-4 text-slate-700">
-                      {v.model ?? "—"}
+                      {v.model ?? NOT_PROVIDED}
                     </td>
                     <td className="py-2 pr-4 text-slate-700">
-                      {v.year ?? "—"}
+                      {v.year ?? NOT_PROVIDED}
                     </td>
                     <td className="py-2 pr-4 text-slate-700">
-                      {v.color ?? "—"}
+                      {v.color ?? NOT_PROVIDED}
                     </td>
                     <td className="py-2 pr-4 text-slate-700">
-                      {v.saleDate ? new Date(v.saleDate).toLocaleDateString("en-GB") : "—"}
+                      {v.saleDate ? new Date(v.saleDate).toLocaleDateString("en-GB") : NOT_PROVIDED}
                     </td>
                     <td className="py-2 pr-4">
                       <Link
@@ -252,7 +253,6 @@ export default function CustomerDetailPage() {
                   <th className="py-2 pr-4">Description</th>
                   <th className="py-2 pr-4">Status</th>
                   <th className="py-2 pr-4">Progress</th>
-                  <th className="py-2 pr-4">Est. Cost</th>
                 </tr>
               </thead>
               <tbody>
@@ -274,9 +274,6 @@ export default function CustomerDetailPage() {
                     </td>
                     <td className="py-2 pr-4 text-slate-700">
                       {j.progress ?? 0}%
-                    </td>
-                    <td className="py-2 pr-4 text-slate-700">
-                      ${j.estimatedCost?.toFixed(2) ?? "—"}
                     </td>
                   </tr>
                 ))}
@@ -320,7 +317,7 @@ export default function CustomerDetailPage() {
                       <td className="py-2 pr-4 text-slate-700">
                         {inv.dueDate
                           ? new Date(inv.dueDate).toLocaleDateString()
-                          : "—"}
+                          : NOT_PROVIDED}
                       </td>
                       <td className="py-2 pr-4 text-slate-700">
                         ${inv.total.toFixed(2)}
@@ -366,7 +363,7 @@ function DetailField({
       <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
         {label}
       </p>
-      <p className="mt-0.5 text-sm text-slate-700">{value || "—"}</p>
+      <p className="mt-0.5 text-sm text-slate-700">{value || NOT_PROVIDED}</p>
     </div>
   );
 }

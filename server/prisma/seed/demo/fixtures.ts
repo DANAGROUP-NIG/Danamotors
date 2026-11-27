@@ -151,6 +151,12 @@ export const VEHICLES = {
   stgWtyIrregular: { vin: "KNAPX81DMS7000517", registrationNumber: "KJA-527ST", customer: "okafor", model: "SPORTAGE", saleDaysAgo: 600 },
   stgWtyRegular: { vin: "KNAPX81DMS7000518", registrationNumber: "KJA-528ST", customer: "lakeside", model: "SPORTAGE", saleDaysAgo: 250 },
   stgWtyNoSale: { vin: "KNAPX81DMS7000519", registrationNumber: "KJA-529ST", customer: "adeyemi", model: "SPORTAGE", saleDaysAgo: 300 },
+  // Estimate and approval (phase 5): in warranty with AC items on warranty; out of warranty for phone approval
+  // and for a customer who declines everything; a free service with a warranty repair (no advance needed).
+  stgEstPrepare: { vin: "KNAPX81DMS7000520", registrationNumber: "KJA-530ST", customer: "okafor", model: "SPORTAGE", saleDaysAgo: 60 },
+  stgEstPhone: { vin: "KNAPM81DMK7000521", registrationNumber: "LSR-531ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2200 },
+  stgEstDecline: { vin: "KNAPM81DMK7000522", registrationNumber: "LSR-532ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2200 },
+  stgEstFree: { vin: "KNAPX81DMS7000523", registrationNumber: "KJA-533ST", customer: "lakeside", model: "SPORTAGE", saleDaysAgo: 40 },
 } satisfies Record<string, VehicleFixture>;
 
 export type VehicleKey = keyof typeof VEHICLES;
@@ -242,7 +248,7 @@ export const WARRANTY_CODES = {
 
 // ── Job cards ────────────────────────────────────────────────────────────────
 
-export type ServiceTypeCode = "RG" | "RR";
+export type ServiceTypeCode = "RG" | "RR" | "1F";
 
 export interface EstimateFixture {
   description: string;
@@ -285,6 +291,8 @@ export interface FindingFixture {
   possibleWarranty?: boolean;
   labour?: LabourKey[];
   parts?: [PartKey, number][];
+  /** At the warranty check: these items are charged to warranty (the rest are customer pay). */
+  warranty?: (LabourKey | PartKey)[];
 }
 
 /**
@@ -328,6 +336,8 @@ export interface JobFixture {
   checkIn?: CheckInLevel;
   /** For a job that stops at diagnosis with a technician: findings and how far they got. */
   diagnosis?: DiagnosisFixture;
+  /** For a job that stops at the estimate (phase 5): prepared as a draft, or prepared and presented to the customer. */
+  estimateStep?: "prepared" | "presented";
   /** An earlier odometer reading for a vehicle with no visits yet, so check-in shows "Last recorded". */
   priorMileage?: number;
   /** The answer recorded for linked campaigns (FPC) before READY; without it a FREE line must pre-set it. */
@@ -620,15 +630,16 @@ const serviceEstimate = (decided: boolean): EstimateFixture => ({
 const stageJob = (
   id: string,
   vehicle: VehicleKey,
-  fields: Pick<JobFixture, "description" | "complaints" | "mileage" | "withTechnician" | "target" | "checkIn" | "priorMileage" | "diagnosis"> & {
+  fields: Pick<JobFixture, "description" | "complaints" | "mileage" | "withTechnician" | "target" | "checkIn" | "priorMileage" | "diagnosis" | "estimateStep"> & {
     stop?: StageStop;
     estimate?: "none" | "pending" | "approved";
+    serviceType?: ServiceTypeCode;
   },
 ): JobFixture => ({
   id,
   vehicle,
   branch: "main",
-  serviceType: "RG",
+  serviceType: fields.serviceType ?? "RG",
   description: fields.description,
   complaints: fields.complaints,
   mileage: fields.mileage,
@@ -641,6 +652,7 @@ const stageJob = (
   stop: fields.stop,
   checkIn: fields.checkIn,
   diagnosis: fields.diagnosis,
+  estimateStep: fields.estimateStep,
   priorMileage: fields.priorMileage,
   startDaysAgo: 0,
   spanHours: 0,
@@ -773,6 +785,56 @@ export const STAGE_JOBS: JobFixture[] = [
     diagnosis: {
       stop: "confirmed",
       findings: [{ request: 0, text: "Compressor clutch not engaging.", possibleWarranty: true, labour: ["acCheck"], parts: [["acCompressor", 1]] }],
+    },
+  }),
+  // Estimate (phase 5): findings priced from the catalogue, the AC compressor and its labour on warranty.
+  stageJob("JC-S19", "stgEstPrepare", {
+    description: "Noise from the front left wheel when braking, AC not cooling well, and the periodic service.",
+    complaints: ["Noise from front left wheel when braking", "AC not cooling well", "Periodic service (5,000 km)"],
+    mileage: 5_200, withTechnician: true, target: "OPEN", stop: "ESTIMATE", estimate: "none",
+    diagnosis: {
+      stop: "confirmed",
+      findings: [
+        { request: 0, text: "Front pads worn to 2 mm, disc surface fine.", labour: ["brakePads"], parts: [["brakePads", 1]] },
+        { request: 1, text: "Compressor clutch not engaging. Refrigerant low after the repair test.", possibleWarranty: true, labour: ["acCheck"], parts: [["acCompressor", 1], ["acRefrigerant", 1]], warranty: ["acCheck", "acCompressor"] },
+        { request: 2, text: "Due for the 5,000 km service.", labour: ["service"], parts: [["engineOil", 1]] },
+      ],
+    },
+  }),
+  // Prepared, for a phone approval: the customer left and approves on the phone.
+  stageJob("JC-S20", "stgEstPhone", {
+    description: "Brakes noisy and the periodic service.",
+    complaints: ["Brakes noisy", "Periodic service"],
+    mileage: 101_300, withTechnician: true, target: "OPEN", stop: "ESTIMATE", estimate: "none", estimateStep: "prepared",
+    diagnosis: {
+      stop: "confirmed",
+      findings: [
+        { request: 0, text: "Front pads worn to 3 mm.", labour: ["brakePads"], parts: [["brakePads", 1]] },
+        { request: 1, text: "Due for the periodic service.", labour: ["service"], parts: [["engineOil", 1]] },
+      ],
+    },
+  }),
+  // Presented to the customer, who is expected to decline everything (estimation charge, terms clause 4).
+  stageJob("JC-S21", "stgEstDecline", {
+    description: "Brakes noisy.",
+    complaints: ["Brakes noisy"],
+    mileage: 104_800, withTechnician: true, target: "OPEN", stop: "ESTIMATE", estimate: "none", estimateStep: "presented",
+    diagnosis: {
+      stop: "confirmed",
+      findings: [{ request: 0, text: "Front pads worn to 2 mm, rear pads fine.", labour: ["brakePads"], parts: [["brakePads", 1]] }],
+    },
+  }),
+  // A free first service with a warranty repair: the customer pays nothing, so no advance is needed.
+  stageJob("JC-S22", "stgEstFree", {
+    description: "First free service. AC not cooling well.",
+    complaints: ["First free service", "AC not cooling well"],
+    mileage: 1_100, withTechnician: true, target: "OPEN", stop: "ESTIMATE", estimate: "none", estimateStep: "prepared", serviceType: "1F",
+    diagnosis: {
+      stop: "confirmed",
+      findings: [
+        { request: 0, text: "First service due. The free service covers the work.", labour: [], parts: [] },
+        { request: 1, text: "Compressor clutch not engaging.", possibleWarranty: true, labour: ["acCheck"], parts: [["acCompressor", 1]], warranty: ["acCheck", "acCompressor"] },
+      ],
     },
   }),
   stageJob("JC-S12", "stgSigned", {

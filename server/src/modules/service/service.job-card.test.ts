@@ -357,40 +357,10 @@ describe("JobCard workflow", () => {
     }) }));
   });
 
-  it("calculates the opening estimate from its breakdown", async () => {
+  it("keeps the request amounts on the requests and snapshots other details", async () => {
     await new ServiceService().createJobCard({
       ...input,
       createdById: id,
-      estimatedParts: 10.1,
-      estimatedOil: 0.2,
-      estimatedLabour: 50,
-      serviceCharge: 5,
-      estimatedCost: 9999,
-    });
-    expect(prisma.jobCard.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        estimatedCost: 65.3,
-        estimatedParts: 10.1,
-      }),
-    });
-  });
-
-  it.each([-1, 0.001, Infinity, 1e13])(
-    "rejects an invalid estimate amount: %s",
-    (amount) => {
-      expect(
-        createJobCardSchema.safeParse({
-          body: { ...input, estimatedOil: amount },
-        }).success,
-      ).toBe(false);
-    },
-  );
-
-  it("uses request amounts as the authoritative opening estimate and snapshots other details", async () => {
-    await new ServiceService().createJobCard({
-      ...input,
-      createdById: id,
-      estimatedParts: 9999,
       serviceCharge: 5,
       complaints: [
         {
@@ -412,10 +382,6 @@ describe("JobCard workflow", () => {
     });
     expect(prisma.jobCard.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        estimatedParts: 10.1,
-        estimatedOil: 0.2,
-        estimatedLabour: 50,
-        estimatedCost: 65.3,
         tyres: expect.arrayContaining([
           { makeId: id, make: "Master", number: "TYRE-1" },
         ]),
@@ -490,7 +456,7 @@ describe("JobCard workflow", () => {
       promisedAt: new Date("2026-10-01T00:00:00Z"),
     };
 
-    expect(() => assertTransition("OPEN", "READY", context, now)).toThrow(
+    expect(() => assertTransition("OPEN", "QC", context, now)).toThrow(
       "Cannot move",
     );
 

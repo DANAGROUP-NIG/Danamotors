@@ -17,6 +17,8 @@ import {
 } from "../finance/job-advance";
 import { lagosDay } from "../finance/credit-terms";
 
+import { advanceRequirement, estimateTotals } from "./job-estimate.logic";
+
 export { upfrontAmount } from "./estimate-advance";
 
 export async function assertDepositPaid(
@@ -38,8 +40,36 @@ export async function assertDepositPaid(
   });
   if (!receipt)
     throw new BadRequestError(
-      "Record a positive advance payment before starting work",
+      "Ask the cashier to record the advance before work starts",
     );
+}
+
+/**
+ * Whether this job needs an advance before work, from the latest estimate and any recorded exemption.
+ * Pure rule: advanceRequirement (job-estimate.logic.ts).
+ */
+export async function loadAdvanceRequirement(tx: Prisma.TransactionClient, jobCardId: string) {
+  const [job, estimate] = await Promise.all([
+    tx.jobCard.findUniqueOrThrow({ where: { id: jobCardId }, select: { advanceExemption: true, advanceExemptionReason: true, serviceType: { select: { chargedTo: true } } } }),
+    tx.estimate.findFirst({
+      where: { jobCardId },
+      orderBy: [{ version: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+      select: { vatRate: true, lines: { select: { payer: true, amount: true, customerDecision: true } } },
+    }),
+  ]);
+  const approvedLines = (estimate?.lines ?? []).filter((line) => line.customerDecision !== "DECLINED");
+  return advanceRequirement({
+    approvedTotal: estimate ? estimateTotals(estimate.lines, estimate.vatRate).approvedTotal : "0",
+    approvedPayers: approvedLines.map((line) => line.payer),
+    recorded: job.advanceExemption ? { exemption: job.advanceExemption, reason: job.advanceExemptionReason ?? "" } : null,
+    freeService: job.serviceType?.chargedTo === "COMPANY",
+  });
+}
+
+/** The work-start payment gate: a positive eligible advance, unless the job is exempt. */
+export async function assertAdvanceOrExempt(tx: Prisma.TransactionClient, jobCardId: string) {
+  const requirement = await loadAdvanceRequirement(tx, jobCardId);
+  if (requirement.required) await assertDepositPaid(tx, jobCardId);
 }
 
 export async function recordJobDeposit(

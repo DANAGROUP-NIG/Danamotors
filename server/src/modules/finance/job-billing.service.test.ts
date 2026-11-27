@@ -147,7 +147,15 @@ describe("Job billing after delivery on credit", () => {
         where: expect.objectContaining({
           branchId: "branch",
           billedAt: null,
-          qcStatus: { equals: "PASSED", mode: "insensitive" },
+          // A passed QC, or no QC needed because only the estimation charge is billed.
+          AND: [
+            {
+              OR: [
+                { qcStatus: { equals: "PASSED", mode: "insensitive" } },
+                { qcStatus: "NOT_REQUIRED", estimationCharge: { status: "ADDED" } },
+              ],
+            },
+          ],
         }),
       }),
     );
@@ -415,7 +423,7 @@ describe("Job billing after delivery on credit", () => {
     const data = (prisma.invoice.create as jest.Mock).mock.calls[0][0].data;
     expect(preview.lines.filter((line) => line.type === "SERVICE")).toEqual([
       expect.objectContaining({
-        description: "Full service ? service charge",
+        description: "Full service, service charge",
         amount: 200,
         quantity: 1,
       }),

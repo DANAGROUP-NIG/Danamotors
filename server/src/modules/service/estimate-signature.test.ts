@@ -11,4 +11,4 @@ test('valid, invalid, legacy and override are distinguished',()=>{
  expect(signatureState(estimate,{signatureRequired:false})).toBe('legacy');
  expect(signatureState(estimate,{signatureRequired:true,overrideReason:'Verified paper approval'})).toBe('override');
 });
-test('only bounded PNG signatures are accepted',()=>{expect(()=>assertSignaturePng('data:image/svg+xml;base64,AAAA')).toThrow('PNG');expect(()=>assertSignaturePng('data:image/png;base64,AAAA')).toThrow('64 KiB');});
+test('only bounded PNG signatures are accepted',()=>{expect(()=>assertSignaturePng('data:image/svg+xml;base64,AAAA')).toThrow('A signature is required');expect(()=>assertSignaturePng('data:image/png;base64,AAAA')).toThrow('signature image is too large');});

@@ -10,6 +10,9 @@ export const ACCOUNTS = {
   otherTechnician: "tech2@kiamotors.com",
   engineer: "engineer1@kiamotors.com",
   warranty: "warranty@kiamotors.com",
+  serviceManager: "servicemanager@kiamotors.com",
+  // The local demo data has no billing officer at Main Branch; the super admin records receipts there.
+  cashier: "superadmin@danamotors.com",
   abujaAdmin: "admin.abuja@kiamotors.com",
 } as const;
 export type Role = keyof typeof ACCOUNTS;

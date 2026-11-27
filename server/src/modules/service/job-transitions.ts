@@ -13,7 +13,9 @@ export const JOB_TRANSITION_ROLES: Record<
   string,
   Record<string, readonly string[]>
 > = {
-  OPEN: { IN_PROGRESS: workshop, CANCELLED: managers },
+  // OPEN to READY only when the customer declined all work and the estimation charge was added
+  // (job card revamp phase 5): the charge is billed with no repair and no quality check.
+  OPEN: { IN_PROGRESS: workshop, READY: [ROLES.SERVICE_ADVISOR], CANCELLED: managers },
   IN_PROGRESS: { QC: workshop, WAITING_PARTS: workshop, CANCELLED: managers },
   WAITING_PARTS: { IN_PROGRESS: workshop, QC: workshop, CANCELLED: managers },
   QC: {

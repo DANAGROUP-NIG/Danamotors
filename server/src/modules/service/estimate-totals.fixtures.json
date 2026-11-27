@@ -1,0 +1,153 @@
+{
+  "description": "Totals and VAT cases shared by server/src/modules/service/job-estimate.logic.test.ts and client/test/estimate.test.mjs, so both sides give the same answers.",
+  "cases": [
+    {
+      "name": "design sample, nothing decided",
+      "vatRate": "7.50",
+      "lines": [
+        { "payer": "CUSTOMER", "amount": "25000.00" },
+        { "payer": "CUSTOMER", "amount": "38000.00" },
+        { "payer": "CUSTOMER", "amount": "6500.00" },
+        { "payer": "CUSTOMER", "amount": "12000.00" },
+        { "payer": "CUSTOMER", "amount": "45000.00" },
+        { "payer": "CUSTOMER", "amount": "15000.00" },
+        { "payer": "WARRANTY", "amount": "480000.00" },
+        { "payer": "WARRANTY", "amount": "30000.00" },
+        { "payer": "WARRANTY", "amount": "18000.00" }
+      ],
+      "expected": {
+        "customerSubtotal": "141500.00",
+        "vat": "10612.50",
+        "customerTotal": "152112.50",
+        "otherPayerTotal": "528000.00",
+        "approvedSubtotal": "141500.00",
+        "approvedVat": "10612.50",
+        "approvedTotal": "152112.50",
+        "customerLineCount": 6,
+        "declinedCount": 0
+      },
+      "advance": { "percent": "60", "amount": "91267.50" }
+    },
+    {
+      "name": "design sample, air filter declined",
+      "vatRate": "7.50",
+      "lines": [
+        { "payer": "CUSTOMER", "amount": "25000.00", "customerDecision": "APPROVED" },
+        { "payer": "CUSTOMER", "amount": "38000.00", "customerDecision": "APPROVED" },
+        { "payer": "CUSTOMER", "amount": "6500.00", "customerDecision": "APPROVED" },
+        { "payer": "CUSTOMER", "amount": "12000.00", "customerDecision": "DECLINED" },
+        { "payer": "CUSTOMER", "amount": "45000.00", "customerDecision": "APPROVED" },
+        { "payer": "CUSTOMER", "amount": "15000.00", "customerDecision": "APPROVED" },
+        { "payer": "WARRANTY", "amount": "480000.00" },
+        { "payer": "WARRANTY", "amount": "30000.00" },
+        { "payer": "WARRANTY", "amount": "18000.00" }
+      ],
+      "expected": {
+        "customerSubtotal": "141500.00",
+        "vat": "10612.50",
+        "customerTotal": "152112.50",
+        "otherPayerTotal": "528000.00",
+        "approvedSubtotal": "129500.00",
+        "approvedVat": "9712.50",
+        "approvedTotal": "139212.50",
+        "customerLineCount": 6,
+        "declinedCount": 1
+      },
+      "advance": { "percent": "60", "amount": "83527.50" }
+    },
+    {
+      "name": "half kobo VAT rounds half up",
+      "vatRate": "7.50",
+      "lines": [{ "payer": "CUSTOMER", "amount": "0.10" }, { "payer": "CUSTOMER", "amount": "0.10" }],
+      "expected": {
+        "customerSubtotal": "0.20",
+        "vat": "0.02",
+        "customerTotal": "0.22",
+        "otherPayerTotal": "0.00",
+        "approvedSubtotal": "0.20",
+        "approvedVat": "0.02",
+        "approvedTotal": "0.22",
+        "customerLineCount": 2,
+        "declinedCount": 0
+      },
+      "advance": { "percent": "33.33", "amount": "0.07" }
+    },
+    {
+      "name": "VAT on the subtotal, not per line",
+      "vatRate": "7.50",
+      "lines": [
+        { "payer": "CUSTOMER", "amount": "333.33" },
+        { "payer": "CUSTOMER", "amount": "333.33" },
+        { "payer": "CUSTOMER", "amount": "333.34" },
+        { "payer": "GOODWILL", "amount": "1000.00" },
+        { "payer": "CAMPAIGN", "amount": "250.50" }
+      ],
+      "expected": {
+        "customerSubtotal": "1000.00",
+        "vat": "75.00",
+        "customerTotal": "1075.00",
+        "otherPayerTotal": "1250.50",
+        "approvedSubtotal": "1000.00",
+        "approvedVat": "75.00",
+        "approvedTotal": "1075.00",
+        "customerLineCount": 3,
+        "declinedCount": 0
+      },
+      "advance": { "percent": "20", "amount": "215.00" }
+    },
+    {
+      "name": "everything declined",
+      "vatRate": "7.50",
+      "lines": [
+        { "payer": "CUSTOMER", "amount": "18500.25", "customerDecision": "DECLINED" },
+        { "payer": "CUSTOMER", "amount": "1499.75", "customerDecision": "DECLINED" }
+      ],
+      "expected": {
+        "customerSubtotal": "20000.00",
+        "vat": "1500.00",
+        "customerTotal": "21500.00",
+        "otherPayerTotal": "0.00",
+        "approvedSubtotal": "0.00",
+        "approvedVat": "0.00",
+        "approvedTotal": "0.00",
+        "customerLineCount": 2,
+        "declinedCount": 2
+      },
+      "advance": { "percent": "60", "amount": "0.00" }
+    },
+    {
+      "name": "warranty only, zero VAT rate",
+      "vatRate": "0.00",
+      "lines": [{ "payer": "WARRANTY", "amount": "99999.99" }],
+      "expected": {
+        "customerSubtotal": "0.00",
+        "vat": "0.00",
+        "customerTotal": "0.00",
+        "otherPayerTotal": "99999.99",
+        "approvedSubtotal": "0.00",
+        "approvedVat": "0.00",
+        "approvedTotal": "0.00",
+        "customerLineCount": 0,
+        "declinedCount": 0
+      },
+      "advance": { "percent": "30", "amount": "0.00" }
+    },
+    {
+      "name": "large amounts stay exact",
+      "vatRate": "7.50",
+      "lines": [{ "payer": "CUSTOMER", "amount": "987654321.99" }, { "payer": "CUSTOMER", "amount": "0.01" }],
+      "expected": {
+        "customerSubtotal": "987654322.00",
+        "vat": "74074074.15",
+        "customerTotal": "1061728396.15",
+        "otherPayerTotal": "0.00",
+        "approvedSubtotal": "987654322.00",
+        "approvedVat": "74074074.15",
+        "approvedTotal": "1061728396.15",
+        "customerLineCount": 2,
+        "declinedCount": 0
+      },
+      "advance": { "percent": "60", "amount": "637037037.69" }
+    }
+  ]
+}

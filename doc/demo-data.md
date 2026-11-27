@@ -145,7 +145,7 @@ Opening stock enters as a `RECEIVED` stock movement. The seeded job cards then i
 
 Jobs that start work go through the staged job card: check-in, diagnosis, the warranty check when the vehicle needs it, the estimate, then repair. The cashier records a **₦10,000 advance** (or the suggested amount if lower) before work starts, and the technician presses **Request parts** before the store issues parts (without a store officer at the branch the request time is recorded). Every job that leaves check-in has its walk-around recorded through the check-in service (half a tank, hub caps missing, AC not working, service book seen with 3 stamps, umbrella in boot, a scratch on the rear bumper and a dent on the front right door) and instructions to the technician. Jobs seeded today (the JC-S jobs) are also signed by the owner on screen, with a drawn demo signature. The historical scenario jobs are re-dated after seeding, which would change the opening date the customer signed, so they are recorded like jobs from before signed consent (`TODO(confirm)`).
 
-**Staged job card: one job at every step (JC-S01 to JC-S18)**
+**Staged job card: one job at every step (JC-S01 to JC-S22)**
 
 Customer `DEMO-C05` Adaeze Okafor (fictional) and existing demo customers, all at the main branch, each on its own vehicle. Periodic service labour only, no parts.
 
@@ -169,6 +169,10 @@ Customer `DEMO-C05` Adaeze Okafor (fictional) and existing demo customers, all a
 | JC-S16 | KJA-527ST (Sportage, sold about 600 days ago) | Warranty check | Service history with one missed service (year 2, quarter 2: a 165-day gap between the services 175 and 10 days before the seed run). Findings: AC compressor clutch (possible warranty) with AC check labour, AC compressor and refrigerant; front brake pads (labour and part); the 25,000 km service with engine oil. No decisions yet |
 | JC-S17 | KJA-528ST (Sportage, sold about 250 days ago) | Warranty check | Regular history (services 170 and 85 days before the run), linked to the open recall RC-DM-2601: periodic service with oil, and harness rerouting labour for the recall. No decisions yet |
 | JC-S18 | KJA-529ST (Sportage) | Warranty check | No sale date recorded (cleared before the job opened), so coverage cannot be confirmed and the service history cannot be checked; AC compressor finding flagged possible warranty |
+| JC-S19 | KJA-530ST (Sportage, sold about 60 days ago) | Estimate, nothing prepared | Phase 5. Findings: front brake pads (labour and part), AC compressor clutch (AC check labour and the compressor on warranty, refrigerant customer pay) and the 5,000 km service with engine oil. The warranty officer decided who pays. Press Prepare estimate |
+| JC-S20 | LSR-531ST (Sorento, out of warranty) | Estimate, draft prepared | Phase 5. Brake pads and the periodic service with oil, priced; for a phone approval |
+| JC-S21 | LSR-532ST (Sorento, out of warranty) | Estimate, presented to the customer | Phase 5. Brake pads only; for the customer who declines everything (estimation charge, waiver) |
+| JC-S22 | KJA-533ST (Sportage, sold about 40 days ago) | Estimate, draft prepared | Phase 5. First free service (service type 1F, paid by the company, charged at zero) with the AC compressor and its labour on warranty: nothing for the customer to pay, so no advance is needed |
 
 Jobs past diagnosis (JC-S04 onward and the scenario jobs) are diagnosed through the services: the workshop supervisor assigns the technician and a bay (bays A1 to A4 are added when missing), the technician records a finding per request with the periodic service labour, and the service engineer confirms. The service engineer is an active Engineer at the branch, or the admin where the branch has none (`TODO(confirm)`); the seed never creates users.
 

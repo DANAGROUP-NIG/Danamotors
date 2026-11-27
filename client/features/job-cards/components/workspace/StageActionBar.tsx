@@ -24,6 +24,8 @@ export function StageActionBar({
   next,
   note,
   status,
+  extra,
+  blockedReason,
 }: {
   primary: StageActionView | null;
   secondary: StageActionView[];
@@ -46,13 +48,17 @@ export function StageActionBar({
   note?: string;
   /** Extra status on the left, such as "Saved 10:42". */
   status?: ReactNode;
+  /** A step-specific button beside the handoff, such as "Notify cashier". */
+  extra?: ReactNode;
+  /** Replaces the blocked handoff's reasons, for example to name who can fix it. */
+  blockedReason?: string;
 }) {
   const reasonId = useId();
   const noteId = useId();
   const busy = pending !== null || savingDraft || !!next?.pending;
   const shownSecondary = next ? [] : secondary.filter((view) => view.enabled);
-  if (!primary && !shownSecondary.length && !danger.length && !onSaveDraft && !back && !next && !status) return null;
-  const blocked = !next && primary && !primary.enabled ? primary.reasons.join(" ") : null;
+  if (!primary && !shownSecondary.length && !danger.length && !onSaveDraft && !back && !next && !status && !extra) return null;
+  const blocked = !next && primary && !primary.enabled ? (blockedReason ?? primary.reasons.join(" ")) : null;
   return (
     <div
       role="region"
@@ -95,6 +101,7 @@ export function StageActionBar({
             </ActionMenu>
           )}
           {status}
+          {extra}
         </div>
         <div className="flex min-w-0 flex-1 basis-full flex-wrap items-center justify-end gap-x-3 gap-y-2 sm:basis-auto">
           {blocked && (

@@ -1,13 +1,13 @@
 import { drainJobcardNotifications } from "../notification/jobcard-notification-router";
 import { JOB_TRANSITION_ROLES, assertTransitionRole } from "./job-transitions";
-import { assertDepositPaid } from "./job-deposit.service";
+import { assertAdvanceOrExempt } from "./job-deposit.service";
+import { QC_NOT_REQUIRED } from "../finance/job-billing.logic";
 import { assertSignedJobOpening } from "./job-opening-signature.service";
 import { syncStage, type StageContext } from "./job-stage.writer";
 import {
   loadOpeningConsent,
   recordOpeningConsent,
 } from "./job-opening-consent";
-import { sumMoney } from "../finance/money";
 import {
   assertBookable,
   assertPromisedDate,
@@ -447,21 +447,6 @@ export class JobCardWorkflowService {
           ? (await requireMaster(tx, data.batteryMakeId, "BATTERY_MAKE"))
               .description
           : undefined;
-        const hasRequestAmounts = data.complaints.some(
-          (row) =>
-            row.spare !== undefined ||
-            row.oil !== undefined ||
-            row.labour !== undefined,
-        );
-        const sum = (key: "spare" | "oil" | "labour") =>
-          sumMoney(complaints.map((row) => row[key]));
-        const estimatedParts = hasRequestAmounts
-          ? sum("spare")
-          : data.estimatedParts;
-        const estimatedOil = hasRequestAmounts ? sum("oil") : data.estimatedOil;
-        const estimatedLabour = hasRequestAmounts
-          ? sum("labour")
-          : data.estimatedLabour;
         const {
           tyres: _tyres,
           batteryMakeId: _batteryMakeId,
@@ -492,22 +477,6 @@ export class JobCardWorkflowService {
             tyres,
             batteryMake,
             acFitted: data.acType ? data.acType !== "NONE" : data.acFitted,
-            estimatedParts,
-            estimatedOil,
-            estimatedLabour,
-            estimatedCost: [
-              estimatedParts,
-              estimatedOil,
-              estimatedLabour,
-              serviceCharge,
-            ].some((value) => value !== undefined)
-              ? sumMoney([
-                  estimatedParts ?? 0,
-                  estimatedOil ?? 0,
-                  estimatedLabour ?? 0,
-                  serviceCharge ?? 0,
-                ])
-              : data.estimatedCost,
             branchId: branch.id,
             createdById,
             promisedAt: new Date(promisedAt),
@@ -762,23 +731,20 @@ export class JobCardWorkflowService {
           workDone: data.workDone,
           serviceCharge: data.serviceCharge,
           engineerId: data.engineerId,
-          ...(data.serviceCharge !== undefined
-            ? {
-                estimatedCost:
-                  [
-                    current.estimatedParts,
-                    current.estimatedOil,
-                    current.estimatedLabour,
-                    data.serviceCharge,
-                  ].reduce<number>(
-                    (sum, value) => sum + Math.round((value ?? 0) * 100),
-                    0,
-                  ) / 100,
-              }
-            : {}),
         };
 
+        // The customer declined all work: only the estimation charge is billed (no work, no QC).
+        const declinedToBilling = from === "OPEN" && data.status === "READY";
+        if (declinedToBilling) {
+          const charge = await tx.estimationCharge.findUnique({ where: { jobCardId: id }, select: { status: true } });
+          if (charge?.status !== "ADDED")
+            throw new BadRequestError(
+              "Only a job whose customer declined all work, with the estimation charge added, can go to billing without repair",
+            );
+          update.qcStatus = QC_NOT_REQUIRED;
+        }
         if (
+          !declinedToBilling &&
           data.status &&
           data.status !== from &&
           ["IN_PROGRESS", "QC", "READY"].includes(data.status)
@@ -788,8 +754,9 @@ export class JobCardWorkflowService {
           await assertApprovedOperation(tx, id, current.customerId, []);
         }
         if (data.status === "IN_PROGRESS" && data.status !== from)
-          await assertDepositPaid(tx, id);
+          await assertAdvanceOrExempt(tx, id);
         if (
+          !declinedToBilling &&
           data.status === "READY" &&
           current.qcStatus?.toUpperCase() !== "PASSED"
         )
@@ -797,7 +764,7 @@ export class JobCardWorkflowService {
             "Record a passed quality check before marking the job Ready",
           );
 
-        if (data.status === "READY" || (data.status === "DELIVERED" && !billed))
+        if (!declinedToBilling && (data.status === "READY" || (data.status === "DELIVERED" && !billed)))
           await assertRecordedScope(tx, id);
         if (data.status && data.status !== from) {
           const actor = await tx.user.findUnique({

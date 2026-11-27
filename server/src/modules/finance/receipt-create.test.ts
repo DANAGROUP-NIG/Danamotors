@@ -62,7 +62,7 @@ it('retries a confirmed serialization rollback', async () => {
 it('creates and reserves a below-target advance with a stable receipt snapshot and idempotent retry', async () => {
   const jobId = '55555555-5555-4555-8555-555555555555';
   (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id: jobId, jobNumber: 'J1', customerId, branchId, status: 'OPEN', branch: { name: 'Test branch' }, customer: { firstName: 'Test', lastName: 'Customer' } });
-  (prisma.estimate.findFirst as jest.Mock).mockResolvedValue({ id: 'estimate', estimateNumber: 'E1', version: 1, amount: 500, upfrontPaymentPercent: new Prisma.Decimal(60) });
+  (prisma.estimate.findFirst as jest.Mock).mockResolvedValue({ id: 'estimate', estimateNumber: 'E1', version: 1, amount: 500, vatRate: new Prisma.Decimal(0), lines: [{ payer: 'CUSTOMER', amount: new Prisma.Decimal(500), customerDecision: null }], upfrontPaymentPercent: new Prisma.Decimal(60) });
   (prisma.receipt.findMany as jest.Mock).mockResolvedValue([]);
   (prisma.invoice.findMany as jest.Mock).mockResolvedValue([]);
   const service = new ReceiptService();

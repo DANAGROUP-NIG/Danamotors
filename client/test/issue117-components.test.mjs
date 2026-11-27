@@ -72,6 +72,9 @@ test("print component excludes internal fields and handles unsigned/superseded v
       estimateDate: "2026-10-20T10:00:00Z",
       currency: "NGN",
       total: 100,
+      vatRate: 7.5,
+      totals: { customerSubtotal: 100, vat: 7.5, customerTotal: 107.5, otherPayerTotal: 0, approvedTotal: 107.5 },
+      phoneApproval: null,
       supersededBy: 3,
       signatureState: null,
       signature: null,
@@ -86,6 +89,8 @@ test("print component excludes internal fields and handles unsigned/superseded v
           source: "SECRET-SOURCE",
           cost: 50,
           chargeType: "WARRANTY",
+          payer: "CUSTOMER",
+          customerDecision: null,
         },
       ],
     },
@@ -127,6 +132,8 @@ test("print component excludes internal fields and handles unsigned/superseded v
       "@/features/service-transactions/transaction.logic": load(
         "features/service-transactions/transaction.logic.ts",
       ),
+      "@/features/job-cards/lib/estimate.logic": load("features/job-cards/lib/estimate.logic.ts"),
+      "@/lib/format": load("lib/format.ts"),
       "@/components/ui/button": {
         Button: ({ children }) => React.createElement("button", null, children),
       },
@@ -154,6 +161,8 @@ test("print component excludes internal fields and handles unsigned/superseded v
   for (const included of [
     "Not a bill",
     "Customer part",
+    "Customer pays",
+    "VAT (7.5%)",
     "Customer signature:",
     "Superseded by revision",
     "Test terms",

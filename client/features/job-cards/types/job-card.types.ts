@@ -29,6 +29,8 @@ export type Estimate = {
   id: string;
   description: string;
   amount: number;
+  /** What the customer pays, with VAT: the approved lines once the customer has answered. */
+  customerTotal: number;
   currency: string;
   status: string;
   createdAt?: string;
@@ -47,7 +49,9 @@ export type Estimate = {
 };
 
 export type CustomerApproval = {
-  signatureState?: "valid" | "invalid" | "legacy" | "override";
+  signatureState?: "valid" | "invalid" | "legacy" | "override" | "phone";
+  channel?: "COUNTER" | "PHONE";
+  signatureDueAtDelivery?: boolean;
   signature?: {
     imageReference: string;
     signerName: string;
@@ -204,9 +208,6 @@ export type JobCard = {
   } | null;
   serviceAdvisor?: { firstName: string; lastName: string } | null;
   deliveryAdvisor?: { firstName: string; lastName: string } | null;
-  estimatedParts?: number | null;
-  estimatedOil?: number | null;
-  estimatedLabour?: number | null;
   serviceCharge?: number | null;
   id: string;
   mileage?: number | null;
@@ -245,9 +246,6 @@ export type JobCard = {
     description: string;
     complaintCodeId?: string | null;
     defectCode?: string | null;
-    spare?: number;
-    oil?: number;
-    labour?: number;
   }[];
   statusHistory?: {
     id: string;
@@ -263,7 +261,6 @@ export type JobCard = {
   /** Step on the staged job card. */
   stage?: JobStage;
   estimatedHours: number;
-  estimatedCost: number;
   progress: number;
   qcStatus: string;
   qcNotes?: string;

@@ -95,7 +95,7 @@ export function JobFileDrawer({
           className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
           {tab === "customer" && <CustomerVehicleTab job={job} />}
-          {tab === "visits" && <VisitHistoryTab job={job} visits={workspace.previousVisits} />}
+          {tab === "visits" && <VisitHistoryTab job={job} visits={workspace.previousVisits} declinedItems={workspace.declinedItems ?? []} />}
           {tab === "warranty" && <WarrantyTab job={job} />}
           {tab === "documents" && <DocumentsTab job={job} onPrintGatePass={onPrintGatePass} />}
           {tab === "activity" && <ActivityTab job={job} activity={workspace.activity} />}

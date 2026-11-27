@@ -1,26 +1,26 @@
-import { signatureState, type SignatureEvidence } from "./estimate-signature";
-import { Prisma } from '@prisma/client';
+import { signatureState, type ApprovalEvidence } from "./estimate-signature";
+import { Prisma, type FindingPayer, type LineDecision } from '@prisma/client';
 import { serviceChargeDescription, serviceChargeReference } from './job-service-charge';
 import { BadRequestError } from '../../shared/errors/appError';
 import { lineAmount, money, sumMoney } from '../finance/money';
 
 // Part lines carry a snapshot of the record's source (part flag); each source is its own part record.
 export type ScopeLine = { type: string; referenceId?: string | null; partSource?: string | null; description: string; quantity: number; rate: number; amount: number };
+type Num = number | { toString(): string };
+/** An estimate line as stored (Decimal money) with the staged payer and the customer's answer. */
+export type EstimateScopeLine = Omit<ScopeLine, 'quantity' | 'rate' | 'amount'> & { quantity: Num; rate: Num; amount: Num; payer?: FindingPayer; customerDecision?: LineDecision | null };
 export type ApprovalEstimate = {
   id: string;
   version?: number;
   status: string;
   currency?: string;
-  amount: number;
-  lines: ScopeLine[];
-  approvals: {
-    approved: boolean | null;
-    customerId: string;
-    signatureRequired?: boolean;
-    overrideReason?: string | null;
-    signature?: SignatureEvidence | null;
-  }[];
+  amount: Num;
+  vatRate?: Num;
+  upfrontPaymentPercent?: Num;
+  lines: EstimateScopeLine[];
+  approvals: ({ approved: boolean | null; customerId: string } & ApprovalEvidence)[];
 };
+const asScope = (line: EstimateScopeLine): ScopeLine => ({ ...line, quantity: Number(String(line.quantity)), rate: Number(String(line.rate)), amount: Number(String(line.amount)) });
 // Every operation gate must load the evidence used to verify the signed revision.
 export const latestEstimateQuery = {
   orderBy: [{ version: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
@@ -29,7 +29,7 @@ export const latestEstimateQuery = {
     lines: true,
     approvals: {
       include: {
-        signature: { select: { estimateVersion: true, totalSigned: true, contentHash: true } },
+        signature: { select: { estimateVersion: true, totalSigned: true, contentHash: true, hashVersion: true } },
       },
     },
   },
@@ -45,7 +45,8 @@ export function reviewApprovedScope(estimate: ApprovalEstimate | undefined, actu
   if (!approved) issues.push(!estimate ? 'Prepare an estimate and record customer approval first.' : 'The latest estimate needs customer approval.');
   if (estimate?.currency && estimate.currency !== 'NGN') issues.push('Create an NGN estimate revision before proceeding.');
   const expected = new Map<string, ScopeLine>();
-  for (const line of estimate?.lines ?? []) {
+  // Declined lines are not part of the approved scope; the work and the bill must leave them out.
+  for (const line of (estimate?.lines ?? []).filter(row => row.customerDecision !== 'DECLINED').map(asScope)) {
     if (line.type === 'COMPLAINT') continue;
     if (expected.has(key(line))) issues.push(`Revise the estimate to remove duplicate scope: ${line.description}.`);
     expected.set(key(line), line);
@@ -91,7 +92,8 @@ export async function assertRecordedScope(tx: Prisma.TransactionClient, jobCardI
   const card = await tx.jobCard.findUniqueOrThrow({ where: { id: jobCardId }, include: { service: true, serviceType: { select: { description: true } }, partIssuances: { include: { sparePart: true, returns: true, requisitionLine: { include: { requisition: { select: { status: true } } } } } }, labourLines: { include: { chargeLine: true } } } });
   const lines: ScopeLine[] = [];
   const chargeReference = serviceChargeReference(card);
-  if (chargeReference) lines.push({ type: 'SERVICE', referenceId: chargeReference, description: serviceChargeDescription(card), quantity: 1, rate: card.serviceCharge ?? 0, amount: card.serviceCharge ?? 0 });
+  const charge = card.serviceCharge == null ? 0 : money(card.serviceCharge.toNumber());
+  if (chargeReference) lines.push({ type: 'SERVICE', referenceId: chargeReference, description: serviceChargeDescription(card), quantity: 1, rate: charge, amount: charge });
   for (const row of card.partIssuances) {
     if (row.requisitionLine?.requisition.status === 'CANCELLED') continue;
     const quantity = row.quantity - row.returns.filter(r => !['REJECTED', 'CANCELLED'].includes(r.status.toUpperCase())).reduce((sum, r) => sum + r.quantity, 0);

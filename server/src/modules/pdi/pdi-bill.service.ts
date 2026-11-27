@@ -54,7 +54,7 @@ function chargesOf(job: BillJob) {
     })),
     ...(job.serviceCharge ? [{
       type: 'SERVICE' as const, chargeType: ChargeType.CUSTOMER, companyPaid, description: `${job.serviceType?.description ?? 'PDI'} service charge`,
-      quantity: 1, rate: money(job.serviceCharge), amount: money(job.serviceCharge), jobCardLineId: undefined, partId: null, partNumber: job.serviceType?.code ?? null, partSource: null,
+      quantity: 1, rate: money(Number(job.serviceCharge)), amount: money(Number(job.serviceCharge)), jobCardLineId: undefined, partId: null, partNumber: job.serviceType?.code ?? null, partSource: null,
       reference: null, taxable: true, taxCategory: 'SERVICE',
     }] : []),
   ]);
