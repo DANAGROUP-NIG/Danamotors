@@ -1,5 +1,10 @@
 // Stage bookkeeping is covered by the job-stage tests; these tests check the calling code only.
 jest.mock("./job-stage.writer", () => ({ syncStage: jest.fn(async () => null), resetQualityCheck: jest.fn(async () => undefined) }));
+// Payment before delivery (phase 8): an unbilled job with something to pay, unless a test bills it.
+jest.mock("./job-billing-gate", () => ({
+  ...jest.requireActual("./job-billing-gate"),
+  loadDeliveryPaymentFacts: jest.fn(async () => ({ billed: false, balanceDue: null, creditApproved: false, nothingToPay: false })),
+}));
 jest.mock("../../prisma/client", () => ({
   __esModule: true,
 
@@ -93,9 +98,13 @@ import {
 } from "./service.validation";
 import {
   assertTransition,
+  JobCardWorkflowService,
   jobStatusFilter,
 } from "./job-card-workflow.service";
 const id = "00000000-0000-4000-8000-000000000001";
+/** Delivery (phase 9): the Deliver action of the delivery service runs the existing delivery path. */
+const deliver = (data: Record<string, unknown>) =>
+  new JobCardWorkflowService().updateInTx(prisma as never, id, { status: "DELIVERED", ...data }, id, { action: "DELIVER", requestId: id });
 
 const input = {
   branchName: "Test",
@@ -573,7 +582,7 @@ describe("JobCard workflow", () => {
 
   it("blocks delivery when a consolidated vehicle invoice still has a balance", async () => {
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, status: "BILLED", billedAt: new Date(), invoices: [], consolidatedInvoices: [{ id: "vehicle-bill", status: "Unpaid", outstandingAmount: 100 }], creditApprovedById: null, promisedAt: new Date("2099-01-01T00:00:00Z") });
-    await expect(new ServiceService().updateJobCard(id, { status: "DELIVERED", deliveryAdvisorId: id }, id)).rejects.toThrow("fully paid");
+    await expect(deliver({ deliveryAdvisorId: id })).rejects.toThrow("fully paid");
     expect(prisma.jobCard.update).not.toHaveBeenCalled();
   });
 
@@ -585,7 +594,7 @@ describe("JobCard workflow", () => {
     (prisma.jobCard.findUniqueOrThrow as jest.Mock).mockResolvedValue({ id, customerId: id, partIssuances: [], labourLines: [] });
     (prisma.estimate.findMany as jest.Mock).mockResolvedValue([{ id, status: 'Approved', amount: 0, lines: [], approvals: [{ approved: true, customerId: id }] }]);
     (prisma.jobCard.update as jest.Mock).mockResolvedValue({ id, status: "DELIVERED" });
-    await new ServiceService().updateJobCard(id, { status: "DELIVERED", deliveryAdvisorId: id, lateReasonIds: [id], remarks: "Customer collected" }, id);
+    await deliver({ deliveryAdvisorId: id, lateReasonIds: [id], remarks: "Customer collected" });
     expect(prisma.jobCard.update).toHaveBeenCalledWith({ where: { id }, data: expect.objectContaining({
       status: "DELIVERED", deliveredAt: expect.any(Date), deliveryAdvisorId: id, lateReasonIds: [id], gatePassNumber: expect.any(String),
     }) });
@@ -594,14 +603,24 @@ describe("JobCard workflow", () => {
 
   it("rejects delivery before billing or credit approval without issuing a gate pass", async () => {
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, branchId: id, status: "READY", billedAt: null, invoices: [], promisedAt: new Date("2099-01-01T00:00:00Z") });
-    await expect(new ServiceService().updateJobCard(id, { status: "DELIVERED", deliveryAdvisorId: id }, id)).rejects.toThrow("bill or approved credit");
+    await expect(deliver({ deliveryAdvisorId: id })).rejects.toThrow("bill or approved credit");
     expect(prisma.documentSequence.upsert).not.toHaveBeenCalled();
     expect(prisma.jobCard.update).not.toHaveBeenCalled();
   });
 
   it("blocks delivery of an unpaid bill without explicit credit approval", async () => {
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, branchId: id, status: 'BILLED', billedAt: new Date(), invoices: [{ status: 'Unpaid', outstandingAmount: 100 }], promisedAt: new Date('2099-01-01') });
-    await expect(new ServiceService().updateJobCard(id, { status: 'DELIVERED', deliveryAdvisorId: id }, id)).rejects.toThrow('fully paid');
+    await expect(deliver({ deliveryAdvisorId: id })).rejects.toThrow('fully paid');
+    expect(prisma.jobCard.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses to deliver a service job outside the Delivery step's Deliver action", async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, branchId: id, jobType: "SERVICE", status: "READY", billedAt: null, invoices: [], creditApprovedById: id, promisedAt: new Date("2099-01-01") });
+    (prisma.$transaction as jest.Mock).mockImplementation((run: (tx: unknown) => unknown) => run(prisma));
+    await expect(new ServiceService().updateJobCard(id, { status: "DELIVERED", deliveryAdvisorId: id }, id)).rejects.toThrow(
+      "Deliver the vehicle from the Delivery step of the job card.",
+    );
+    expect(prisma.documentSequence.upsert).not.toHaveBeenCalled();
     expect(prisma.jobCard.update).not.toHaveBeenCalled();
   });
 

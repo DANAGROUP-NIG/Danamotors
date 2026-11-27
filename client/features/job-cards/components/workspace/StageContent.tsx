@@ -1,7 +1,4 @@
 "use client";
-import { Printer } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { formatDateTime } from "@/lib/format";
 import type { JobCard } from "../../types/job-card.types";
 import type { JobWorkspace } from "../../types/job-workspace.types";
 import type { JobFileTab } from "../../lib/job-frame.logic";
@@ -12,14 +9,12 @@ import { WarrantyStep } from "../warranty/WarrantyStep";
 import { EstimateStep } from "../estimate/EstimateStep";
 import { RepairStep } from "../repair/RepairStep";
 import { QualityCheckStep } from "../quality-check/QualityCheckStep";
-import { InvoicesTable } from "./InvoicesTable";
-import { StageCard } from "./StageCard";
 import { BillingStep } from "../billing/BillingStep";
-import { DeliveryWithBilling } from "../billing/DeliveryWithBilling";
+import { DeliveryStep } from "../delivery/DeliveryStep";
 
 /**
- * What the current step shows. Steps not rebuilt yet show the existing sections that serve them,
- * so the app stays usable; each later phase replaces its step here.
+ * What the current step shows: each of the 8 steps has its own staged screen (phases 2 to 9), and a closed
+ * job shows the delivered summary. PDI jobs keep their own screens.
  */
 export function StageContent({
   job,
@@ -62,38 +57,13 @@ export function StageContent({
       // PDI jobs keep their own screens; everything else uses the staged billing (phase 8).
       return workspace.jobType === "PDI" ? null : <BillingStep job={job} workspace={workspace} bar={bar} />;
     case "DELIVERY":
-      // TODO(phase 9): replaced by the handover, belongings, signature and gate pass screen.
-      return <DeliveryWithBilling job={job} />;
+      // PDI jobs keep their own screens; everything else uses the staged delivery (phase 9).
+      return workspace.jobType === "PDI" ? null : <DeliveryStep job={job} workspace={workspace} bar={bar} onPrintGatePass={onPrintGatePass} />;
     case "CLOSED":
-      return <DeliveredPanel job={job} onPrintGatePass={onPrintGatePass} />;
+      // The delivered summary: who collected the vehicle, the gate pass, the follow-up call and the bill.
+      return <DeliveryStep job={job} workspace={workspace} bar={bar} onPrintGatePass={onPrintGatePass} />;
     case "CANCELLED":
       return null;
   }
 }
 
-function DeliveredPanel({ job, onPrintGatePass }: { job: JobCard; onPrintGatePass: () => void }) {
-  return (
-    <>
-      <StageCard
-        title="Delivered"
-        actions={
-          job.gatePassNumber ? (
-            <Button type="button" variant="outline" onClick={onPrintGatePass}>
-              <Printer aria-hidden="true" />
-              Print gate pass
-            </Button>
-          ) : undefined
-        }
-      >
-        <p className="text-sm">
-          Delivered {formatDateTime(job.deliveredAt)}
-          {job.deliveryAdvisor ? ` by ${job.deliveryAdvisor.firstName} ${job.deliveryAdvisor.lastName}` : ""}.
-          {job.gatePassNumber ? ` Gate pass ${job.gatePassNumber}.` : ""}
-        </p>
-      </StageCard>
-      <StageCard title="Bill">
-        <InvoicesTable invoices={job.invoices ?? []} />
-      </StageCard>
-    </>
-  );
-}

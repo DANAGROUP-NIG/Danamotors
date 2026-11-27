@@ -103,7 +103,7 @@ async function recordWalkAround(fx: JobFixture, jobCardId: string, advisorId: st
   await checkIn.addDamageMark(jobCardId, { requestId: demoUuid(`mark:${fx.id}:door`), type: "DENT", x: 80, y: 42, note: null }, actor);
 }
 
-/** The owner signs the customer consent on the advisor's tablet. */
+/** The owner (or the fixture's representative) signs the customer consent on the advisor's tablet. */
 async function signConsent(fx: JobFixture, jobCardId: string, advisorId: string) {
   if (await prisma.jobOpeningSignature.findFirst({ where: { jobCardId }, select: { id: true } })) return;
   const consent = await getSignedOpeningConsent(jobCardId);
@@ -113,7 +113,10 @@ async function signConsent(fx: JobFixture, jobCardId: string, advisorId: string)
       accepted: true,
       expectedHash: consent.expectedHash,
       idempotencyKey: demoUuid(`consent:${fx.id}`),
-      signerName: consent.document.scope.customerName,
+      // Delivery (phase 9): a representative signs for the owner on some demo jobs.
+      ...(fx.delivery?.representative
+        ? { signerName: fx.delivery.representative.name, relationship: fx.delivery.representative.relationship, signerPhone: fx.delivery.representative.phone }
+        : { signerName: consent.document.scope.customerName }),
       signatureImage: demoSignaturePng(),
     },
     advisorId,

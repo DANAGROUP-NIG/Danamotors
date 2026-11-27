@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { formatDate, formatDateTime, lagosDay } from "@/features/late-deliveries/lib/late-delivery.logic";
+import { NOT_PROVIDED } from "@/lib/format";
 import { AlertBanner, DetailField, SectionCard } from "@/features/warranty/components/ui";
 import { cn } from "@/lib/utils";
 import { usePsfServiceTypes, useRecordPsfCall } from "../hooks/use-psf";
@@ -138,13 +139,14 @@ export function PsfCallEditor({ detail, onDirtyChange, onPrevious, onNext }: Edi
         </div>
       </header>
 
-      <div className="grid gap-x-6 gap-y-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-x-6 gap-y-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-3 xl:grid-cols-7">
         <DetailField label="Delivered" value={<span>{formatDate(detail.deliveredAt)} <span className="text-xs text-muted-foreground">({deliveredDays === 0 ? "today" : `${deliveredDays}d ago`})</span></span>} />
-        <DetailField label="Follow-up date" value={detail.followUp ? formatDate(detail.followUp.lastCalledAt) : "—"} />
-        <DetailField label="Service" value={detail.serviceType ? `${detail.serviceType.code} · ${detail.serviceType.description}` : "—"} />
-        <DetailField label="Mileage" value={detail.mileage !== null ? `${detail.mileage.toLocaleString("en-NG")} km` : "—"} />
-        <DetailField label="Service advisor" value={detail.serviceAdvisor ?? "—"} />
-        <DetailField label="Delivered by" value={detail.deliveryAdvisor ?? "—"} />
+        <DetailField label="Call due" value={detail.followUpDueAt ? formatDate(detail.followUpDueAt) : NOT_PROVIDED} />
+        <DetailField label="Follow-up date" value={detail.followUp ? formatDate(detail.followUp.lastCalledAt) : NOT_PROVIDED} />
+        <DetailField label="Service" value={detail.serviceType ? `${detail.serviceType.code}, ${detail.serviceType.description}` : NOT_PROVIDED} />
+        <DetailField label="Mileage" value={detail.mileage !== null ? `${detail.mileage.toLocaleString("en-NG")} km` : NOT_PROVIDED} />
+        <DetailField label="Service advisor" value={detail.serviceAdvisor ?? NOT_PROVIDED} />
+        <DetailField label="Delivered by" value={detail.deliveryAdvisor ?? NOT_PROVIDED} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[20rem_1fr]">

@@ -64,6 +64,7 @@ interface ListRow {
 const detailSelect = {
   id: true,
   jobNumber: true,
+  psfFollowUpDueAt: true,
   jobType: true,
   status: true,
   branchId: true,
@@ -400,6 +401,8 @@ function view(job: DetailJob, activeBooking: { id: string; bookingNumber: string
     jobDate: job.createdAt,
     branch: job.branch,
     deliveredAt: job.deliveredAt,
+    /** Set at delivery (job card revamp phase 9); null for jobs delivered before it. */
+    followUpDueAt: job.psfFollowUpDueAt,
     mileage: job.mileage,
     registration: job.vehicle?.registrationNumber ?? null,
     vin: job.vehicle?.vin ?? null,

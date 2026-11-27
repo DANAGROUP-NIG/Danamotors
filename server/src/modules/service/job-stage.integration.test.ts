@@ -176,7 +176,14 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     await workflow.approveCredit(card.id, users.admin.id, 'Fleet account on credit terms');
     await act(card.id, 'SEND_TO_DELIVERY', 'advisor');
     expect(await expectAt(card.id, 'DELIVERY', 'BILLED')).toMatchObject({ stageOwnerId: users.advisor.id, stageOwnerRole: 'ServiceAdviser' });
-    await workflow.update(card.id, { status: 'DELIVERED', deliveryAdvisorId: users.advisor.id, remarks: 'Vehicle handed over' }, users.advisor.id);
+    // Phase 9: only the Deliver action (run by the delivery service after the signature) delivers a service job.
+    await expect(workflow.update(card.id, { status: 'DELIVERED', deliveryAdvisorId: users.advisor.id }, users.advisor.id)).rejects.toThrow(
+      'Deliver the vehicle from the Delivery step of the job card.',
+    );
+    await expect(act(card.id, 'DELIVER', 'advisor')).rejects.toMatchObject({ statusCode: 409, code: 'STAGE_ACTION_BLOCKED' });
+    await db.$transaction(tx =>
+      stages.actInTx(tx, card.id, { action: 'DELIVER', requestId: randomUUID(), note: 'Vehicle handed over', delivery: { deliveryAdvisorId: users.advisor.id, lateReasonIds: [] } }, users.advisor),
+    );
     await expectAt(card.id, 'CLOSED', 'DELIVERED');
 
     const closed = await stages.workspace(card.id, users.advisor);

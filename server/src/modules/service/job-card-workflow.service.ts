@@ -19,6 +19,7 @@ import {
   assertRecordedScope,
 } from "./estimate-approval";
 import { getBranchSettings } from "../company-settings/company-settings.service";
+import { followUpDueAt } from "../psf/psf.logic";
 import { JobCardType, Prisma, WarrantyCoverageStatus } from "@prisma/client";
 import { nextSequenceNumber } from "../../shared/db/documentSequence";
 import { assertNotFrozen, assertServiceTypeForJob, pdiDocumentNumber, pdiRegistrationFromVin, pdiSequenceKey } from "../pdi/pdi.logic";
@@ -800,6 +801,13 @@ export class JobCardWorkflowService {
           );
 
           if (data.status === "DELIVERED") {
+            // Delivery (phase 9): a service job is delivered only from the Delivery step, which records the
+            // belongings, the collector and the customer's signature first. PDI jobs keep their own path.
+            const pdi = current.jobType === JobCardType.PDI;
+            if (!pdi && stage?.action !== "DELIVER")
+              throw new BadRequestError(
+                "Deliver the vehicle from the Delivery step of the job card. It records the belongings, who collected the vehicle and the customer's signature.",
+              );
             // Payment before delivery: a paid bill, approved credit, or nothing for the customer to pay
             // (warranty, campaign or free work only, phase 8).
             if (
@@ -834,11 +842,14 @@ export class JobCardWorkflowService {
             update.deliveryAdvisorId = data.deliveryAdvisorId;
             update.lateReasonIds = data.lateReasonIds ?? [];
             update.lateRemarks = data.lateRemarks?.trim() || null;
-          update.gatePassNumber = await nextDocumentNumber(
+            update.gatePassNumber = await nextDocumentNumber(
               tx,
               "GATE_PASS",
               now,
             );
+            // The post-service follow-up call is scheduled now (PSF leaves PDI jobs out).
+            if (!pdi)
+              update.psfFollowUpDueAt = followUpDueAt(now, (await getBranchSettings(current.branchId, tx)).psfFollowUpDays);
           }
 
           if (data.status === "READY") {

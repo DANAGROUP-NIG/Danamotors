@@ -173,6 +173,12 @@ export const VEHICLES = {
   stgBillStorage: { vin: "KNAPM81DMK7000531", registrationNumber: "LSR-541ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2280 },
   stgBillUnpaid: { vin: "KNAPM81DMK7000532", registrationNumber: "LSR-542ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2420 },
   stgBillCredit: { vin: "KNAPM81DMK7000533", registrationNumber: "LSR-543ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2310 },
+  // Delivery (phase 9): paid and waiting for the owner (an item declined, extra work approved during repair);
+  // late, on credit; paid, a representative signed at check-in; delivered, with the gate pass.
+  stgDeliverReady: { vin: "KNAPM81DMK7000534", registrationNumber: "LSR-544ST", customer: "okafor", model: "SORENTO", saleDaysAgo: 2330 },
+  stgDeliverLate: { vin: "KNAPM81DMK7000535", registrationNumber: "LSR-545ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2260 },
+  stgDeliverRep: { vin: "KNAPM81DMK7000536", registrationNumber: "LSR-546ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2390 },
+  stgDelivered: { vin: "KNAPM81DMK7000537", registrationNumber: "LSR-547ST", customer: "okafor", model: "SORENTO", saleDaysAgo: 2340 },
 } satisfies Record<string, VehicleFixture>;
 
 export type VehicleKey = keyof typeof VEHICLES;
@@ -238,6 +244,12 @@ export const PARTS = {
     partNumber: "98850-DM000", name: "Rear wiper blade", category: "Body", partFlag: "O", partType: "S", uom: "PCS",
     unitPrice: 6_500, retailRate: 8_500, warrantyApplicable: false,
     stock: { main: { quantity: 10, minimum: 3, rack: "BDY-01" }, second: { quantity: 4, minimum: 2, rack: "BDY-01" } },
+  },
+  // Delivery (phase 9): recommended at the service and declined by the customer.
+  airFilter: {
+    partNumber: "28113-DM100", name: "Air filter element", category: "Filters", partFlag: "O", partType: "S", uom: "PCS",
+    unitPrice: 9_000, retailRate: 12_000, warrantyApplicable: false,
+    stock: { main: { quantity: 6, minimum: 2, rack: "FLT-02" }, second: { quantity: 3, minimum: 1, rack: "FLT-02" } },
   },
 } satisfies Record<string, PartFixture>;
 
@@ -332,7 +344,24 @@ export interface RepairFixture {
   started?: (LabourKey | "serviceType")[];
   waiting?: (LabourKey | "serviceType")[];
   finding?: { text: string; parts: [PartKey, number][]; labour?: LabourKey[] };
-  supplementary?: "prepared" | "presented";
+  /** approved: the customer approved the extra work on the phone; it is done before the quality check. */
+  supplementary?: "prepared" | "presented" | "approved";
+}
+
+/** Delivery (phase 9): how the job waits at the Delivery step, or that it is delivered. */
+export interface DeliveryFixture {
+  /** Hand the vehicle over to the owner: the customer signs, the gate pass is issued and the job closes. */
+  deliver?: boolean;
+  /** The customer already signed the estimate they approved on the phone. */
+  phoneSigned?: boolean;
+  /** The promised time has passed: the advisor must give reasons for late delivery. */
+  late?: boolean;
+  /** Days from opening to the promised delivery (default 2), so an on-time job stays on time while testers use it. */
+  promiseDays?: number;
+  /** Someone other than the owner signed the job card at check-in (terms clause 7). */
+  representative?: { name: string; phone: string; relationship: string };
+  /** Customer-pay parts the customer declined on the phone: "Declined, recommended for next visit". */
+  declined?: PartKey[];
 }
 
 /** Quality check (phase 7): the supervisor fails the check first, returning these lines to the technician. */
@@ -389,6 +418,8 @@ export interface JobFixture {
   qualityCheck?: QualityCheckFixture;
   /** Billing (phase 8): a second notice by SMS and the washed tick, after the vehicle is marked ready. */
   billing?: { notifyAgain?: boolean; washed?: boolean };
+  /** Delivery (phase 9): see DeliveryFixture. */
+  delivery?: DeliveryFixture;
   /** An earlier odometer reading for a vehicle with no visits yet, so check-in shows "Last recorded". */
   priorMileage?: number;
   /** The answer recorded for linked campaigns (FPC) before READY; without it a FREE line must pre-set it. */
@@ -681,7 +712,7 @@ const serviceEstimate = (decided: boolean): EstimateFixture => ({
 const stageJob = (
   id: string,
   vehicle: VehicleKey,
-  fields: Pick<JobFixture, "description" | "complaints" | "mileage" | "withTechnician" | "target" | "checkIn" | "priorMileage" | "diagnosis" | "estimateStep" | "repair" | "qualityCheck" | "billing"> & {
+  fields: Pick<JobFixture, "description" | "complaints" | "mileage" | "withTechnician" | "target" | "checkIn" | "priorMileage" | "diagnosis" | "estimateStep" | "repair" | "qualityCheck" | "billing" | "delivery"> & {
     /** Repair jobs priced from their diagnosis record labour through the work list, not as legacy lines. */
     labour?: [LabourKey, number][];
     issues?: [PartKey, number][];
@@ -710,6 +741,7 @@ const stageJob = (
   repair: fields.repair,
   qualityCheck: fields.qualityCheck,
   billing: fields.billing,
+  delivery: fields.delivery,
   priorMileage: fields.priorMileage,
   startDaysAgo: 0,
   spanHours: 0,
@@ -720,6 +752,15 @@ const BILLING_DIAGNOSIS: DiagnosisFixture = {
   stop: "confirmed",
   findings: [
     { request: 0, text: "Due for the 50,000 km service.", labour: [], parts: [["engineOil", 1]] },
+    { request: 1, text: "Front pads worn to 2 mm. Caliper slider dry.", labour: ["brakePads"], parts: [["brakePads", 1]] },
+  ],
+};
+
+/** Delivery demo jobs (phase 9): the service with the air filter recommended, and the brake pads. */
+const DELIVERY_DIAGNOSIS: DiagnosisFixture = {
+  stop: "confirmed",
+  findings: [
+    { request: 0, text: "Due for the 50,000 km service. Air filter dirty, replacement recommended.", labour: [], parts: [["engineOil", 1], ["airFilter", 1]] },
     { request: 1, text: "Front pads worn to 2 mm. Caliper slider dry.", labour: ["brakePads"], parts: [["brakePads", 1]] },
   ],
 };
@@ -1018,6 +1059,45 @@ export const STAGE_JOBS: JobFixture[] = [
     complaints: ["Periodic service (50,000 km)", "Brake noise reported by the driver"],
     mileage: 55_120, withTechnician: true, target: "BILLED", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1], ["engineOil", 1]],
     diagnosis: BILLING_DIAGNOSIS,
+  }),
+  // Delivery (phase 9). Paid; the owner collects. The air filter was declined; the rear wiper blade was added
+  // with the customer's approval during the repair. Both estimates were approved on the phone, so the customer
+  // signs them at delivery.
+  stageJob("JC-S33", "stgDeliverReady", {
+    description: "50,000 km periodic service. Noise from the front left wheel when braking.",
+    complaints: ["Periodic service (50,000 km)", "Noise from front left wheel when braking"],
+    mileage: 50_870, withTechnician: true, target: "BILLED_PAID", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1], ["engineOil", 1]],
+    diagnosis: DELIVERY_DIAGNOSIS,
+    repair: { finding: { text: "Rear wiper blade torn. It smears the rear screen.", parts: [["wiperBlade", 1]], labour: ["wiper"] }, supplementary: "approved" },
+    delivery: { promiseDays: 14, declined: ["airFilter"] },
+  }),
+  // On credit, and the promised time has passed: the advisor gives the reasons for the late delivery.
+  {
+    ...stageJob("JC-S34", "stgDeliverLate", {
+      description: "Periodic service for a fleet vehicle. Brake noise reported by the driver.",
+      complaints: ["Periodic service (50,000 km)", "Brake noise reported by the driver"],
+      mileage: 56_340, withTechnician: true, target: "BILLED_CREDIT", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1], ["engineOil", 1]],
+      diagnosis: BILLING_DIAGNOSIS,
+      delivery: { phoneSigned: true, late: true },
+    }),
+    startDaysAgo: 3,
+    spanHours: 40,
+  },
+  // Paid. The owner's brother signed the job card at check-in, so he may collect it too.
+  stageJob("JC-S35", "stgDeliverRep", {
+    description: "Periodic service. Squeal from the front brakes.",
+    complaints: ["Periodic service (50,000 km)", "Squeal from the front brakes"],
+    mileage: 48_930, withTechnician: true, target: "BILLED_PAID", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1], ["engineOil", 1]],
+    diagnosis: BILLING_DIAGNOSIS,
+    delivery: { phoneSigned: true, promiseDays: 14, representative: { name: "Kunle Adeyemi", phone: "08099900181", relationship: "Brother" } },
+  }),
+  // Delivered to the owner: the read-only summary with the gate pass and the follow-up call date.
+  stageJob("JC-S36", "stgDelivered", {
+    description: "Periodic service. Brakes noisy when stopping.",
+    complaints: ["Periodic service (50,000 km)", "Brakes noisy when stopping"],
+    mileage: 51_220, withTechnician: true, target: "BILLED_PAID", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1], ["engineOil", 1]],
+    diagnosis: BILLING_DIAGNOSIS,
+    delivery: { deliver: true, promiseDays: 14 },
   }),
   stageJob("JC-S12", "stgSigned", {
     description: "Clicking noise when turning the steering fully.",

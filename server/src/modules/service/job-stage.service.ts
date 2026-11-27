@@ -92,9 +92,9 @@ async function stageFacts(tx: Prisma.TransactionClient, job: WorkspaceJob, now: 
   const warrantyProblems = job.stage === "WARRANTY" && job.jobType !== JobCardType.PDI ? await loadWarrantyFacts(tx, job.id) : [];
   const estimate = job.stage === "ESTIMATE" && job.jobType !== JobCardType.PDI ? await loadEstimateStageFacts(tx, job.id) : null;
   const repairProblems = job.stage === "REPAIR" && job.jobType !== JobCardType.PDI ? await loadRepairProblems(tx, job.id) : [];
-  // Billing (phase 8): payment before delivery, once the vehicle is marked ready.
+  // Billing (phase 8) and Delivery (phase 9): payment before delivery, once the vehicle is marked ready.
   const paymentProblem =
-    job.stage === "BILLING" && job.jobType !== JobCardType.PDI && normaliseJobStatus(job.status) !== "QC"
+    ["BILLING", "DELIVERY"].includes(job.stage) && job.jobType !== JobCardType.PDI && normaliseJobStatus(job.status) !== "QC"
       ? await loadDeliveryPaymentProblem(tx, job.id)
       : null;
   const [openingSignatureProblem, approvalProblem, depositProblem] = gated
@@ -140,6 +140,8 @@ export interface StageActionInput {
   action: StageAction;
   note?: string;
   requestId: string;
+  /** DELIVER only: the existing delivery fields for the workflow (delivery advisor, late reasons). */
+  delivery?: { deliveryAdvisorId: string; lateReasonIds: string[]; lateRemarks?: string };
 }
 
 const NOTE_REQUIRED: Partial<Record<StageAction, string>> = {
@@ -231,6 +233,9 @@ export class JobStageService {
    * Repeating a requestId returns the current workspace without acting twice.
    */
   async act(id: string, input: StageActionInput, actor: StageActor) {
+    // Some actions record evidence first (the delivery signature); only their own service runs them.
+    const serviceOnly = ACTION_RULES[input.action].serviceOnly;
+    if (serviceOnly) throw new ConflictError(serviceOnly).withCode("STAGE_ACTION_BLOCKED", { reasons: [serviceOnly] });
     await prisma.$transaction((tx) => this.actInTx(tx, id, input, actor), { maxWait: 5000, timeout: 15000 });
     await drainJobcardNotifications(id);
     return this.workspace(id, actor);
@@ -295,7 +300,7 @@ export class JobStageService {
       return;
     }
     try {
-      await this.workflow.updateInTx(tx, id, { status: check.toStatus, remarks: note }, actor.id, ctx);
+      await this.workflow.updateInTx(tx, id, { status: check.toStatus, remarks: note, ...(input.action === "DELIVER" ? input.delivery : {}) }, actor.id, ctx);
       // Repair (phase 6): the approved work becomes the technician's list; a pause stops the clock.
       if (input.action === "RELEASE_TO_REPAIR") await createWorkLines(tx, id, { supplementary: false });
       if (input.action === "PAUSE_FOR_PARTS") await pauseWorkLines(tx, id);

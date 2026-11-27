@@ -18,6 +18,7 @@ import { notifyStoreOfParts } from "../../../src/modules/service/jobcard-parts-r
 import { JobRepairService, type RepairActor } from "../../../src/modules/service/job-repair.service";
 import { JobQualityCheckService } from "../../../src/modules/service/job-quality-check.service";
 import { JobBillingStepService } from "../../../src/modules/service/job-billing-step.service";
+import { JobDeliveryService } from "../../../src/modules/service/job-delivery.service";
 import { QC_GENERAL_CHECKS } from "../../../src/modules/service/job-quality-check.logic";
 import { demoSignaturePng } from "./check-in";
 import { ROLES } from "../../../src/shared/constants/roles";
@@ -63,6 +64,7 @@ const services = {
   repair: new JobRepairService(),
   qc: new JobQualityCheckService(),
   billingStep: new JobBillingStepService(),
+  delivery: new JobDeliveryService(),
 };
 
 /** A workshop user with the permissions of their role, as the repair screens send them. */
@@ -181,6 +183,9 @@ export async function seedJob(ctx: DemoContext, ref: Reference, parties: Parties
 
   job = await loadJob(id);
   if (needsRetime(job.createdAt, fx)) await retimeJob(id, fx, fx.spanHours + 6);
+  // Delivery (phase 9): the promised time has passed while the vehicle waits for collection.
+  if (fx.delivery?.late && job.stage === "DELIVERY")
+    await prisma.jobCard.update({ where: { id }, data: { promisedAt: new Date(Date.now() - 3 * 3_600_000) } });
   await seedLedger.mark(key, staff.advisor.id);
   return { key: fx.id, id, jobNumber: job.jobNumber };
 }
@@ -213,7 +218,7 @@ async function openJob(ctx: DemoContext, ref: Reference, parties: Parties, fx: J
     bayId: ref.bayId,
     serviceAdvisorId: staff.advisor.id,
     ...(fx.withTechnician ? { technicianId: staff.technician.id } : { teamId: ref.teamId }),
-    promisedAt: new Date(Date.now() + 2 * 86_400_000).toISOString(),
+    promisedAt: new Date(Date.now() + (fx.delivery?.promiseDays ?? 2) * 86_400_000).toISOString(),
     complaints: fx.complaints.map((description) => ({ description })),
     warrantyAcknowledged: check.requiresAcknowledgement,
     acknowledgedCampaignIds: check.openCampaigns.map((c) => c.campaignId),
@@ -328,11 +333,49 @@ async function advance(ctx: DemoContext, fx: JobFixture, id: string) {
         await stageAction(fx, id, "SEND_TO_DELIVERY", staff.advisor.id, "Paid, sent to delivery");
         continue;
       }
-      await services.workflow.update(id, { status: "DELIVERED", deliveryAdvisorId: staff.advisor.id, remarks: "Vehicle handed over" }, staff.advisor.id);
+      // Delivery (phase 9): the delivery demo jobs wait at the Delivery step unless told to deliver.
+      if (fx.delivery && !fx.delivery.deliver) {
+        if (fx.delivery.phoneSigned) await signPhoneApprovals(fx, id, staff.advisor.id);
+        return;
+      }
+      await deliverVehicle(fx, id, staff.advisor.id);
     } else {
       return;
     }
   }
+}
+
+/** Delivery (phase 9): the customer signs, at the counter, the estimates they approved on the phone. */
+async function signPhoneApprovals(fx: JobFixture, id: string, advisorId: string) {
+  const advisor = await repairActor(advisorId);
+  const view = await services.delivery.view(id, advisor);
+  if (!view.phoneApprovals.length) return view;
+  return services.delivery.signPhoneApprovals(
+    id,
+    advisor,
+    { requestId: demoUuid(`delivery-estimate:${fx.id}`), signerName: view.owner.name, accepted: true, signatureImage: demoSignaturePng() },
+    "Demo data",
+  );
+}
+
+/**
+ * Delivery (phase 9), as the advisor does it on screen: the phone approvals signed, every belonging returned,
+ * the owner collects and signs, with a late reason when the promised time has passed. Issues the gate pass.
+ */
+async function deliverVehicle(fx: JobFixture, id: string, advisorId: string) {
+  const view = await signPhoneApprovals(fx, id, advisorId);
+  const reasons = view.late
+    ? await prisma.workshopMaster.findMany({ where: { kind: "LATE_REASON", active: true }, orderBy: [{ displayOrder: "asc" }, { code: "asc" }], take: 1, select: { id: true } })
+    : [];
+  await services.delivery.deliver(id, await repairActor(advisorId), {
+    requestId: demoUuid(`delivery:${fx.id}`),
+    collectorType: "OWNER",
+    returnedCodes: view.belongings.map((item) => item.code),
+    lateReasonIds: reasons.map((reason) => reason.id),
+    lateRemarks: reasons.length ? "Collected after the promised time." : undefined,
+    accepted: true,
+    signatureImage: demoSignaturePng(),
+  });
 }
 
 /**
@@ -413,8 +456,11 @@ async function walkToEstimate(ctx: DemoContext, ref: Reference, fx: JobFixture, 
         approverName: `${customer.customer?.firstName ?? ""} ${customer.customer?.lastName ?? ""}`.trim() || "Vehicle owner",
         approverPhone: customer.customer?.phoneNumber || "08035550142",
         approvedAt: new Date().toISOString(),
-        approvedLineIds: step.estimate.lines.filter((line) => line.payer === "CUSTOMER").map((line) => line.id),
-        note: "Customer approved all items on the phone.",
+        // Delivery (phase 9): declined parts become "Declined, recommended for next visit".
+        approvedLineIds: step.estimate.lines
+          .filter((line) => line.payer === "CUSTOMER" && !(fx.delivery?.declined ?? []).some((key) => ref.parts[key] === line.referenceId))
+          .map((line) => line.id),
+        note: fx.delivery?.declined?.length ? "Customer approved the work on the phone and declined the air filter for now." : "Customer approved all items on the phone.",
         requestId: demoUuid(`phone-approval:${fx.id}`),
       });
     }
@@ -605,6 +651,20 @@ async function workRepair(ctx: DemoContext, ref: Reference, fx: JobFixture, id: 
     const step = await services.estimates.prepareSupplementary(id, advisor);
     if (plan.supplementary === "presented" && step.estimate && !step.estimate.presentedAt && !step.estimate.approval)
       await services.estimates.presentToCustomer(id, advisor, step.estimate.id);
+    // The customer approved the extra work on the phone; the new lines join the technician's list.
+    if (plan.supplementary === "approved" && step.estimate && !step.estimate.approval) {
+      const { customer } = await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { customer: { select: { firstName: true, lastName: true, phoneNumber: true } } } });
+      await services.estimates.phoneApproval(id, advisor, {
+        estimateId: step.estimate.id,
+        expectedHash: step.estimate.contentHash,
+        approverName: `${customer?.firstName ?? ""} ${customer?.lastName ?? ""}`.trim() || "Vehicle owner",
+        approverPhone: customer?.phoneNumber || "08035550142",
+        approvedAt: new Date().toISOString(),
+        approvedLineIds: step.estimate.lines.filter((line) => line.payer === "CUSTOMER" && !line.carriedOver).map((line) => line.id),
+        note: "Customer approved the extra work on the phone.",
+        requestId: demoUuid(`supplementary-approval:${fx.id}`),
+      });
+    }
   }
 }
 

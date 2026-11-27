@@ -19,17 +19,9 @@ export interface AssignInput {
   requestId?: string;
 }
 
-export interface DeliveryInput {
-  deliveryAdvisorId: string;
-  lateReasonIds: string[];
-  lateRemarks?: string;
-  remarks?: string;
-}
-
 /**
- * The workshop actions that are not step handoffs: assigning the technician, saving work done,
- * recording the quality check, delivering, and approving delivery on credit. Each refreshes the
- * job and its workspace, because the server may move the step as a result.
+ * The workshop actions that are not step handoffs: assigning the technician and saving work done.
+ * Each refreshes the job and its workspace, because the server may move the step as a result.
  */
 export function useWorkshopActions(jobCardId: string, jobNumber: string) {
   const client = useQueryClient();
@@ -51,13 +43,5 @@ export function useWorkshopActions(jobCardId: string, jobNumber: string) {
     },
   });
 
-  const deliver = useMutation({
-    mutationFn: (input: DeliveryInput) => apiPut(`/service/job-cards/${jobCardId}`, { status: "DELIVERED", ...input }),
-    onSuccess: async () => {
-      toast.success(`Job ${jobNumber} delivered and gate pass issued`);
-      await refresh();
-    },
-  });
-
-  return { assign, saveWorkDone, deliver };
+  return { assign, saveWorkDone };
 }

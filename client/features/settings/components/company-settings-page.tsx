@@ -17,6 +17,7 @@ type BranchSettings = {
   estimationChargePercent: number;
   storageFreeHours: number;
   storageDailyRate: number;
+  psfFollowUpDays: number;
   repeatWindowDays: number;
   repeatWindowKm: number | null;
   printRepeatBlock: boolean;
@@ -63,6 +64,11 @@ const NUMBER_GROUPS: { title: string; note: string; fields: [NumberKey, string, 
       ["storageFreeHours", "Free storage (hours)", "1"],
       ["storageDailyRate", "Storage charge per day (₦)", "0.01"],
     ],
+  },
+  {
+    title: "Follow-up call",
+    note: "When a vehicle is delivered, the post-service follow-up call is scheduled this many days later (0 is the same day).",
+    fields: [["psfFollowUpDays", "Follow-up call after delivery (days)", "1"]],
   },
   {
     title: "Repeat jobs and bookings",

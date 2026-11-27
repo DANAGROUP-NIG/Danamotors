@@ -5,7 +5,8 @@ export const WORKSHOP_EVENTS = {
   JOB_READY: 'Vehicle ready', STAGE_HANDOFF: 'Job sent to you',
   REPAIR_FINDING: 'New finding during repair', SUPPLEMENTARY_APPROVED: 'Supplementary work approved',
   ADVANCE_REQUESTED: 'Advance payment needed', ESTIMATION_WAIVER_REQUESTED: 'Estimation charge waiver requested',
-  ESTIMATION_WAIVER_APPROVED: 'Estimation charge waived', ESTIMATION_WAIVER_DECLINED: 'Estimation charge waiver declined', PROMISED_24H: 'Promised delivery in 24 hours', PROMISED_12H: 'Promised delivery in 12 hours',
+  ESTIMATION_WAIVER_APPROVED: 'Estimation charge waived', ESTIMATION_WAIVER_DECLINED: 'Estimation charge waiver declined',
+  RELEASE_APPROVAL_REQUESTED: 'Approval needed to release a vehicle', PROMISED_24H: 'Promised delivery in 24 hours', PROMISED_12H: 'Promised delivery in 12 hours',
 } as const;
 export type WorkshopEvent = keyof typeof WORKSHOP_EVENTS;
 // Email is intentionally excluded: issue #140 marks it as a suggestion.

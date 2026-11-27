@@ -335,3 +335,29 @@ Built on Jayking (no phase branch, at the owner's request).
 - Oil and parts are told apart by the part type (O), as on the paper card, not by the VAT category.
 - The header badge read "QC passed" on an invoiced job; it reads "Ready" while the job is ready or invoiced.
 - The demo seed ran out of brake pads and engine oil after phase 7; it now has the store receive what is missing.
+
+## Phase 9: Delivery (27 Nov 2026)
+
+Built on Jayking (no phase branch, at the owner's request).
+
+### Plan
+
+1. Data: `JobDeliverySignature` (one per job, signed document, document and evidence hashes, belongings returned, collector type, request ID; never updated), `JobReleaseApproval` (manager's approval for someone else, terms clause 7), `JobCard.psfFollowUpDueAt`, `BranchSettings.psfFollowUpDays` (2).
+2. Stage and workflow: `DELIVER` (Delivery to Closed with status DELIVERED through the existing delivery path), run only by the delivery service; the workflow refuses DELIVERED for service jobs outside it; delivery sets the follow-up call date.
+3. Server: pure `job-delivery.logic.ts` (belongings, collector check, problems, document and evidence hashes, input rules) and `followUpDueAt` in `psf.logic.ts`; `job-delivery.service.ts` and routes (`GET/POST /delivery`, `/estimate-signature`, `/release-approval`, `/release-request`).
+4. Client: `lib/delivery.logic.ts`, `use-job-delivery.ts`, `components/delivery/` (DeliveryStep, DeliveryCards, SignatureCards, ReleaseApprovalDialog, DeliveredSummary); the old delivery form, temporary Delivery screen and Delivered panel deleted; PSF **Call due**; **Follow-up call** branch setting.
+5. Demo seed JC-S33 to JC-S36; tests (logic, integration, Playwright phase 9); docs and manual test guide.
+
+### Status (milestones)
+
+- [x] Migration `20261127210000_jobcard_delivery` (additive, no data conversion). Generated against a copy of the phase 8 dev database and trimmed to this phase's objects (the generated diff also carried other teams' drift); residual diff for phase 9 objects empty.
+- [x] Server: logic, service, routes, `DELIVER` action, workflow restriction, follow-up date, PSF detail `followUpDueAt`, release notice `RELEASE_APPROVAL_REQUESTED`.
+- [x] Demo seed JC-S33 to JC-S36 on a local copy (`dana_demo_p9`, now the e2e template; local job numbers 2026000049 to 2026000052). The seed now delivers through the delivery service (the old status write is refused) and can decline parts on the phone approval, approve a supplementary estimate on the phone and have a representative sign at check-in.
+- [x] Client: Delivery step, delivered summary, settings, PSF.
+- [x] Server database: `20261127210000_jobcard_delivery` applied on 27 Nov 2026 (the only pending migration; the first attempt failed to connect, the retry applied it).
+- [x] Docs: `doc/job-cards.md` ("Delivery (phase 9)"), `doc/demo-data.md`, manual test guide `doc/testing/jobcard-revamp/phase-9-manual-test.md`.
+
+### Found and fixed in passing
+
+- Two unit tests in `service.job-card.test.ts` had failed since phase 8 (the payment check read invoices the mock did not have); the payment facts are now mocked.
+- The PSF entry header showed "—" fallbacks and middle dots in the row this phase touched; they read "Not provided" and use commas.

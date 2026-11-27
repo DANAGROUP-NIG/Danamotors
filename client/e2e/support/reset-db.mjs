@@ -5,7 +5,7 @@ const require = createRequire(new URL("../../../server/package.json", import.met
 const { PrismaClient } = require("@prisma/client");
 
 const server = process.env.E2E_DB_SERVER ?? "postgresql://dana:jobflow@localhost:55433";
-const template = process.env.E2E_TEMPLATE_DB ?? "dana_demo_p8";
+const template = process.env.E2E_TEMPLATE_DB ?? "dana_demo_p9";
 const target = process.env.E2E_DB ?? "dana_e2e";
 if (!["localhost", "127.0.0.1"].includes(new URL(server).hostname)) throw new Error("E2E database must be on localhost");
 if (!/^[a-z0-9_]+$/.test(template) || !/^[a-z0-9_]+$/.test(target)) throw new Error("Invalid database name");

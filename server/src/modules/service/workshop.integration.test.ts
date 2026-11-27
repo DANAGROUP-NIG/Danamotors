@@ -14,6 +14,7 @@ import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { ServiceService } from "./service.service";
+import { JobCardWorkflowService } from "./job-card-workflow.service";
 import { LabourService } from "./labour.service";
 import { VehicleService } from "../vehicle/vehicle.service";
 import { CustomerService } from "../customer/customer.service";
@@ -259,26 +260,17 @@ integration("Workshop database flow", () => {
             expect(bill.lines).toHaveLength(3);
             await new ReceiptService().createReceipt({ customerId: customer.id, branchId: branch.id, issuedById: user.id, mode: 'CASH', category: 'SERVICE_PARTS', amount: bill.total, allocations: [{ invoiceId: bill.id, amount: bill.total }] });
 
-            await expect(
-              jobs.updateJobCard(
-                job.id,
-                {
-                  status: "DELIVERED",
-                  deliveryAdvisorId: user.id,
-                },
-                user.id,
-              ),
-            ).rejects.toThrow("Late delivery");
+            // Phase 9: the delivery service runs the existing delivery path through the Deliver action.
+            const deliver = (lateReasonIds?: string[]) =>
+              prisma.$transaction((db) =>
+                new JobCardWorkflowService().updateInTx(db, job.id, { status: "DELIVERED", deliveryAdvisorId: user.id, lateReasonIds }, user.id, {
+                  action: "DELIVER",
+                  requestId: randomUUID(),
+                }),
+              );
+            await expect(deliver()).rejects.toThrow("Late delivery");
 
-            const delivered = await jobs.updateJobCard(
-              job.id,
-              {
-                status: "DELIVERED",
-                deliveryAdvisorId: user.id,
-                lateReasonIds: [late.id],
-              },
-              user.id,
-            );
+            const delivered = await deliver([late.id]);
 
             expect(delivered.gatePassNumber).toMatch(/^\d{10}$/);
 

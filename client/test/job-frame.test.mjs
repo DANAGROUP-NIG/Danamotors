@@ -217,6 +217,7 @@ test("activity, toasts, vehicle, customer and bill wording never show codes", ()
   assert.equal(frame.activityOwner({ ...entry, ownerName: null, ownerRole: null }), null);
   assert.equal(frame.activityLine({ ...entry, fromStage: null, toStage: "CHECK_IN", action: "OPENED" }), "Job opened at Check-in");
   assert.equal(frame.activityLine({ ...entry, fromStage: "REPAIR", toStage: "REPAIR", action: "PAUSE_FOR_PARTS" }), "Pause for parts (Repair)");
+  assert.equal(frame.activityLine({ ...entry, fromStage: "DELIVERY", toStage: "CLOSED", action: "DELIVER" }), "Vehicle delivered. Job closed");
   assert.equal(frame.activityLine({ ...entry, fromStage: "REPAIR", toStage: "REPAIR", action: null }), "Step owner changed (Repair)");
   assert.equal(frame.activityLine({ ...entry, fromStage: "DIAGNOSIS", toStage: "DIAGNOSIS", action: "ASSIGNED" }), "Technician and bay assigned (Diagnosis)");
   assert.equal(frame.activityLine({ ...entry, toStage: "CANCELLED", action: "CANCEL" }), "Job cancelled");
@@ -259,14 +260,6 @@ test("forms name the field and the fix", () => {
   for (const bad of ["", "-1", "12.345", "abc"])
     assert.equal(findings.safeParse({ ...base, serviceCharge: bad }).error.issues[0].message, "Enter the service charge in naira, 0 or more, with up to two decimal places.");
 
-  const onTime = workshopSchemas.deliverySchema(false);
-  const late = workshopSchemas.deliverySchema(true);
-  const delivery = { deliveryAdvisorId: "a", lateReasonIds: [], lateRemarks: "", remarks: "" };
-  assert.equal(onTime.safeParse(delivery).success, true);
-  assert.equal(late.safeParse(delivery).error.issues[0].message, "The promised time has passed. Choose at least one late-delivery reason.");
-  assert.equal(late.safeParse({ ...delivery, lateReasonIds: ["1"] }).success, true);
-  assert.equal(late.safeParse({ ...delivery, lateReasonIds: ["1", "2", "3", "4", "5", "6", "7"] }).error.issues[0].message, "Choose up to six late-delivery reasons.");
-  assert.equal(onTime.safeParse({ ...delivery, deliveryAdvisorId: "" }).error.issues[0].message, "Choose the delivery advisor who hands the vehicle over.");
   assert.equal(workshopSchemas.creditApprovalSchema.safeParse({ remarks: " " }).error.issues[0].message, "Enter why delivery on credit is approved.");
 });
 

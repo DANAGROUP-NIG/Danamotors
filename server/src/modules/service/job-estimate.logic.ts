@@ -263,7 +263,7 @@ export const saveDraftBody = z
 export const presentBody = z.object({ estimateId: uuid("Reload the page and try again") }).strict();
 
 const decision = z.object({ lineId: uuid("Reload the estimate and try again"), decision: z.enum(["APPROVED", "DECLINED"]) }).strict();
-const nigerianPhone = z
+export const nigerianPhone = z
   .string()
   .trim()
   .regex(/^(\+?234|0)[789][01]\d{8}$/, "Enter a Nigerian mobile number, for example 0803 555 0142")

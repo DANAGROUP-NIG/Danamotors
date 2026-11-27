@@ -123,6 +123,7 @@ export const ACTION_LABELS: Record<StageAction, string> = {
   RETURN_TO_REPAIR: "Fail and return to technician",
   MARK_READY: "Mark ready and notify customer",
   SEND_TO_DELIVERY: "Send to delivery",
+  DELIVER: "Complete delivery and print gate pass",
   CANCEL: "Cancel job",
 };
 

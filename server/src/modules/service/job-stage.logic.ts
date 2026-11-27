@@ -330,6 +330,7 @@ export const STAGE_ACTIONS = [
   "RETURN_TO_REPAIR",
   "MARK_READY",
   "SEND_TO_DELIVERY",
+  "DELIVER",
   "CANCEL",
 ] as const;
 export type StageAction = (typeof STAGE_ACTIONS)[number];
@@ -345,6 +346,11 @@ interface ActionRule {
   /** A handoff passes the job on; one of them becomes the primary button. */
   kind: "handoff" | "secondary" | "danger";
   requiresNote?: boolean;
+  /**
+   * Run only by the service that records the step's evidence first (POST /stage refuses it), with this
+   * message saying where to do it instead.
+   */
+  serviceOnly?: string;
   /** Offered only when this holds, for example the warranty route. */
   when?: (facts: StageFacts) => boolean;
   gates: (facts: StageFacts) => string[];
@@ -514,6 +520,18 @@ export const ACTION_RULES: Record<StageAction, ActionRule> = {
     statuses: ["READY", "BILLED"],
     roles: ADVISORS,
     kind: "handoff",
+    gates: (facts) => (facts.paymentProblem ? [facts.paymentProblem] : []),
+  },
+  // Delivery (phase 9): the existing delivery path (DELIVERED with the gate pass) closes the job. Run only by the
+  // delivery service, after the belongings, the collector and the customer's signature are recorded.
+  DELIVER: {
+    from: ["DELIVERY"],
+    to: "CLOSED",
+    statuses: ["READY", "BILLED"],
+    toStatus: "DELIVERED",
+    roles: ADVISORS,
+    kind: "handoff",
+    serviceOnly: "Complete the delivery on the Delivery step: it records the belongings, who collected the vehicle and the customer's signature.",
     gates: (facts) => (facts.paymentProblem ? [facts.paymentProblem] : []),
   },
   CANCEL: {

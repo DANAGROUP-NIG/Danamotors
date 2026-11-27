@@ -64,6 +64,8 @@ export interface PsfDetail {
   jobDate: string;
   branch: { id: string; name: string };
   deliveredAt: string;
+  /** When the follow-up call is due, set at delivery (job card revamp phase 9). Null for older jobs. */
+  followUpDueAt: string | null;
   mileage: number | null;
   registration: string | null;
   vin: string | null;

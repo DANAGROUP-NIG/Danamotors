@@ -293,6 +293,7 @@ model User {
   deliveredJobs       JobCard[]              @relation("JobDeliveryAdvisor")
   creditApprovedJobs  JobCard[]              @relation("JobCreditApprover")
   vehicleWashedJobs   JobCard[]              @relation("JobVehicleWashedBy")
+  releaseApprovals    JobReleaseApproval[]   @relation("JobReleaseApprovedBy")
   customerContacts    CustomerContact[]      @relation("CustomerContactBy")
   jobStatusChanges    JobCardStatusHistory[]
   createdJobCards     JobCard[]              @relation("CreatedJobCards")
@@ -812,6 +813,12 @@ model JobCard {
   vehicleWashedAt    DateTime?
   vehicleWashedById  String?
   vehicleWashedBy    User?                  @relation("JobVehicleWashedBy", fields: [vehicleWashedById], references: [id], onDelete: Restrict)
+  /// Delivery (phase 9): the date the post-service follow-up call is due, set when the vehicle is delivered.
+  psfFollowUpDueAt   DateTime?
+  /// Delivery (phase 9): the customer's delivery signature with the belongings and the collector.
+  deliverySignature  JobDeliverySignature?
+  /// Delivery (phase 9): managers' approvals to release the vehicle to someone other than the owner or signer.
+  releaseApprovals   JobReleaseApproval[]
   complaints         JobComplaint[]
   statusHistory      JobCardStatusHistory[]
 
@@ -4935,6 +4942,8 @@ model BranchSettings {
   /// vehicle is ready, then storageDailyRate is proposed per started day at billing.
   storageFreeHours        Int     @default(48)
   storageDailyRate        Decimal @default(2000) @db.Decimal(18, 2)
+  /// Delivery (phase 9): the post-service follow-up call is due this many days after delivery.
+  psfFollowUpDays         Int     @default(2)
 
   // Workshop rules. A job is a repeat when it is within either limit of the vehicle's last billed job.
   repeatWindowDays Int     @default(15)
@@ -5607,20 +5616,71 @@ enum ReadyNoticeChannel {
 
 /// One "customer told the vehicle is ready" entry. Never updated or deleted.
 model CustomerContact {
-  id            String         @id @default(uuid())
+  id            String             @id @default(uuid())
   jobCardId     String
-  jobCard       JobCard        @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  jobCard       JobCard            @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
   channel       ReadyNoticeChannel
   /// The number used, copied from the customer when the entry was made.
   phone         String?
   note          String?
-  contactedAt   DateTime       @default(now())
+  contactedAt   DateTime           @default(now())
   contactedById String
-  contactedBy   User           @relation("CustomerContactBy", fields: [contactedById], references: [id], onDelete: Restrict)
+  contactedBy   User               @relation("CustomerContactBy", fields: [contactedById], references: [id], onDelete: Restrict)
   requestId     String
 
   @@unique([jobCardId, requestId])
   @@index([jobCardId, contactedAt])
+}
+
+/// Who collected the vehicle at delivery (terms clause 7: only the owner or the person who signed the job card).
+enum CollectorType {
+  OWNER
+  CHECK_IN_SIGNER
+  OTHER
+}
+
+/// The customer's delivery signature (job card revamp phase 9). Kept like JobOpeningSignature: a separate row
+/// with the signed document and hashes, never updated or deleted. One per job.
+model JobDeliverySignature {
+  id                 String              @id @default(uuid())
+  jobCardId          String              @unique
+  jobCard            JobCard             @relation(fields: [jobCardId], references: [id], onDelete: Restrict)
+  /// Client request ID: a repeated submission returns this delivery.
+  requestId          String              @unique
+  collectorType      CollectorType
+  /// [{ code, label, returned }] for every belonging listed at check-in.
+  belongingsReturned Json
+  /// The manager's approval when the collector is someone else.
+  releaseApprovalId  String?
+  releaseApproval    JobReleaseApproval? @relation(fields: [releaseApprovalId], references: [id], onDelete: Restrict)
+  signerName         String
+  signerPhone        String?
+  /// The signed document: statement, work done, declined items, belongings and collector.
+  snapshot           Json
+  documentHash       String              @db.Char(64)
+  evidenceHash       String              @db.Char(64)
+  capturedById       String
+  signedAt           DateTime            @default(now())
+  signatureImage     String              @db.Text
+}
+
+/// A service or workshop manager's approval to release a vehicle to someone other than the owner or the
+/// person who signed the job card (terms clause 7). The latest one counts.
+model JobReleaseApproval {
+  id             String                 @id @default(uuid())
+  jobCardId      String
+  jobCard        JobCard                @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  collectorName  String
+  collectorPhone String
+  reason         String
+  approvedById   String
+  approvedBy     User                   @relation("JobReleaseApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
+  approvedAt     DateTime               @default(now())
+  requestId      String
+  deliveries     JobDeliverySignature[]
+
+  @@unique([jobCardId, requestId])
+  @@index([jobCardId, approvedAt])
 }
 
 model JobWorkLine {

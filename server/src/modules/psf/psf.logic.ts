@@ -28,6 +28,20 @@ export function statusCode(status: PsfStatus): number {
   return PSF_STATUSES.find((item) => item.status === status)?.code ?? 0;
 }
 
+const LAGOS_OFFSET_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** The follow-up call is due at 09:00 Lagos time. */
+const DUE_HOUR_MS = 9 * 60 * 60 * 1000;
+
+/**
+ * Delivery (job card revamp phase 9): the follow-up call is due `days` Lagos calendar days after the delivery
+ * day, at 09:00 Lagos time (UTC+1 all year). Set once, when the vehicle is delivered.
+ */
+export function followUpDueAt(deliveredAt: Date, days: number): Date {
+  const lagosMidnight = Math.floor((deliveredAt.getTime() + LAGOS_OFFSET_MS) / DAY_MS) * DAY_MS - LAGOS_OFFSET_MS;
+  return new Date(lagosMidnight + days * DAY_MS + DUE_HOUR_MS);
+}
+
 /** Reached the customer: they said satisfied or dissatisfied. */
 export function isContacted(status: PsfStatus | null | undefined): boolean {
   return status === 'SATISFIED' || status === 'DISSATISFIED';

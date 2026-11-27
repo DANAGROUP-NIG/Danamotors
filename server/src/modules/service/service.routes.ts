@@ -8,6 +8,7 @@ import { jobEstimateRoutes } from "./job-estimate.routes";
 import { jobRepairRoutes, myJobsRoutes } from "./job-repair.routes";
 import { jobQualityCheckRoutes } from "./job-quality-check.routes";
 import { jobBillingRoutes } from "./job-billing-step.routes";
+import { jobDeliveryRoutes } from "./job-delivery.routes";
 import { CREDIT_APPROVERS } from "./job-billing-step.service";
 import { loadOpeningConsent } from "./job-opening-consent";
 import { assertBookable } from "./booking.logic";
@@ -67,6 +68,7 @@ router.use("/job-cards/:id/estimate", jobEstimateRoutes);
 router.use("/job-cards/:id/repair", jobRepairRoutes);
 router.use("/job-cards/:id/quality-check", jobQualityCheckRoutes);
 router.use("/job-cards/:id/billing", jobBillingRoutes);
+router.use("/job-cards/:id/delivery", jobDeliveryRoutes);
 router.use("/my-jobs", myJobsRoutes);
 router.get(
   "/staff",

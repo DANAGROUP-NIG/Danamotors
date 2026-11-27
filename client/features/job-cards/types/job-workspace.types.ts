@@ -29,6 +29,7 @@ export type StageAction =
   | "RETURN_TO_REPAIR"
   | "MARK_READY"
   | "SEND_TO_DELIVERY"
+  | "DELIVER"
   | "CANCEL";
 
 export type SubStep =

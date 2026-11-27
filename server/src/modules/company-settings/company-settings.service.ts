@@ -30,6 +30,8 @@ export const branchSettingsSchema = z.object({
   // Terms clause 3: storage is free for these hours after the customer is told the vehicle is ready.
   storageFreeHours: z.number({ invalid_type_error: 'Enter the free storage hours as a whole number' }).int('Enter the free storage hours as a whole number').min(0, 'The free storage hours cannot be negative').max(720, 'The free storage hours must be 720 or less'),
   storageDailyRate: z.number({ invalid_type_error: 'Enter the storage charge per day as a number' }).min(0, 'The storage charge per day cannot be negative').max(1_000_000, 'The storage charge per day must be 1,000,000 or less').multipleOf(0.01, 'Use at most 2 decimal places for the storage charge per day'),
+  // Delivery (job card revamp phase 9): the follow-up call is due this many days after delivery.
+  psfFollowUpDays: z.number({ invalid_type_error: 'Enter the follow-up call days as a whole number' }).int('Enter the follow-up call days as a whole number').min(0, 'The follow-up call days cannot be negative').max(60, 'The follow-up call days must be 60 or less'),
   repeatWindowDays: z.number().int().min(1).max(3650),
   repeatWindowKm: z.number().int().min(1).max(1_000_000).nullable(),
   printRepeatBlock: z.boolean().default(true),
@@ -59,6 +61,8 @@ export function defaultBranchSettings(): BranchSettingsValues {
     // TODO(confirm): terms clause 3 (48 hours free, then ₦2,000.00 a day) for every branch until each sets its own.
     storageFreeHours: 48,
     storageDailyRate: 2000,
+    // TODO(confirm): the follow-up call two days after delivery, as in the design, until each branch sets its own.
+    psfFollowUpDays: 2,
     repeatWindowDays: Number(process.env.JOB_REPEAT_WINDOW_DAYS ?? 15),
     repeatWindowKm: 500,
     printRepeatBlock: true,

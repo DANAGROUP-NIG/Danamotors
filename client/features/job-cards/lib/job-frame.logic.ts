@@ -280,6 +280,8 @@ export function activityLine(entry: StageActivity): string {
   // The quality check's result, so the history shows each check (phase 7).
   if (entry.action === "QC_PASSED_TO_ADVISOR") return `Quality check passed. Moved to ${to}`;
   if (entry.action === "RETURN_TO_REPAIR") return `Quality check failed. Returned to ${to}`;
+  // Delivery (phase 9): the note says who collected the vehicle.
+  if (entry.action === "DELIVER") return "Vehicle delivered. Job closed";
   return `Moved from ${STAGE_LABELS[entry.fromStage]} to ${to}`;
 }
 
