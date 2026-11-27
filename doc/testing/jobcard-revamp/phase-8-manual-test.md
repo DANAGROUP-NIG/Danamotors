@@ -36,10 +36,10 @@ On the test site the service advisor's role may also be allowed to create invoic
 
 | Plate | Job number | Where it is | Used in section |
 |---|---|---|---|
-| LSR-540ST | JOB_S29 (2026000045) | Billing. Quality check passed; not marked ready yet | A, B, H |
-| LSR-541ST | JOB_S30 (2026000046) | Billing. Marked ready about four days before the demo data was loaded (phone call, then an SMS reminder), washed. Storage days are due | C, D, G |
-| LSR-542ST | JOB_S31 (2026000047) | Billing. Invoiced; the ₦10,000.00 advance is taken off; a balance is left | E |
-| LSR-543ST | JOB_S32 (2026000048) | Billing. Invoiced and unpaid, for a credit approval | F |
+| LSR-540ST | 2026000063 (2026000045) | Billing. Quality check passed; not marked ready yet | A, B, H |
+| LSR-541ST | 2026000064 (2026000046) | Billing. Marked ready about four days before the demo data was loaded (phone call, then an SMS reminder), washed. Storage days are due | C, D, G |
+| LSR-542ST | 2026000065 (2026000047) | Billing. Invoiced; the ₦10,000.00 advance is taken off; a balance is left | E |
+| LSR-543ST | 2026000066 (2026000048) | Billing. Invoiced and unpaid, for a credit approval | F |
 
 Sections A to F change their jobs. After testing, ask the developer to reload the demo data before you test them again.
 
@@ -70,7 +70,7 @@ The service line shows the service type's name as written in the service type li
 9. Click **Phone call** instead, and type in **Note (optional)**: `Customer will collect tomorrow morning.`
    - **Expected:** the SMS box disappears; Phone call is selected.
 10. Click **Mark ready and save notice**.
-    - **Expected:** the button shows a spinner and "Saving", then the window closes and a green toast says "Job JOB_S29 marked ready. The customer notice is recorded." The header badge changes to **Ready** and "With: Billing officer since (now)".
+    - **Expected:** the button shows a spinner and "Saving", then the window closes and a green toast says "Job 2026000063 marked ready. The customer notice is recorded." The header badge changes to **Ready** and "With: Billing officer since (now)".
 11. Look at **Customer notified**.
     - **Expected:** a green box "Phone call to (number) on (today's date), (time)", for example "Phone call to +2348099900105 on 27 Nov 2026, 16:31", with "By Chidi Eze. Customer will collect tomorrow morning." and a **Send again** button. The grey box now reads "Storage charge of ₦2,000.00 per day starts after (the date and time 48 hours later) (terms clause 3)."
 12. Look at the bar.
@@ -97,7 +97,7 @@ The service line shows the service type's name as written in the service type li
 18. Click **Earlier notices (1)**.
     - **Expected:** a line "Phone call to (number) on (date about four days ago), (time), by Chidi Eze. Told the customer the vehicle is ready for collection."
 19. Click **Create invoice** in the **Invoice** card.
-    - **Expected:** a window **Create invoice** with "Invoice for job JOB_S30. Advances already paid are applied.", the invoice lines (Front brake pads set, Engine oil 5W-30, 4 litres, Replace front brake pads, PAID SERVICE) each with its amount, then Parts, Labour, Service charge, VAT, Round-off and **Total before storage**. Below that, a yellow box "Storage charge proposed: ₦X (N days at ₦2,000.00 per day after (date), terms clause 3)." with two choices **Add to the invoice** and **Remove, with a reason**, and the line "Need a discount? Use Billing, Create job bill."
+    - **Expected:** a window **Create invoice** with "Invoice for job 2026000064. Advances already paid are applied.", the invoice lines (Front brake pads set, Engine oil 5W-30, 4 litres, Replace front brake pads, PAID SERVICE) each with its amount, then Parts, Labour, Service charge, VAT, Round-off and **Total before storage**. Below that, a yellow box "Storage charge proposed: ₦X (N days at ₦2,000.00 per day after (date), terms clause 3)." with two choices **Add to the invoice** and **Remove, with a reason**, and the line "Need a discount? Use Billing, Create job bill."
 20. Click **Create invoice** inside the window without choosing.
     - **Expected:** in red: "Accept the storage charge, or remove it with a reason." Nothing is created.
 21. Click **Remove, with a reason**, then click **Create invoice**.
@@ -139,15 +139,15 @@ To test **Add to the invoice** instead, ask the developer to reload the demo dat
 ## E. Record the payment and send to delivery (billing officer, then advisor)
 
 34. Sign in as the **Billing officer**. Open job **LSR-542ST**.
-    - **Expected:** **Invoice** card: "Invoice (number), (date), (time)", Customer total ₦104,850.00, Advance paid ₦10,000.00, Balance due ₦94,850.00 in large red, Payment status **Unpaid**.
+    - **Expected:** **Invoice** card: "Invoice (number), (date), (time)", Customer total ₦83,850.00 (₦104,850.00 on the developer's computer), Advance paid ₦10,000.00, Balance due ₦73,850.00 (₦94,850.00) in large red, Payment status **Unpaid**.
 35. Click **Record payment**.
-    - **Expected:** the existing **Payment receipt** window opens with the customer's name, the invoice in the list with ₦94,850.00 filled in, and **Amount received (NGN)** 94850.
+    - **Expected:** the existing **Payment receipt** window opens with the customer's name, the invoice in the list with 73850 filled in (94850 on the developer's computer), and **Amount received (NGN)** the same.
 36. Set **Mode** to **Cash** and click **Save receipt**.
-    - **Expected:** the window closes, a green toast "Payment receipt created". The Invoice card shows Payments received ₦94,850.00, Balance due ₦0.00, Payment status **Paid** (green), a grey **Record payment** with "The invoice is paid in full." under it.
+    - **Expected:** the window closes, a green toast "Payment receipt created". The Invoice card shows Payments received ₦73,850.00 (₦94,850.00), Balance due ₦0.00, Payment status **Paid** (green), a grey **Record payment** with "The invoice is paid in full." under it.
 37. Sign out, sign in as the **Service advisor** and open **LSR-542ST**.
     - **Expected:** the bar shows a dark **Send to delivery** with "The job goes to the Delivery step with the service advisor." under it.
 38. Click **Send to delivery**.
-    - **Expected:** a green toast "Job JOB_S31 sent to Chidi Eze". The step heading reads **Step 8 of 8: Delivery**, circle 7 is ticked, and the header reads "With: Chidi Eze (Service advisor) since (now)". The page shows the existing **Deliver the vehicle** form and the Invoice card (read only, Paid).
+    - **Expected:** a green toast "Job 2026000065 sent to Chidi Eze". The step heading reads **Step 8 of 8: Delivery**, circle 7 is ticked, and the header reads "With: Chidi Eze (Service advisor) since (now)". The page shows the existing **Deliver the vehicle** form and the Invoice card (read only, Paid).
 39. Click **Job file**, then the **Activity** tab.
     - **Expected:** at the top, "Moved from Billing to Delivery", then "Step owner changed (Billing)" (the invoice), then "Mark ready and notify customer (Billing)", each with a name and time. Close the panel.
 40. Click the bell at the top right.
@@ -158,13 +158,13 @@ To test **Add to the invoice** instead, ask the developer to reload the demo dat
 ## F. Delivery on credit (service manager)
 
 41. Sign in as the **Service manager**. Open job **LSR-543ST**.
-    - **Expected:** the Invoice card with Balance due ₦94,850.00, **Unpaid**, and a link **Approve delivery on credit**.
+    - **Expected:** the Invoice card with Balance due ₦73,850.00 (₦94,850.00 on the developer's computer), **Unpaid**, and a link **Approve delivery on credit**.
 42. Click **Approve delivery on credit**.
-    - **Expected:** a window **Approve delivery on credit**: "Job JOB_S32 can go to delivery before the balance of ₦94,850.00 is paid. Approve only for customers with agreed credit terms.", a box **Reason for credit approval** with a red star.
+    - **Expected:** a window **Approve delivery on credit**: "Job 2026000066 can go to delivery before the balance of ₦73,850.00 is paid. Approve only for customers with agreed credit terms.", a box **Reason for credit approval** with a red star.
 43. Click **Approve delivery on credit** in the window without typing.
     - **Expected:** in red: "Enter why delivery on credit is approved."
 44. Type `Lakeside fleet account on 30-day credit terms.` and click **Approve delivery on credit**.
-    - **Expected:** the window closes, a green toast "Delivery on credit approved for job JOB_S32." The Invoice card shows a green box "Credit approved by Mark Folorusho (Service manager), (date), (time)." Payment status stays **Unpaid**.
+    - **Expected:** the window closes, a green toast "Delivery on credit approved for job 2026000066." The Invoice card shows a green box "Credit approved by Mark Folorusho (Service manager), (date), (time)." Payment status stays **Unpaid**.
 45. Sign out, sign in as the **Service advisor**, open **LSR-543ST**.
     - **Expected:** the same green credit line, and a dark **Send to delivery** in the bar (not grey), even though the balance is unpaid.
 
@@ -183,7 +183,7 @@ To test **Add to the invoice** instead, ask the developer to reload the demo dat
 ## H. Money and dates
 
 49. On any of the jobs, look at every amount on the Billing step.
-    - **Expected:** every amount starts with ₦ (never "N", "NGN" or a strange symbol) and has two decimals, for example ₦94,850.00. Amounts in tables line up on the right.
+    - **Expected:** every amount starts with ₦ (never "N", "NGN" or a strange symbol) and has two decimals, for example ₦73,850.00. Amounts in tables line up on the right.
 50. Look at every date and time.
     - **Expected:** day, short month, year and a 24-hour time, for example "27 Nov 2026, 16:31", in Lagos time.
 
