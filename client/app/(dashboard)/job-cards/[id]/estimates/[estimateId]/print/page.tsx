@@ -18,6 +18,8 @@ type PrintData = {
     estimateDate: string;
     currency: string;
     total: number;
+    vatAmount?: number;
+    roundOff?: number;
     upfrontPaymentPercent?: number;
     upfrontAmount?: number;
     supersededBy: number | null;
@@ -178,6 +180,12 @@ export default function EstimatePrintPage() {
           </table>
         </section>
       ))}
+      {estimate.vatAmount !== undefined && (
+        <div className="space-y-1 text-right text-sm tabular-nums">
+          <p>VAT {money(estimate.vatAmount)}</p>
+          {estimate.roundOff !== undefined && <p>Round off {money(estimate.roundOff)}</p>}
+        </div>
+      )}
       <p className="text-right text-lg font-bold">
         Total: {money(estimate.total)}
       </p>

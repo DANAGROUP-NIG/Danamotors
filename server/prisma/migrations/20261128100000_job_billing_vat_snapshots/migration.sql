@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE "Estimate" ADD COLUMN IF NOT EXISTS "partsVatSnapshot" JSONB;
+ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "partsVatSnapshot" JSONB;
+
+COMMIT;

@@ -16,6 +16,11 @@ export function PartsVatSettings() {
     queryKey: ["parts-vat-settings"],
     queryFn: () => apiGet<Settings>("/reports/billing-settings"),
   });
+  const preflight = useQuery({
+    queryKey: ["parts-vat-preflight"],
+    enabled: query.isSuccess,
+    queryFn: () => apiGet<{ count: number; parts: { id: string; partNumber: string; name: string }[] }>("/reports/billing-settings/preflight"),
+  });
   const [draft, setDraft] = useState<Settings | null>(null);
   const current = draft ?? query.data;
   const save = useMutation({
@@ -29,7 +34,7 @@ export function PartsVatSettings() {
       </Link>
       <PageHeader
         title="Parts VAT settings"
-        description="Applies to newly created bills. Existing invoices retain their stored amounts."
+        description="New estimates save the tax settings used for their bills. Existing invoices retain their stored amounts."
       />
       {query.isLoading ? (
         <p>Loading settings…</p>
@@ -46,11 +51,22 @@ export function PartsVatSettings() {
             }}
             className="max-w-2xl space-y-5 rounded-2xl border bg-card p-6"
           >
-            <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-              Enable parts VAT only after business confirmation. Classify
-              customer-paid parts in Part Master first. Unticking Taxable on a
-              part makes it exempt (0%).
-            </p>
+            <section className="space-y-2 rounded-md border border-border p-3 text-sm">
+              {preflight.isPending ? <p role="status">Checking part tax categories</p> :
+                preflight.isError ? (
+                  <p role="alert">Unable to check part tax categories.{" "}
+                    <button type="button" className="underline" onClick={() => void preflight.refetch()}>Retry</button>
+                  </p>
+                ) : preflight.data.count ? (
+                  <details>
+                    <summary className="cursor-pointer font-medium">{preflight.data.count} retail parts need a tax category</summary>
+                    <p className="mt-2">Classify these parts in Part Master before enabling parts VAT.</p>
+                    <ul className="mt-2 max-h-60 space-y-1 overflow-y-auto break-words">
+                      {preflight.data.parts.map(part => <li key={part.id}>{part.partNumber} {part.name}</li>)}
+                    </ul>
+                  </details>
+                ) : <p role="status">All retail parts have a billing tax category.</p>}
+            </section>
             <label className="flex items-center gap-3">
               <input
                 type="checkbox"
@@ -59,11 +75,11 @@ export function PartsVatSettings() {
                   setDraft({ ...current, enabled: e.target.checked })
                 }
               />
-              Enable parts VAT on new bills
+              Enable parts VAT on new estimates
             </label>
             <div className="grid gap-4 sm:grid-cols-3">
-              {(["SPARES", "OIL", "ACCESSORIES"] as const).map((k) => (
-                <Field key={k} label={k + " VAT (%)"}>
+              {([["SPARES", "Spares"], ["OIL", "Oil"], ["ACCESSORIES", "Accessories"]] as const).map(([k, label]) => (
+                <Field key={k} label={label + " VAT (%)"}>
                   <NumberInput
                     className={inputCls}
                     min={0}
@@ -84,7 +100,7 @@ export function PartsVatSettings() {
                 </Field>
               ))}
             </div>
-            <Button disabled={save.isPending}>Save settings</Button>
+            <Button disabled={save.isPending || (current.enabled && (!preflight.isSuccess || preflight.data.count > 0))}>Save settings</Button>
             {save.isSuccess && (
               <p role="status" className="text-sm">
                 Settings saved.

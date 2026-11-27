@@ -58,6 +58,8 @@ jest.mock("../../prisma/client", () => ({
     // Repeat detection runs in a savepoint against the branch window.
     $executeRaw: jest.fn(),
     branchSettings: { findUnique: jest.fn() },
+    financeSetting: { findUnique: jest.fn() },
+    sparePart: { findUnique: jest.fn() },
     repeatJob: { create: jest.fn() },
     auditLog: { create: jest.fn() },
 
@@ -319,7 +321,8 @@ describe("JobCard workflow", () => {
     expect(prisma.estimate.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          amount: 85000,
+          amount: 91370,
+          partsVatSnapshot: expect.objectContaining({ vatAmount: 6375, roundOff: -5 }),
           lines: {
             createMany: { data: [
               expect.objectContaining({
@@ -345,10 +348,31 @@ describe("JobCard workflow", () => {
     });
     expect(prisma.service.findFirst).not.toHaveBeenCalled();
     expect(prisma.estimate.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
-      amount: 15100, lines: { createMany: { data: [expect.objectContaining({
+      amount: 16230, lines: { createMany: { data: [expect.objectContaining({
         type: 'SERVICE', referenceId: id, description: 'PAID SERVICE', amount: 15100,
       })] } },
     }) }));
+  });
+
+  it("stores the customer quote with parts VAT and the default advance percentage", async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, status: "OPEN", branchId: "branch" });
+    (prisma.financeSetting.findUnique as jest.Mock).mockImplementation(({ where }) =>
+      where.key === "JOB_BILL_PARTS_VAT_ENABLED" ? { value: true } : null,
+    );
+    (prisma.sparePart.findUnique as jest.Mock).mockResolvedValue({
+      id, partFlag: "O", partNumber: "TEST-PART", name: "Test part",
+      retailRate: 200, taxable: true, taxCategory: "A",
+    });
+    await new ServiceService().addEstimate(id, {
+      description: "VAT quote",
+      lines: [{ type: "PART", referenceId: id, quantity: 1 }],
+    });
+    expect(prisma.estimate.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        amount: 210, upfrontPaymentPercent: 60,
+        partsVatSnapshot: expect.objectContaining({ enabled: true, vatAmount: 15, roundOff: -5 }),
+      }),
+    }));
   });
 
   it("calculates the opening estimate from its breakdown and persists the checklist", async () => {

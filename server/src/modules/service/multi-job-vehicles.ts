@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import prisma from '../../prisma/client';
-import { canAccessAllBranches } from '../../middleware/authorize';
+import { isGeneralDepartmentManager } from '../../middleware/authorize';
 import { ForbiddenError } from '../../shared/errors/appError';
 import type { Request } from 'express';
 
@@ -27,7 +27,7 @@ export const multiJobVehiclesQuery = z.object({
 type Query = z.infer<typeof multiJobVehiclesQuery>;
 
 export function multiJobBranch(user: Request['user'], requested?: string) {
-  if (canAccessAllBranches(user)) return requested;
+  if (isGeneralDepartmentManager(user)) return requested;
   if (!user?.branchId || (requested && requested !== user.branchId)) {
     throw new ForbiddenError('Choose a branch you can access');
   }

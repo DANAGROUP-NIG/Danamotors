@@ -16,7 +16,7 @@ import {
   NotFoundError,
 } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
-import { calculateBillWithPartsVat, partsVatSettings } from "./parts-vat";
+import { calculateBillWithPartsVat, defaultPartsVatRates, partsVatSettings, partsVatSnapshotSchema, resolveGovernmentPartsExemption } from "./parts-vat";
 import { invoiceSpareHeads } from "./invoice-bill-heads";
 import { categoryOf } from "../reports/report.logic";
 import { taxRegisterValues } from "../reports/tax-register-layout";
@@ -32,7 +32,7 @@ const JOB_BILL_INCLUDE = {
   customer: true,
   serviceType: true,
   service: { select: { name: true } },
-  appointment: { select: { customerId: true, customer: { select: { governmentVehicle: true } } } },
+  appointment: { select: { customerId: true, customer: { select: { governmentVehicle: true, type: true } } } },
   vehicle: true,
   branch: true,
   partIssuances: {
@@ -87,9 +87,10 @@ export class JobBillingService {
   private async loadJobCard(
     jobCardId: string,
     transaction: Prisma.TransactionClient | typeof prisma = prisma,
+    branchId?: string,
   ) {
     const jobCard = await transaction.jobCard.findUnique({
-      where: { id: jobCardId },
+      where: { id: jobCardId, branchId },
       include: JOB_BILL_INCLUDE,
     });
     if (!jobCard) throw new NotFoundError("Job card not found");
@@ -97,10 +98,10 @@ export class JobBillingService {
   }
 
   private async billScope(
-    input: { jobCardId: string; consolidateVehicle?: boolean },
+    input: { jobCardId: string; consolidateVehicle?: boolean; branchId?: string },
     transaction: Prisma.TransactionClient | typeof prisma = prisma,
   ) {
-    const jobCard = await this.loadJobCard(input.jobCardId, transaction);
+    const jobCard = await this.loadJobCard(input.jobCardId, transaction, input.branchId);
     this.assertBillable(jobCard);
     if (input.consolidateVehicle && !jobCard.vehicleId)
       throw new BadRequestError("Choose a job card with a vehicle");
@@ -108,6 +109,7 @@ export class JobBillingService {
       ? await transaction.jobCard.findMany({
           where: {
             vehicleId: jobCard.vehicleId,
+            branchId: jobCard.branchId,
             billedAt: null,
             status: {
               notIn: [
@@ -377,12 +379,31 @@ export class JobBillingService {
     lines: ReturnType<JobBillingService["pricedScope"]>["lines"],
     discounts: { partsDiscountPercent: number; labourDiscountPercent: number },
     transaction: Prisma.TransactionClient = prisma,
+    jobCards = [jobCard],
   ) {
     const [settings, taxSettings] = await Promise.all([
       getBranchSettings(jobCard.branchId, transaction),
       partsVatSettings(transaction),
     ]);
-    return calculateBillWithPartsVat(
+    const policies = jobCards.map((card) => {
+      const estimate = card.estimates?.[0];
+      if (estimate?.partsVatSnapshot) {
+        const { vatAmount: _vat, roundOff: _roundOff, ...saved } = partsVatSnapshotSchema.parse(estimate.partsVatSnapshot);
+        return saved;
+      }
+      return {
+        enabled: estimate ? false : taxSettings.enabled,
+        rates: estimate ? defaultPartsVatRates : taxSettings.rates,
+        exemption: resolveGovernmentPartsExemption(card.customer ?? card.appointment?.customer),
+        labourVatPercent: settings.labourVatPercent,
+        roundOffValue: settings.roundOffValue,
+      };
+    });
+    const policy = policies[0];
+    if (policies.some(other => JSON.stringify(other) !== JSON.stringify(policy))) {
+      throw new BadRequestError("These job cards use different approved tax settings. Bill them separately or approve updated estimates.");
+    }
+    const bill = calculateBillWithPartsVat(
       {
         partsTotal: sumMoney(
           lines
@@ -400,8 +421,8 @@ export class JobBillingService {
             .map((line) => line.amount),
         ),
         ...discounts,
-        vatRate: settings.labourVatPercent,
-        roundOffValue: settings.roundOffValue,
+        vatRate: policy.labourVatPercent,
+        roundOffValue: policy.roundOffValue,
       },
       lines.flatMap((line) =>
         line.type === "PART"
@@ -416,14 +437,23 @@ export class JobBillingService {
             ]
           : [],
       ),
-      taxSettings.enabled,
-      taxSettings.rates,
-      jobCard.customer?.governmentVehicle ?? jobCard.appointment?.customer?.governmentVehicle ?? false,
+      policy.enabled,
+      policy.rates,
+      policy.exemption !== null,
     );
+    const approvedEstimate = jobCard.estimates?.[0];
+    if (jobCards.length === 1 && approvedEstimate?.partsVatSnapshot && bill.totals.total > approvedEstimate.amount) {
+      throw new BadRequestError("The final bill exceeds the approved estimate. Review the tax categories and approve a revised estimate.");
+    }
+    return {
+      ...bill,
+      partsVatSnapshot: { ...policy, vatAmount: bill.totals.vatAmount, roundOff: bill.totals.roundOff },
+    };
   }
 
   async previewJobBill(input: {
     jobCardId: string;
+    branchId?: string;
     consolidateVehicle?: boolean;
     partsDiscountPercent: number;
     labourDiscountPercent: number;
@@ -432,7 +462,7 @@ export class JobBillingService {
     const { totals, breakdown } = await this.calculateTotals(jobCard, lines, {
       partsDiscountPercent: input.partsDiscountPercent,
       labourDiscountPercent: input.labourDiscountPercent,
-    });
+    }, prisma, jobCards);
     return {
       jobCard,
       jobCards: jobCards.map((card) => ({
@@ -455,6 +485,7 @@ export class JobBillingService {
 
   async createJobBill(input: {
     jobCardId: string;
+    branchId?: string;
     consolidateVehicle?: boolean;
     partsDiscountPercent: number;
     labourDiscountPercent: number;
@@ -468,7 +499,7 @@ export class JobBillingService {
           async (transaction) => {
             // Use the same customer -> job -> receipt lock order as advance receipt creation.
             const owner = await transaction.jobCard.findUnique({
-              where: { id: input.jobCardId },
+              where: { id: input.jobCardId, branchId: input.branchId },
               select: {
                 customerId: true,
                 appointment: { select: { customerId: true } },
@@ -520,7 +551,7 @@ export class JobBillingService {
 
             if (!review.canBill)
               throw new BadRequestError(review.issues.join(" "));
-            const { totals, breakdown } = await this.calculateTotals(
+            const { totals, breakdown, partsVatSnapshot } = await this.calculateTotals(
               jobCard,
               lines,
               {
@@ -528,6 +559,7 @@ export class JobBillingService {
                 labourDiscountPercent: input.labourDiscountPercent,
               },
               transaction,
+              jobCards,
             );
             const invoiceNumber = await nextDocumentNumber(
               transaction,
@@ -560,6 +592,7 @@ export class JobBillingService {
                       },
                     }
                   : {}),
+                partsVatSnapshot,
                 vatBreakdown: { create: breakdown },
                 taxRegisterSnapshot: {
                   version: 1,

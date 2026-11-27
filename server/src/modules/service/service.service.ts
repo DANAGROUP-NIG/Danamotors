@@ -28,6 +28,8 @@ import {
   serviceChargeDescription,
   serviceChargeReference,
 } from "./job-service-charge";
+import { calculateBillWithPartsVat, partsVatSettings, resolveGovernmentPartsExemption, type TaxPart } from "../finance/parts-vat";
+import { categoryOf } from "../reports/report.logic";
 import { lineAmount, sumMoney } from "../finance/money";
 import { Prisma, WarrantyCoverageStatus } from "@prisma/client";
 import {
@@ -902,7 +904,9 @@ export class ServiceService {
         const card = await tx.jobCard.findUnique({
           where: { id: jobCardId },
           include: {
-            serviceType: { select: { description: true } },
+            serviceType: { select: { description: true, chargedTo: true } },
+            customer: { select: { governmentVehicle: true, type: true } },
+            appointment: { select: { customer: { select: { governmentVehicle: true, type: true } } } },
             vehicle: { include: { catalogue: true } },
           },
         });
@@ -952,7 +956,9 @@ export class ServiceService {
           throw new BadRequestError(
             "Package inclusions require the selected service line",
           );
-        const lines = [];
+        const lines: Array<Prisma.EstimateLineCreateManyEstimateInput & { amount: number }> = [];
+        const taxParts: TaxPart[] = [];
+        const customerPaid = card.serviceType?.chargedTo !== "COMPANY";
         for (const line of data.lines) {
           let description = line.description ?? "";
           let rate = 0;
@@ -973,6 +979,13 @@ export class ServiceService {
             partSource = part.partFlag;
             description = part.name;
             rate = part.retailRate;
+            if (!line.includedInService) taxParts.push({
+              amount: lineAmount(quantity, rate),
+              category: categoryOf(part),
+              partNumber: part.partNumber,
+              taxable: part.taxable,
+              customerPaid,
+            });
           } else if (line.type === "LABOUR") {
             const item = line.referenceId
               ? await tx.labourItem.findFirst({
@@ -1058,9 +1071,29 @@ export class ServiceService {
             include: { lines: true },
           })
         )?.[0];
+        const tax = await partsVatSettings(tx);
+        const settings = await getBranchSettings(card.branchId, tx);
+        const exemption = resolveGovernmentPartsExemption(card.customer ?? card.appointment?.customer);
+        const subtotal = (type: string) => customerPaid
+          ? sumMoney(lines.filter(line => line.type === type).map(line => line.amount))
+          : 0;
+        const { totals } = calculateBillWithPartsVat({
+          partsTotal: subtotal("PART"),
+          labourTotal: subtotal("LABOUR"),
+          serviceTotal: subtotal("SERVICE"),
+          partsDiscountPercent: 0,
+          labourDiscountPercent: 0,
+          vatRate: settings.labourVatPercent,
+          roundOffValue: settings.roundOffValue,
+        }, taxParts, tax.enabled, tax.rates, exemption !== null);
+        const partsVatSnapshot = {
+          ...tax, exemption, labourVatPercent: settings.labourVatPercent,
+          roundOffValue: settings.roundOffValue, vatAmount: totals.vatAmount, roundOff: totals.roundOff,
+        };
+        const quoteTotal = customerPaid ? totals.total : sumMoney(lines.map(line => line.amount));
         const revision = planEstimateRevision(previous, supersedesId, {
           description: data.description,
-          amount: sumMoney(lines.map((line) => line.amount)),
+          amount: quoteTotal,
           lines,
         });
         if (previous)
@@ -1097,7 +1130,8 @@ export class ServiceService {
             description: data.description,
             currency: "NGN",
             status: "Pending",
-            amount: sumMoney(lines.map((line) => line.amount)),
+            amount: quoteTotal,
+            ...(customerPaid && { partsVatSnapshot }),
             lines: { createMany: { data: lines } },
           },
           include: { lines: true },

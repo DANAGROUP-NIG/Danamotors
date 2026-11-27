@@ -45,6 +45,10 @@ describe("Multi-job vehicle scope", () => {
       email: "actor@example.invalid",
     };
     expect(multiJobBranch(user)).toBe(branchId);
+    expect(() => multiJobBranch({ ...user, role: ROLES.SUPER_ADMIN }, otherBranch)).toThrow(
+      "Choose a branch you can access",
+    );
+    expect(multiJobBranch({ ...user, role: ROLES.GENERAL_BILLING_MANAGER })).toBeUndefined();
     expect(() => multiJobBranch(user, otherBranch)).toThrow(
       "Choose a branch you can access",
     );

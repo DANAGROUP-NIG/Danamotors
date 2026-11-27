@@ -186,7 +186,7 @@ Migration 20261008220000_outstanding_maintenance_letters is additive, transactio
 Automated validation and frontend acceptance steps are recorded in issue-77-progress.md and issue-77-frontend-testing.md. The Word-compatible walkthrough is Dana-Motors-Frontend-Testing-Guide.rtf. It covers startup, fixture preparation, advances/FIFO/reversal, credit applications, notes, reports, Tally, credit days/overdue, repair preview/apply, letter generation/reprints and access checks. Manual browser/Excel/printing/external-Tally results remain for the tester to record separately.
 # Parts VAT (issue #79)
 
-Parts VAT defaults OFF. `JOB_BILL_PARTS_VAT_ENABLED=true` in the environment or an explicitly true finance setting enables it for new bills; the environment true value overrides the stored switch. Admin/SuperAdmin can edit rates and the stored flag at Reports → Parts VAT settings. Do not enable it in production before business confirmation.
+Parts VAT defaults off. Admin and SuperAdmin can enable it at Reports ? Parts VAT settings after the preflight list is clear. The default rate is 7.5% for spares, oil and accessories. An environment opt-in also requires a clear preflight and a recorded setting takes precedence. A new customer estimate saves its tax settings and rounded total. Bills use that saved policy, including the government parts exemption. Existing estimate revisions without a snapshot retain the previous parts VAT treatment, and historical invoices keep their stored amounts.
 
 ### Issue 142 rollout and accounting decisions
 

@@ -228,6 +228,7 @@ test("combined and legacy bills print explicit job explanations without internal
       "components/CustomerExplanation.tsx",
     ),
     "@/components/DocumentTermsBlock": { DocumentTermsBlock: () => null },
+    "./BillHeads": load("features/invoices/components/BillHeads.tsx"),
     "./VatBreakdownTable": { VatBreakdownTable: () => null },
     "./PaymentReceiptModal": { PaymentReceiptModal: () => null },
     "./CancelJobBillModal": { CancelJobBillModal: () => null },

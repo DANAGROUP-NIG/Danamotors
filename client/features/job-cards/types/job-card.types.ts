@@ -17,6 +17,7 @@ export type Inspection = {
 };
 
 export type Estimate = {
+  partsVatSnapshot?: { vatAmount: number; roundOff: number } | null;
   upfrontPaymentPercent?: number | string;
   upfrontAmount?: number;
   version: number;

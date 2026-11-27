@@ -1,4 +1,5 @@
 jest.mock('../../prisma/client',()=>({__esModule:true,default:{
+ financeSetting:{findUnique:jest.fn()},branchSettings:{findUnique:jest.fn()},
  $transaction:jest.fn(),$queryRaw:jest.fn(),jobCard:{findUnique:jest.fn(),update:jest.fn()},estimate:{findMany:jest.fn(),update:jest.fn(),create:jest.fn()},auditLog:{create:jest.fn()}
 }}));
 jest.mock('../finance/document-number',()=>({nextDocumentNumber:jest.fn(async()=> 'TEST-2')}));

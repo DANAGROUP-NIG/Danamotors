@@ -1,4 +1,4 @@
-import { createCustomerSchema, listCustomerSchema, updateCustomerSchema } from './customer.validation';
+import { legacyCustomerCategory, createCustomerSchema, listCustomerSchema, updateCustomerSchema } from './customer.validation';
 import { CustomerService } from './customer.service';
 import { withPartyTransaction } from '../finance/party-account.service';
 
@@ -8,6 +8,11 @@ const branchId = '123e4567-e89b-42d3-a456-426614174000';
 const customer = { branchId, phoneNumber: '0000000000' };
 
 describe('Customer category validation', () => {
+  it.each([['C', 'CORPORATE'], ['I', 'INDIVIDUAL'], ['G', 'GOVERNMENT'], ['F', 'CORPORATE'], ['X', 'OTHERS']])(
+    'maps legacy code %s to %s',
+    (legacy, category) => expect(legacyCustomerCategory(legacy)).toBe(category),
+  );
+
   it.each(['INDIVIDUAL', 'CORPORATE', 'GOVERNMENT', 'IN_HOUSE', 'OTHERS'])(
     'accepts %s on create and as a directory filter',
     (type) => {

@@ -925,6 +925,7 @@ model Inspection {
 // ============================================================
 
 model Estimate {
+  partsVatSnapshot Json?
   customerRemarks String?
   upfrontPaymentPercent Decimal @default(60) @db.Decimal(5, 2)
   remarks String?
@@ -1689,6 +1690,7 @@ model ServiceHistory {
 // ============================================================
 
 model Invoice {
+  partsVatSnapshot Json?
   jobCards            JobCard[]             @relation("WarrantyJobBills")
   taxRegisterSnapshot Json?
   billType            String?

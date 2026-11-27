@@ -3,9 +3,11 @@ import {
   type SignedContent,
   type SignatureEvidence,
 } from "./estimate-signature";
+import { partsVatSnapshotSchema } from "../finance/parts-vat";
 import { upfrontAmount } from "./estimate-advance";
 type PrintEstimate = SignedContent & {
   id: string;
+  partsVatSnapshot?: unknown;
   estimateNumber: string | null;
   estimateDate: Date | null;
   createdAt: Date;
@@ -37,6 +39,7 @@ export function projectEstimatePrint(
     estimate.approvals.find((a) => a.signature) ?? estimate.approvals[0];
   const state = approval ? signatureState(estimate, approval) : null;
   const signature = approval?.signature;
+  const tax = partsVatSnapshotSchema.safeParse(estimate.partsVatSnapshot);
   return {
     id: estimate.id,
     version: estimate.version ?? 1,
@@ -44,6 +47,7 @@ export function projectEstimatePrint(
     estimateDate: estimate.estimateDate ?? estimate.createdAt,
     currency: estimate.currency ?? "NGN",
     total: estimate.amount,
+    ...(tax.success && { vatAmount: tax.data.vatAmount, roundOff: tax.data.roundOff }),
     supersededBy: estimate.successor?.version ?? null,
     customerRemarks: estimate.customerRemarks ?? null,
     upfrontPaymentPercent: Number(estimate.upfrontPaymentPercent ?? 60),

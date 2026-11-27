@@ -19,6 +19,12 @@ export const customerTallyLedgerSchema = z.object({
 
 export const customerCategory = z.enum(['INDIVIDUAL', 'CORPORATE', 'GOVERNMENT', 'IN_HOUSE', 'OTHERS']);
 
+export function legacyCustomerCategory(code: string) {
+  const mapping = { C: 'CORPORATE', I: 'INDIVIDUAL', G: 'GOVERNMENT', F: 'CORPORATE' } as const;
+  const normalized = code.trim().toUpperCase();
+  return Object.hasOwn(mapping, normalized) ? mapping[normalized as keyof typeof mapping] : 'OTHERS';
+}
+
 export const customerBody = z.object({
   firstName: z.string().trim().max(100).default(''),
   lastName: z.string().trim().max(100).default(''),

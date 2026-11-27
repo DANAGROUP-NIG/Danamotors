@@ -72,6 +72,7 @@ export function toEstimateViewModel(estimate: Estimate) {
     ),
     currency: estimate.currency,
     total: estimate.amount,
+    partsVatSnapshot: estimate.partsVatSnapshot,
     suggestedAdvance,
     decision,
     invalid,

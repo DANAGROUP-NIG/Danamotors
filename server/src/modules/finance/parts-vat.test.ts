@@ -1,4 +1,5 @@
-import { calculateBillWithPartsVat, defaultPartsVatRates } from './parts-vat';
+import type { Prisma } from '@prisma/client';
+import { calculateBillWithPartsVat, defaultPartsVatRates, partsVatSettings, resolveGovernmentPartsExemption, unclassifiedBillingParts } from './parts-vat';
 import { jobBillMappingAmounts } from './tally-xml';
 import { sumMoney } from './money';
 import { calculateJobBillTotals } from './job-bill-calculator';
@@ -48,4 +49,41 @@ describe('Flagged parts VAT', () => {
     it('accepts category-specific rates', () => { expect(calculateBillWithPartsVat(input, parts, true, { ...defaultPartsVatRates, OIL: 5 }).breakdown[1].vat).toBe(22.5); });
     it('rejects unclassified parts only when enabled', () => { const p = [{ amount: 1750, category: 'UNCLASSIFIED', taxable: true, customerPaid: true }]; expect(() => calculateBillWithPartsVat(input, p, true)).toThrow('Classify'); expect(() => calculateBillWithPartsVat(input, p, false)).not.toThrow(); });
     it('allocates a rounding remainder so category discounts reconcile', () => { const p = [{ amount: 0.05, category: 'SPARES', taxable: true, customerPaid: true }, { amount: 0.05, category: 'OIL', taxable: true, customerPaid: true }]; const r = calculateBillWithPartsVat({ ...input, partsTotal: 0.1, partsDiscountPercent: 10 }, p, true); expect(r.breakdown[0].discount + r.breakdown[1].discount).toBe(r.totals.partsDiscountAmount); });
+});
+
+it('resolves exemption from the government flag or the government customer category', () => {
+    expect(resolveGovernmentPartsExemption({ governmentVehicle: true, type: 'INDIVIDUAL' })).toBe('GOVERNMENT_VEHICLE');
+    expect(resolveGovernmentPartsExemption({ governmentVehicle: false, type: 'GOVERNMENT' })).toBe('GOVERNMENT_CUSTOMER');
+    expect(resolveGovernmentPartsExemption({ governmentVehicle: false, type: 'CORPORATE' })).toBeNull();
+});
+
+it('finds unclassified retail parts with the same category resolution as the bill', async () => {
+    const findMany = jest.fn().mockResolvedValue([
+        { id: '1', partNumber: 'TEST-1', name: 'Classified', taxCategory: 'A' },
+        { id: '2', partNumber: 'TEST-2', name: 'Unclassified', taxCategory: null },
+        { id: '3', partNumber: 'TEST-3', name: 'Oil', reportTaxCategoryCode: 'OIL' },
+    ]);
+    const db = { sparePart: { findMany } } as unknown as Prisma.TransactionClient;
+    await expect(unclassifiedBillingParts(db)).resolves.toEqual([
+        { id: '2', partNumber: 'TEST-2', name: 'Unclassified' },
+    ]);
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { retailRate: { not: null } } }));
+});
+
+it('fails closed on environment activation until the catalogue passes preflight', async () => {
+    const previous = process.env.JOB_BILL_PARTS_VAT_ENABLED;
+    process.env.JOB_BILL_PARTS_VAT_ENABLED = 'true';
+    const findUnique = jest.fn().mockResolvedValue(null);
+    const findMany = jest.fn().mockResolvedValue([{ id: '1', partNumber: 'TEST-1', name: 'Unclassified' }]);
+    const db = { financeSetting: { findUnique }, sparePart: { findMany } } as unknown as Prisma.TransactionClient;
+    try {
+        await expect(partsVatSettings(db)).resolves.toMatchObject({ enabled: false });
+        findMany.mockResolvedValue([]);
+        await expect(partsVatSettings(db)).resolves.toMatchObject({ enabled: true });
+        findUnique.mockResolvedValue({ value: false });
+        await expect(partsVatSettings(db)).resolves.toMatchObject({ enabled: false });
+    } finally {
+        if (previous === undefined) delete process.env.JOB_BILL_PARTS_VAT_ENABLED;
+        else process.env.JOB_BILL_PARTS_VAT_ENABLED = previous;
+    }
 });

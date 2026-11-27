@@ -5,13 +5,13 @@ import { authMiddleware } from '../../middleware/authMiddleware';
 import { requirePermission, requireRole } from '../../middleware/authorize';
 import { validateRequest } from '../../middleware/requestValidator';
 import { ROLES } from '../../shared/constants/roles';
-import { ForbiddenError } from '../../shared/errors/appError';
+import { BadRequestError, ForbiddenError } from '../../shared/errors/appError';
 import { z } from 'zod';
 import { REPORT_SLUGS } from './report.types';
 import { reportQueries, selectionQuery, ReportInput } from './report.validation';
 import { ReportsService } from './reports.service';
 import { CorporateService } from './corporate.service';
-import { partsVatSettings, partsVatRatesSchema } from '../finance/parts-vat';
+import { partsVatSettings, partsVatRatesSchema, unclassifiedBillingParts } from '../finance/parts-vat';
 import { vehicleOptions, vehicleOptionsQuery } from './vehicle-options';
 export function reportBranch(req: Request, branchId?: string) {
     if (req.user?.role === ROLES.ADMIN || req.user?.role === ROLES.SUPER_ADMIN)
@@ -73,9 +73,21 @@ router.get('/billing-settings', requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), asy
         next(e);
     }
 });
+router.get('/billing-settings/preflight', requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), async (_req, res, next) => {
+    try {
+        const parts = await unclassifiedBillingParts(prisma);
+        res.json({ status: 'success', statusCode: 200, data: { count: parts.length, parts } });
+    } catch (error) { next(error); }
+});
 router.put('/billing-settings', requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), validateRequest(z.object({ body: z.object({ enabled: z.boolean(), rates: partsVatRatesSchema }).strict() })), async (req, res, next) => {
     try {
         await prisma.$transaction(async (tx) => {
+            if (req.body.enabled) {
+                const parts = await unclassifiedBillingParts(tx);
+                if (parts.length) throw new BadRequestError(
+                    `Classify ${parts.length} retail parts before enabling parts VAT. Review the billing settings preflight list.`,
+                ).withCode('PARTS_VAT_PREFLIGHT', { count: parts.length });
+            }
             const previous = await tx.financeSetting.findMany({ where: { key: { in: ['JOB_BILL_PARTS_VAT_ENABLED', 'partsVatRates'] } } });
             for (const [key, value] of [['JOB_BILL_PARTS_VAT_ENABLED', req.body.enabled], ['partsVatRates', req.body.rates]] as const)
                 await tx.financeSetting.upsert({ where: { key }, create: { key, value }, update: { value } });

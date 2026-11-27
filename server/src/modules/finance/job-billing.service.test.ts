@@ -112,6 +112,28 @@ describe("Job billing after delivery on credit", () => {
     );
   });
 
+  it("keeps the approved VAT and rounding policy on the bill after settings change", async () => {
+    const snapshot = {
+      enabled: true,
+      rates: { SPARES: 7.5, OIL: 7.5, ACCESSORIES: 7.5 },
+      exemption: null,
+      labourVatPercent: 10,
+      roundOffValue: 1,
+      vatAmount: 30,
+      roundOff: 0,
+    };
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({
+      ...card, serviceCharge: 200,
+      estimates: [{ ...approved, amount: 330, partsVatSnapshot: snapshot }],
+    });
+    const preview = await new JobBillingService().previewJobBill(input);
+    expect(preview.totals.total).toBe(330);
+    await new JobBillingService().createJobBill(input);
+    expect(prisma.invoice.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ total: 330, partsVatSnapshot: snapshot }),
+    }));
+  });
+
   it("creates a bill while preserving delivery and gate-pass details", async () => {
     await new JobBillingService().createJobBill(input);
     expect(prisma.invoice.create).toHaveBeenCalledWith(
@@ -361,7 +383,14 @@ describe("Job billing after delivery on credit", () => {
       estimates: [
         {
           ...approved,
-          amount: 500,
+          amount: total,
+          partsVatSnapshot: {
+            enabled: true,
+            rates: { SPARES: 7.5, OIL: 7.5, ACCESSORIES: 7.5 },
+            exemption: governmentVehicle ? "GOVERNMENT_VEHICLE" : null,
+            labourVatPercent: 7.5, roundOffValue: 10, vatAmount: partsVat + 7.5,
+            roundOff: total - (300 + partsVat + 7.5),
+          },
           lines: [
             ...approved.lines,
             {

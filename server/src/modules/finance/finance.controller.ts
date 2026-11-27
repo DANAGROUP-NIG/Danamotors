@@ -26,8 +26,7 @@ export class FinanceController {
 
   listBillableJobCards = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const branchId = canChooseBillingBranch(req) ? req.query.branchId as string | undefined : req.user?.branchId ?? undefined;
-      if (!canChooseBillingBranch(req) && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const branchId = jobBillingBranch(req, req.query.branchId as string | undefined);
       const jobCards = await this.jobBillingService.listBillableJobCards(branchId);
       res.status(200).json({ status: 'success', statusCode: 200, data: { jobCards } });
     } catch (error) {
@@ -37,8 +36,7 @@ export class FinanceController {
 
   previewJobBill = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const preview = await this.jobBillingService.previewJobBill(req.body);
-      assertBillingBranch(req, preview.jobCard.branchId);
+      const preview = await this.jobBillingService.previewJobBill({ ...req.body, branchId: jobBillingBranch(req) });
       res.status(200).json({ status: 'success', statusCode: 200, data: { preview } });
     } catch (error) {
       next(error);
@@ -47,9 +45,9 @@ export class FinanceController {
 
   createJobBill = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const preview = await this.jobBillingService.previewJobBill(req.body);
-      assertBillingBranch(req, preview.jobCard.branchId);
-      const invoice = await this.jobBillingService.createJobBill({ ...req.body, actorId: req.user?.userId });
+      const branchId = jobBillingBranch(req);
+      const preview = await this.jobBillingService.previewJobBill({ ...req.body, branchId });
+      const invoice = await this.jobBillingService.createJobBill({ ...req.body, branchId, actorId: req.user?.userId });
       if (invoice.serviceAdvisorId) {
         void new NotificationService().notifyUsers([invoice.serviceAdvisorId], {
           type: 'JOB_BILL_CREATED',
@@ -395,6 +393,15 @@ export class FinanceController {
       next(error);
     }
   };
+}
+
+function jobBillingBranch(req: Request, requested?: string) {
+  if (isGeneralDepartmentManager(req.user)) return requested;
+  const branchId = req.user?.branchId;
+  if (!branchId || (requested && requested !== branchId)) {
+    throw new ForbiddenError('Billing access is restricted to your assigned branch');
+  }
+  return branchId;
 }
 
 function canChooseBillingBranch(req: Request): boolean {

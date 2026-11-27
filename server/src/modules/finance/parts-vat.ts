@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { calculateJobBillTotals, finalizeJobBill, JobBillTotalsInput } from './job-bill-calculator';
+import { categoryOf } from '../reports/report.logic';
 import { money, sumMoney } from './money';
 import { BadRequestError } from '../../shared/errors/appError';
 export const partsVatRatesSchema = z.object({ SPARES: z.number().min(0).max(100).multipleOf(0.01), OIL: z.number().min(0).max(100).multipleOf(0.01), ACCESSORIES: z.number().min(0).max(100).multipleOf(0.01) }).strict();
@@ -80,11 +81,39 @@ export function calculateBillWithPartsVat(input: JobBillTotalsInput, parts: TaxP
     return { totals: finalizeJobBill({ ...base, vatAmount }, input.roundOffValue), breakdown };
 }
 export async function partsVatSettings(db: Prisma.TransactionClient) {
-    // TODO(confirm): business approval is required before enabling parts VAT; default is OFF.
+    // Activate through billing settings after the part master preflight passes.
     const [flag, rates] = await Promise.all([db.financeSetting.findUnique({ where: { key: 'JOB_BILL_PARTS_VAT_ENABLED' } }), db.financeSetting.findUnique({ where: { key: 'partsVatRates' } })]);
-    // An explicit true is required; legacy or unrelated values never enable billing changes.
-    const enabled = process.env.JOB_BILL_PARTS_VAT_ENABLED === 'true' || flag?.value === true;
+    // An environment opt-in is only a default. A recorded decision takes precedence.
+    const optIn = flag?.value !== false && process.env.JOB_BILL_PARTS_VAT_ENABLED === 'true';
+    const enabled = flag?.value === true || (optIn && (await unclassifiedBillingParts(db)).length === 0);
     const saved = partsVatRatesSchema.safeParse(rates?.value);
     if (enabled && rates?.value && !saved.success) throw new BadRequestError('Review the stored parts VAT rates before enabling parts VAT');
     return { enabled, rates: saved.success ? saved.data : defaultPartsVatRates };
+}
+
+export function resolveGovernmentPartsExemption(customer?: { governmentVehicle?: boolean; type?: string } | null) {
+    if (customer?.governmentVehicle) return 'GOVERNMENT_VEHICLE';
+    if (customer?.type === 'GOVERNMENT') return 'GOVERNMENT_CUSTOMER';
+    return null;
+}
+
+export const partsVatSnapshotSchema = z.object({
+    enabled: z.boolean(),
+    rates: partsVatRatesSchema,
+    exemption: z.enum(['GOVERNMENT_VEHICLE', 'GOVERNMENT_CUSTOMER']).nullable(),
+    labourVatPercent: z.number(),
+    roundOffValue: z.number().int().positive(),
+    vatAmount: z.number(),
+    roundOff: z.number(),
+});
+
+export async function unclassifiedBillingParts(db: Prisma.TransactionClient) {
+    // Any part with a retail rate can enter a future customer estimate or bill.
+    const parts = await db.sparePart.findMany({
+        where: { retailRate: { not: null } },
+        select: { id: true, partNumber: true, name: true, taxCategory: true, reportTaxCategoryCode: true },
+        orderBy: { partNumber: 'asc' },
+    });
+    return parts.filter(part => !Object.hasOwn(defaultPartsVatRates, categoryOf(part)))
+        .map(({ id, partNumber, name }) => ({ id, partNumber, name }));
 }

@@ -59,7 +59,7 @@ export function EstimateApprovalCard({
                   currency={estimate.currency}
                 />
                 <p className="text-xs text-muted-foreground">
-                  {COPY.exclusions}
+                  {estimate.partsVatSnapshot ? "Includes VAT and round off" : COPY.exclusions}
                 </p>
               </div>
               {printAction}
@@ -88,6 +88,18 @@ export function EstimateApprovalCard({
               </div>
             )}
             <EstimateLinesTable estimate={estimate} />
+            {estimate.partsVatSnapshot && (
+              <dl className="ml-auto grid w-full max-w-sm grid-cols-2 gap-2 text-sm">
+                <dt>VAT</dt>
+                <dd className="text-right tabular-nums">
+                  {formatEstimateMoney(estimate.partsVatSnapshot.vatAmount, estimate.currency)}
+                </dd>
+                <dt>Round off</dt>
+                <dd className="text-right tabular-nums">
+                  {formatEstimateMoney(estimate.partsVatSnapshot.roundOff, estimate.currency)}
+                </dd>
+              </dl>
+            )}
             <div className="flex items-center justify-between gap-4 border-t border-border pt-5 font-semibold">
               <span>{COPY.total}</span>
               <span className="text-right tabular-nums">
