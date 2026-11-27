@@ -11,7 +11,7 @@ export const E2E = {
     return `http://localhost:${this.clientPort}`;
   },
   /** A database with the base seed and the demo seed, never used directly. */
-  templateDb: process.env.E2E_TEMPLATE_DB ?? "dana_demo_p5",
+  templateDb: process.env.E2E_TEMPLATE_DB ?? "dana_demo_p6",
   /** Recreated from the template before every run. */
   db: process.env.E2E_DB ?? "dana_e2e",
   dbServer,

@@ -18,6 +18,7 @@ import {
   waiverRequestBody,
 } from "./job-estimate.logic";
 import { JobEstimateService, type EstimateActor } from "./job-estimate.service";
+import { supplementaryBody } from "./job-repair.logic";
 
 const service = new JobEstimateService();
 const actor = (req: Request): EstimateActor => ({ id: req.user!.userId, role: req.user!.role, permissions: req.user!.permissions });
@@ -57,6 +58,15 @@ const handle =
  *       200: { description: 'status=success, data=estimate step' }
  *       403: { description: Permission or branch access denied }
  *       404: { description: Job card not found }
+ * /api/service/job-cards/{id}/estimate/supplementary:
+ *   post:
+ *     tags: [Service]
+ *     summary: Prepare a supplementary estimate during repair (job card revamp phase 6)
+ *     description: 'Requires jobcard:update, estimate:create, an advisor role and branch access; the job must be in repair with a decided estimate and new findings raised during repair. Creates revision N+1 through the existing revision logic: earlier lines copied unchanged with their decisions (carriedOver), the new findings priced as customer pay. Repeating it returns the open supplementary revision. Body: { requestId }.'
+ *     responses:
+ *       200: { description: 'status=success, data=estimate step' }
+ *       403: { description: Not the service advisor, or the job is not in repair }
+ *       409: { description: No decided estimate, or no new finding to price }
  * /api/service/job-cards/{id}/estimate/prepare:
  *   post:
  *     tags: [Service]
@@ -132,6 +142,12 @@ jobEstimateRoutes.post(
   requirePermission(PERMISSIONS.ESTIMATE_SIGN),
   route(phoneApprovalBody),
   handle((req) => service.phoneApproval(req.params.id, actor(req), req.body), "Phone approval saved"),
+);
+jobEstimateRoutes.post(
+  "/supplementary",
+  update,
+  route(supplementaryBody),
+  handle((req) => service.prepareSupplementary(req.params.id, actor(req)), "Supplementary estimate prepared"),
 );
 jobEstimateRoutes.post("/parts-request", update, route(chargeBody), handle((req) => service.retryPartsRequest(req.params.id, actor(req)), "Parts request sent"));
 jobEstimateRoutes.post(

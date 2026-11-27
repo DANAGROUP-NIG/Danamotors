@@ -180,9 +180,9 @@ export function currentTab(step: Pick<JobEstimateStep, "estimate">): EstimateTab
 export const TAB_LABELS: Record<EstimateTab, string> = { PREPARE: "Prepare", APPROVAL: "Customer approval", ADVANCE: "Advance and release" };
 
 /** "Estimate, revision 1, draft" and the like. */
-export function estimateTitle(estimate: { version: number; approval: unknown; presentedAt: string | null; outcome: string | null }): string {
+export function estimateTitle(estimate: { version: number; supplementary?: boolean; approval: unknown; presentedAt: string | null; outcome: string | null }): string {
   const state = !estimate.approval ? (estimate.presentedAt ? "with the customer" : "draft") : estimate.outcome === "ALL_DECLINED" ? "declined" : estimate.outcome === "PARTIAL" ? "partly approved" : "approved";
-  return `Estimate, revision ${estimate.version}, ${state}`;
+  return `Estimate, revision ${estimate.version}${estimate.supplementary ? " (supplementary)" : ""}, ${state}`;
 }
 
 /** The disabled Release reason with who can fix it. */

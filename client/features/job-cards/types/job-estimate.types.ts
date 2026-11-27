@@ -21,6 +21,8 @@ export interface EstimateLine {
   customerDecision: LineDecision | null;
   findingItemId: string | null;
   complaintId: string | null;
+  /** Supplementary revisions: copied from the revision before with its decision; the customer decides only the other lines. */
+  carriedOver: boolean;
 }
 
 export interface EstimateTotals {
@@ -57,6 +59,8 @@ export interface EstimateRevision {
   id: string;
   number: string | null;
   version: number;
+  /** Prepared during repair for new findings (phase 6). */
+  supplementary: boolean;
   status: string;
   outcome: EstimateOutcome | null;
   createdAt: string;

@@ -102,6 +102,12 @@ export async function assertWithinBookingHorizon(
     );
 }
 
+/** An estimate line copied unchanged into a supplementary revision (repair, phase 6). */
+export type CarriedEstimateLine = Pick<
+  Prisma.EstimateLineGetPayload<object>,
+  "type" | "referenceId" | "partSource" | "description" | "quantity" | "rate" | "amount" | "payer" | "customerDecision" | "findingItemId" | "complaintId"
+>;
+
 export class ServiceService {
   private serviceRepository: ServiceRepository;
 
@@ -926,9 +932,17 @@ export class ServiceService {
     input: z.infer<typeof estimateBody>,
     actorId?: string,
     supersedesId?: string,
-    options: { draft?: { estimateId: string; updatedAt: Date } } = {},
+    options: {
+      draft?: { estimateId: string; updatedAt: Date };
+      /**
+       * Repair (phase 6): a supplementary revision. These lines of the revision before are copied as they
+       * are, with their prices and decisions; only `input.lines` (the new work) is priced.
+       */
+      supplementary?: { carried: CarriedEstimateLine[] };
+    } = {},
   ) {
     const data = estimateBody.parse(input);
+    const carried = options.supplementary?.carried ?? [];
     return prisma.$transaction(
       async (tx) => {
         await setNotificationActor(tx, actorId);
@@ -955,7 +969,16 @@ export class ServiceService {
         // A service type the company pays for (free services) is not charged to the customer, as on the bill.
         // TODO(confirm): free-service charge shown at zero on the customer's estimate.
         const companyPaidService = card.serviceType?.chargedTo === "COMPANY";
-        const billable = data.lines.filter((line) => line.type !== "COMPLAINT");
+        const billable = [
+          ...carried.filter((line) => line.type !== "COMPLAINT").map((line) => ({ type: line.type.replace("INCLUDED_", ""), referenceId: line.referenceId, quantity: Number(line.quantity) })),
+          ...data.lines.filter((line) => line.type !== "COMPLAINT"),
+        ];
+        // A supplementary line for work or a part already on the estimate: say which, in plain words.
+        const repeated = data.lines.find((line) => carried.some((old) => old.type.replace("INCLUDED_", "") === line.type && old.referenceId === line.referenceId));
+        if (repeated)
+          throw new BadRequestError(
+            `${carried.find((old) => old.referenceId === repeated.referenceId)?.description ?? "This item"} is already on the approved estimate. A supplementary estimate can only add new work or parts.`,
+          );
         // Each part record once: a used or local version of a part is its own record (source record).
         if (
           new Set(billable.map((line) => `${line.type}:${line.referenceId}`))
@@ -1094,10 +1117,27 @@ export class ServiceService {
             payer,
             findingItemId: line.findingItemId ?? null,
             complaintId,
-            sortOrder: index,
+            sortOrder: carried.length + index,
+            carriedOver: false,
           });
         }
-        const amount = sumMoney(lines.map((line) => line.amount));
+        // Earlier lines of a supplementary revision: copied unchanged, decision included.
+        const copied = carried.map((line, index) => ({
+          type: line.type,
+          referenceId: line.referenceId,
+          partSource: line.partSource,
+          description: line.description,
+          quantity: line.quantity,
+          rate: line.rate,
+          amount: line.amount,
+          payer: line.payer,
+          customerDecision: line.customerDecision,
+          findingItemId: line.findingItemId,
+          complaintId: line.complaintId,
+          sortOrder: index,
+          carriedOver: true,
+        }));
+        const amount = sumMoney([...copied.map((line) => Number(line.amount)), ...lines.map((line) => line.amount)]);
         const previous = (
           await tx.estimate.findMany({
             where: { jobCardId },
@@ -1136,7 +1176,7 @@ export class ServiceService {
               amount,
               upfrontPaymentPercent: data.upfrontPaymentPercent ?? 60,
               presentedAt: null,
-              lines: { createMany: { data: lines } },
+              lines: { createMany: { data: [...copied, ...lines] } },
             },
             include: { lines: true },
           });
@@ -1209,7 +1249,8 @@ export class ServiceService {
             status: "Pending",
             amount,
             vatRate: settings.labourVatPercent,
-            lines: { createMany: { data: lines } },
+            supplementary: !!options.supplementary,
+            lines: { createMany: { data: [...copied, ...lines] } },
           },
           include: { lines: true },
         });

@@ -25,18 +25,18 @@ beforeEach(() => {
 });
 
 it.each([null, undefined])('blocks issuance before a successful request (%s)', partsRequestedAt => {
-  expect(() => assertPartsRequested({ partsRequestedAt })).toThrow('Click Request Parts');
+  expect(() => assertPartsRequested({ partsRequestedAt })).toThrow('The parts request for this job has not been sent yet');
 });
 it('allows issuance after the recorded request', () => {
   expect(() => assertPartsRequested({ partsRequestedAt: new Date() })).not.toThrow();
 });
 it('blocks the direct inventory endpoint before changing stock or creating issuance', async () => {
-  await expect(new InventoryService().createPartIssuance({ branchId: id, jobCardId: id, issuedById: id, sparePartId: id, quantity: 1 })).rejects.toThrow('Click Request Parts');
+  await expect(new InventoryService().createPartIssuance({ branchId: id, jobCardId: id, issuedById: id, sparePartId: id, quantity: 1 })).rejects.toThrow('The parts request for this job has not been sent yet');
   expect(prisma.inventoryStock.updateMany).not.toHaveBeenCalled();
   expect(prisma.partIssuance.create).not.toHaveBeenCalled();
 });
 it('blocks issuance through requisitions as well', async () => {
   (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, branchId: id, status: 'IN_PROGRESS', billedAt: null, partsRequestedAt: null, invoices: [] });
-  await expect(new RequisitionService().create({ branchId: id, jobCardId: id, chargeType: 'CUSTOMER', lines: [{ sparePartId: id, quantityRequired: 1, quantityIssued: 1 }] }, { userId: id, branchId: id, allBranches: false, goodwill: false })).rejects.toThrow('Click Request Parts');
+  await expect(new RequisitionService().create({ branchId: id, jobCardId: id, chargeType: 'CUSTOMER', lines: [{ sparePartId: id, quantityRequired: 1, quantityIssued: 1 }] }, { userId: id, branchId: id, allBranches: false, goodwill: false })).rejects.toThrow('The parts request for this job has not been sent yet');
   expect(prisma.partIssuance.create).not.toHaveBeenCalled();
 });

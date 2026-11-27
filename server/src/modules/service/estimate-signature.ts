@@ -39,7 +39,7 @@ export function approvedCustomerTotal(estimate: SignedContent): string {
 }
 
 export function assertSignaturePng(image: string) {
-  if (!/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(image)) throw new BadRequestError('Ask the customer to sign in the box. A signature is required');
+  if (!/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(image)) throw new BadRequestError('Sign in the box. A signature is required');
   const bytes = Buffer.from(image.slice(image.indexOf(',') + 1), 'base64');
   if (bytes.length > 65536 || bytes.length < 33 || bytes.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a' || bytes.toString('ascii', 12, 16) !== 'IHDR' || bytes.readUInt32BE(16) > 2048 || bytes.readUInt32BE(20) > 1024) throw new BadRequestError('The signature image is too large. Clear it and sign again');
 }

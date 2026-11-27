@@ -72,10 +72,23 @@ export function reviewApprovedScope(estimate: ApprovalEstimate | undefined, actu
   return { estimateId: estimate?.id ?? null, status: invalid ? 'Invalid' : !estimate ? 'Draft' : approved ? (issues.length ? 'Revision Required' : 'Approved') : estimate.status.toUpperCase() === 'DECLINED' ? 'Revision Required' : 'Awaiting Approval', canBill: issues.length === 0, issues, rows, approvedSubtotal: sumMoney(rows.map(row => row.approvedAmount)), actualSubtotal: sumMoney(rows.map(row => row.actualAmount)) };
 }
 
+/**
+ * The revision that sets the approved scope for work. Normally the latest. While a supplementary
+ * revision (repair, phase 6) waits for the customer, the revision it replaced still governs, so the
+ * work already approved continues; the new lines join the scope once the customer approves them.
+ */
+export function governingEstimate<T extends ApprovalEstimate & { supplementary?: boolean }>(newestFirst: T[]): T | undefined {
+  const [latest, previous] = newestFirst;
+  if (!latest?.supplementary || latest.approvals.length || !previous) return latest;
+  // The replaced revision is marked superseded; for the gate it keeps the status its decision gave it.
+  const decided = previous.approvals.find(approval => approval.approved !== null);
+  return decided ? { ...previous, status: decided.approved ? 'Approved' : 'Declined' } : previous;
+}
+
 // Call while holding the JobCard row lock. All estimate decisions and work writes share it.
 export async function assertApprovedOperation(tx: Prisma.TransactionClient, jobCardId: string, customerId: string | null, actual: ScopeLine[], operation?: "parts issue") {
-  const estimates = await tx.estimate.findMany({ where: { jobCardId }, ...latestEstimateQuery });
-  const review = reviewApprovedScope(estimates[0], actual, customerId);
+  const estimates = await tx.estimate.findMany({ where: { jobCardId }, ...latestEstimateQuery, take: 2 });
+  const review = reviewApprovedScope(governingEstimate(estimates), actual, customerId);
   if (!review.canBill) {
     const reason = review.issues.join(' ');
     if (operation === 'parts issue') {

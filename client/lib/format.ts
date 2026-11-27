@@ -26,6 +26,8 @@ const dateTime = new Intl.DateTimeFormat("en-GB", {
 });
 
 const monthYear = new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric", timeZone: LAGOS });
+const time = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: LAGOS });
+const weekdayDate = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: LAGOS });
 
 const DECIMAL = /^-?\d+(\.\d+)?$/;
 
@@ -59,6 +61,18 @@ export function formatDate(value: DateValue): string {
 export function formatDateTime(value: DateValue): string {
   const parsed = toDate(value);
   return parsed ? dateTime.format(parsed) : NOT_PROVIDED;
+}
+
+/** 14:10, in Lagos time (24-hour clock). For times on the same day as the screen, such as "Done 14:10". */
+export function formatTime(value: DateValue): string {
+  const parsed = toDate(value);
+  return parsed ? time.format(parsed) : NOT_PROVIDED;
+}
+
+/** Wed 27 Nov, in Lagos time. A day heading, such as on My jobs. */
+export function formatWeekdayDate(value: DateValue): string {
+  const parsed = toDate(value);
+  return parsed ? weekdayDate.format(parsed).replace(",", "") : NOT_PROVIDED;
 }
 
 /** Mar 2023, in Lagos time. */

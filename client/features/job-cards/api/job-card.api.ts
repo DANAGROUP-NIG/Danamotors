@@ -2,10 +2,6 @@ import { apiGet, apiPost } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import type { JobCard, JobCardListResponse } from "../types/job-card.types";
 
-export async function requestJobCardParts(id: string, requestId: string): Promise<void> {
-  await apiPost(API_ROUTES.service.jobCards.requestParts(id), { requestId });
-}
-
 export async function getJobCardsRequest(params?: {
   page?: number;
   limit?: number;

@@ -5,7 +5,7 @@ const localStaging = !!testUrl && ['localhost', '127.0.0.1', '[::1]'].includes(n
 if (localStaging) process.env.DATABASE_URL = testUrl;
 import prisma from '../../prisma/client';
 import { ROLES } from '../../shared/constants/roles';
-import { requestJobcardParts } from '../service/jobcard-parts-request.service';
+import { notifyStoreOfParts } from '../service/jobcard-parts-request.service';
 import { processJobcardNotification } from './jobcard-notification-router';
 
 const integration = localStaging ? describe : describe.skip;
@@ -28,11 +28,11 @@ integration('Durable parts delivery in disposable localhost notification_staging
       const dedupeKey = `PART_REQUESTED:${job.id}:button:${requestId}`;
       const spy = jest.spyOn(prisma, '$transaction').mockImplementation(((callback: (client: Prisma.TransactionClient) => Promise<unknown>) => callback(tx)) as typeof prisma.$transaction);
       try {
-        await requestJobcardParts(job.id, branch.id, actor.id, requestId);
+        await notifyStoreOfParts(tx, job.id, branch.id, actor.id, `button:${requestId}`);
         expect(await tx.notification.count({ where: { dedupeKey } })).toBe(0);
         const event = await tx.jobcardNotificationEvent.findUniqueOrThrow({ where: { id: eventId } });
         await processJobcardNotification(event);
-        await requestJobcardParts(job.id, branch.id, actor.id, requestId);
+        await notifyStoreOfParts(tx, job.id, branch.id, actor.id, `button:${requestId}`);
         await processJobcardNotification(event);
         expect(await tx.notification.findMany({ where: { dedupeKey }, select: { userId: true } })).toEqual([{ userId: manager.id }]);
         expect(await tx.jobcardNotificationEvent.count({ where: { id: eventId } })).toBe(1);

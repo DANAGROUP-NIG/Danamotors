@@ -324,70 +324,79 @@ export class LabourSlipService {
       throw new BadRequestError(
         parsed.error.issues.map((issue) => issue.message).join("; "),
       );
-    input = parsed.data;
-    return prisma.$transaction(
-      async (tx) => {
-        const job = await this.lockJob(tx, input.jobCardId, actor);
-        if (job.branchId !== input.branchId)
-          throw new BadRequestError(
-            "Job card must belong to the labour slip branch",
-          );
-        await this.validateGroup(tx, input.groupId);
-        if (
-          input.engineerId &&
-          !(await tx.user.findFirst({
-            where: {
-              id: input.engineerId,
-              branchId: input.branchId,
-              isActive: true,
-            },
-          }))
+    const data = parsed.data;
+    return prisma.$transaction((tx) => this.createInTx(tx, data, actor), {
+      maxWait: 5000,
+      timeout: 20000,
+    });
+  }
+
+  /** Creates a slip inside the caller's transaction (the repair work list records labour this way). */
+  async createInTx(
+    tx: Prisma.TransactionClient,
+    input: LabourSlipInput,
+    actor: LabourSlipActor,
+  ) {
+    const job = await this.lockJob(tx, input.jobCardId, actor);
+    if (job.branchId !== input.branchId)
+      throw new BadRequestError(
+        "Job card must belong to the labour slip branch",
+      );
+    await this.validateGroup(tx, input.groupId);
+    if (
+      input.engineerId &&
+      !(await tx.user.findFirst({
+        where: {
+          id: input.engineerId,
+          branchId: input.branchId,
+          isActive: true,
+        },
+      }))
+    )
+      throw new BadRequestError("Engineer must be active in this branch");
+    const now = new Date();
+    const pdi = job.jobType === JobCardType.PDI;
+    if (pdi) await assertPdiDocumentChange(tx, "labour", now, { create: true });
+    const slipNumber = pdi
+      ? pdiDocumentNumber(
+          "LABOUR_SLIP",
+          await nextSequenceNumber(
+            tx,
+            pdiSequenceKey("LABOUR_SLIP", input.branchId),
+            now,
+          ),
         )
-          throw new BadRequestError("Engineer must be active in this branch");
-        const now = new Date();
-        const pdi = job.jobType === JobCardType.PDI;
-        if (pdi)
-          await assertPdiDocumentChange(tx, "labour", now, { create: true });
-        const slipNumber = pdi
-          ? pdiDocumentNumber(
-              "LABOUR_SLIP",
-              await nextSequenceNumber(
-                tx,
-                pdiSequenceKey("LABOUR_SLIP", input.branchId),
-                now,
-              ),
-            )
-          : await nextSequenceNumber(tx, `LABOUR_SLIP_${input.branchId}`, now);
-        const slip = await tx.labourSlip.create({
-          data: {
-            branchId: input.branchId,
-            jobCardId: job.id,
-            groupId: input.groupId,
-            engineerId: input.engineerId,
-            mileage: input.mileage ?? (pdi ? job.mileage : undefined),
-            createdById: actor.userId,
-            slipNumber,
-          },
-        });
-        for (const line of input.lines)
-          await this.saveLine(tx, slip, job, line, actor);
-        await applyJobWorkChange(tx, job, actor.userId, { label: "Labour slip", pdi });
-        await tx.auditLog.create({
-          data: {
-            userId: actor.userId,
-            action: "LABOUR_SLIP_CREATED",
-            details: JSON.stringify({
-              labourSlipId: slip.id,
-              slipNumber,
-              branchId: job.branchId,
-              jobCardId: job.id,
-            }),
-          },
-        });
-        return this.get(slip.id, actor, tx);
+      : await nextSequenceNumber(tx, `LABOUR_SLIP_${input.branchId}`, now);
+    const slip = await tx.labourSlip.create({
+      data: {
+        branchId: input.branchId,
+        jobCardId: job.id,
+        groupId: input.groupId,
+        engineerId: input.engineerId,
+        mileage: input.mileage ?? (pdi ? job.mileage : undefined),
+        createdById: actor.userId,
+        slipNumber,
       },
-      { maxWait: 5000, timeout: 20000 },
-    );
+    });
+    for (const line of input.lines)
+      await this.saveLine(tx, slip, job, line, actor);
+    await applyJobWorkChange(tx, job, actor.userId, {
+      label: "Labour slip",
+      pdi,
+    });
+    await tx.auditLog.create({
+      data: {
+        userId: actor.userId,
+        action: "LABOUR_SLIP_CREATED",
+        details: JSON.stringify({
+          labourSlipId: slip.id,
+          slipNumber,
+          branchId: job.branchId,
+          jobCardId: job.id,
+        }),
+      },
+    });
+    return this.get(slip.id, actor, tx);
   }
 
   async save(
@@ -401,28 +410,38 @@ export class LabourSlipService {
       throw new BadRequestError(
         parsed.error.issues.map((issue) => issue.message).join("; "),
       );
+    const data = parsed.data;
     return prisma.$transaction(
-      async (tx) => {
-        const slip = await tx.labourSlip.findUnique({ where: { id } });
-        if (!slip) throw new NotFoundError("Labour slip not found");
-        assertRequisitionBranch(actor, slip.branchId, "labour slips");
-        const job = await this.lockJob(tx, slip.jobCardId, actor);
-        if (job.jobType === JobCardType.PDI)
-          await assertPdiDocumentChange(tx, "labour", slip.slipDate, {
-            printedAt: slip.printedAt,
-          });
-        await this.saveLine(tx, slip, job, parsed.data, actor, lineId);
-        await tx.labourSlip.update({
-          where: { id },
-          data: { updatedAt: new Date() },
-        });
-        await applyJobWorkChange(tx, job, actor.userId, {
-          label: "Labour slip",
-          pdi: job.jobType === JobCardType.PDI,
-        });
-        return this.get(id, actor, tx);
-      },
+      (tx) => this.saveInTx(tx, id, data, actor, lineId),
       { maxWait: 5000, timeout: 20000 },
     );
+  }
+
+  /** Adds (or replaces) one line inside the caller's transaction. */
+  async saveInTx(
+    tx: Prisma.TransactionClient,
+    id: string,
+    input: LabourSlipLineInput,
+    actor: LabourSlipActor,
+    lineId?: string,
+  ) {
+    const slip = await tx.labourSlip.findUnique({ where: { id } });
+    if (!slip) throw new NotFoundError("Labour slip not found");
+    assertRequisitionBranch(actor, slip.branchId, "labour slips");
+    const job = await this.lockJob(tx, slip.jobCardId, actor);
+    if (job.jobType === JobCardType.PDI)
+      await assertPdiDocumentChange(tx, "labour", slip.slipDate, {
+        printedAt: slip.printedAt,
+      });
+    await this.saveLine(tx, slip, job, input, actor, lineId);
+    await tx.labourSlip.update({
+      where: { id },
+      data: { updatedAt: new Date() },
+    });
+    await applyJobWorkChange(tx, job, actor.userId, {
+      label: "Labour slip",
+      pdi: job.jobType === JobCardType.PDI,
+    });
+    return this.get(id, actor, tx);
   }
 }

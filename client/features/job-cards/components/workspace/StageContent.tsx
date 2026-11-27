@@ -1,26 +1,22 @@
 "use client";
 import Link from "next/link";
-import { Loader2, Package, Printer, Receipt } from "lucide-react";
+import { Printer, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { ServiceTransactions } from "@/features/service-transactions/components/ServiceTransactions";
 import { formatDateTime } from "@/lib/format";
-import { useRequestJobCardParts } from "../../hooks/use-request-job-card-parts";
-import { canonicalJobStatus, hasJobBill } from "../../types/job-card-status";
+import { canonicalJobStatus } from "../../types/job-card-status";
 import type { JobCard } from "../../types/job-card.types";
 import type { JobWorkspace } from "../../types/job-workspace.types";
 import type { JobFileTab } from "../../lib/job-frame.logic";
-import { JobCardLabourSection } from "../JobCardLabourSection";
-import { JobCardPartsSection } from "../JobCardPartsSection";
 import { CheckInStep, type StageBarProps } from "../check-in/CheckInStep";
 import { ConsentCatchUp } from "../check-in/ConsentCatchUp";
 import { DiagnosisStep } from "../diagnosis/DiagnosisStep";
 import { WarrantyStep } from "../warranty/WarrantyStep";
 import { EstimateStep } from "../estimate/EstimateStep";
+import { RepairStep } from "../repair/RepairStep";
 import { InvoicesTable } from "./InvoicesTable";
 import { StageCard } from "./StageCard";
 import {
-  AssignTechnicianSection,
   CreditApprovalSection,
   DeliverySection,
   QualityCheckSection,
@@ -65,16 +61,8 @@ export function StageContent({
       // PDI jobs keep their own screens; everything else uses the staged warranty check.
       return workspace.jobType === "PDI" ? null : <WarrantyStep job={job} bar={bar} />;
     case "REPAIR":
-      // TODO(phase 6): replaced by the technician repair view, parts collection and supplementary estimate.
-      return (
-        <>
-          <RequestPartsBar job={job} />
-          <ServiceTransactions job={job} />
-          <JobCardPartsSection jobCard={job} />
-          <JobCardLabourSection jobCard={job} />
-          <AssignTechnicianSection job={job} />
-        </>
-      );
+      // PDI jobs keep their own screens; everything else uses the staged repair (phase 6).
+      return workspace.jobType === "PDI" ? null : <RepairStep job={job} workspace={workspace} bar={bar} onOpenTab={onOpenTab} />;
     case "QUALITY_CHECK":
       // TODO(phase 7): replaced by the quality check screen with road test and certification.
       return (
@@ -105,42 +93,6 @@ export function StageContent({
     case "CANCELLED":
       return null;
   }
-}
-
-function RequestPartsBar({ job }: { job: JobCard }) {
-  const { hasPermission } = useAuth();
-  const request = useRequestJobCardParts(job.id);
-  const status = canonicalJobStatus(job.status);
-  const allowed =
-    (hasPermission("partissuance:create") || hasPermission("partreturn:create")) &&
-    !hasJobBill(job) &&
-    !["DELIVERED", "CANCELLED"].includes(status);
-  if (!allowed) return null;
-  return (
-    <StageCard
-      title="Parts"
-      description="Tell the branch store manager that this job needs parts. Prepare the requisition in Service transactions."
-      actions={
-        <Button
-          type="button"
-          variant="outline"
-          disabled={request.isPending}
-          onClick={() => {
-            if (!request.isPending) request.mutate(crypto.randomUUID());
-          }}
-        >
-          {request.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Package aria-hidden="true" />}
-          {request.isPending ? "Sending request" : "Request part"}
-        </Button>
-      }
-    >
-      {job.partsRequestedAt ? (
-        <p className="text-sm">Parts last requested {formatDateTime(job.partsRequestedAt)}.</p>
-      ) : (
-        <p className="text-sm text-muted-foreground">No parts request has been sent for this job.</p>
-      )}
-    </StageCard>
-  );
 }
 
 function BillingSection({ job }: { job: JobCard }) {

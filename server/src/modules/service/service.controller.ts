@@ -10,7 +10,6 @@ import { ROLES } from "../../shared/constants/roles";
 import prisma from "../../prisma/client";
 import { ForbiddenError, NotFoundError } from "../../shared/errors/appError";
 import { LabourService } from "./labour.service";
-import { requestJobcardParts } from "./jobcard-parts-request.service";
 
 export class ServiceController {
   private serviceService: ServiceService;
@@ -433,34 +432,6 @@ export class ServiceController {
       res
         .status(200)
         .json({ status: "success", statusCode: 200, data: result });
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  requestParts = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const card = await prisma.jobCard.findUnique({
-        where: { id: req.params.id },
-        select: { branchId: true },
-      });
-      if (!card) throw new NotFoundError("Job card not found");
-      assertBranchOwnership(req, card.branchId);
-      await requestJobcardParts(
-        req.params.id,
-        card.branchId,
-        req.user!.userId,
-        req.body.requestId,
-      );
-      res.status(200).json({
-        status: "success",
-        message: "Parts request queued for the Branch Store Manager",
-        data: {},
-      });
     } catch (error) {
       next(error);
     }

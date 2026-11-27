@@ -17,6 +17,7 @@ import { canWorkDiagnosis, diagnosisRoute, diagnosisSubStep } from "./job-diagno
 import { applyDiagnosisAction, diagnosisEventNote, loadDiagnosisFacts } from "./job-diagnosis.service";
 import { applyWarrantyHandoff, loadWarrantyFacts } from "./job-warranty.service";
 import { loadEstimateStageFacts, vehicleDeclinedItems } from "./job-estimate.service";
+import { createWorkLines, loadRepairProblems, pauseWorkLines } from "./job-repair.service";
 import { moveStage } from "./job-stage.writer";
 import {
   ACTION_RULES,
@@ -88,6 +89,7 @@ async function stageFacts(tx: Prisma.TransactionClient, job: WorkspaceJob, now: 
   const diagnosis = job.stage === "DIAGNOSIS" ? await loadDiagnosisFacts(tx, job.id) : null;
   const warrantyProblems = job.stage === "WARRANTY" && job.jobType !== JobCardType.PDI ? await loadWarrantyFacts(tx, job.id) : [];
   const estimate = job.stage === "ESTIMATE" && job.jobType !== JobCardType.PDI ? await loadEstimateStageFacts(tx, job.id) : null;
+  const repairProblems = job.stage === "REPAIR" && job.jobType !== JobCardType.PDI ? await loadRepairProblems(tx, job.id) : [];
   const [openingSignatureProblem, approvalProblem, depositProblem] = gated
     ? await Promise.all([
         job.openingSignatureRequired ? gateProblem(() => assertSignedJobOpening(tx, job.id)) : null,
@@ -122,6 +124,7 @@ async function stageFacts(tx: Prisma.TransactionClient, job: WorkspaceJob, now: 
     creditApproved: !!job.creditApprovedById,
     unansweredCampaigns: job.campaigns.filter((campaign) => campaign.attended === null).length,
     estimate,
+    repairProblems,
   };
 }
 
@@ -277,6 +280,9 @@ export class JobStageService {
         }
         try {
           await this.workflow.updateInTx(tx, id, { status: check.toStatus, remarks: note }, actor.id, ctx);
+          // Repair (phase 6): the approved work becomes the technician's list; a pause stops the clock.
+          if (input.action === "RELEASE_TO_REPAIR") await createWorkLines(tx, id, { supplementary: false });
+          if (input.action === "PAUSE_FOR_PARTS") await pauseWorkLines(tx, id);
         } catch (error) {
           // A workflow gate that our facts did not catch is still a blocked move, not a bad request.
           if (error instanceof BadRequestError)

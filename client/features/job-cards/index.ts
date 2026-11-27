@@ -1,4 +1,5 @@
 export { JobCardsPage } from "./components/job-cards-page";
+export { MyJobsPage } from "./components/my-jobs/MyJobsPage";
 export { JobCardCreateForm } from "./components/JobCardCreateForm";
 export { useJobCards } from "./hooks/use-job-cards";
 export { useJobCard } from "./hooks/use-job-card";

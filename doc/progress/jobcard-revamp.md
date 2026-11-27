@@ -227,3 +227,37 @@ Built on Jayking (no phase branch, at the owner's request).
 - Steps that draw their own bar (check-in, diagnosis, warranty, estimate): on a phone the bar's second row sat under the bottom menu until you scrolled. The step section no longer limits the sticky bar.
 - The customer and vehicle pages showed an "Est. cost" column that was never filled ("—" or "$"); removed with the old opening estimate.
 - Service advisors and service managers had no `estimate:create`, so they could not create estimates from the old screen either.
+
+## Phase 6: Repair (27 Nov 2026)
+
+Built on Jayking (no phase branch, at the owner's request).
+
+### Plan
+
+1. Data: `JobWorkLine` (status NOT_STARTED, IN_PROGRESS, WAITING_PARTS, DONE; technician, started, done, time worked, the labour line it recorded); `JobFinding.raisedDuringRepair`, request ID and the supplementary revision that answered it; `Estimate.supplementary`, `EstimateLine.carriedOver`; work lines backfilled for jobs already at Repair.
+2. Supplementary estimate = revision N+1 through the existing revision logic (previous revision superseded): earlier lines copied unchanged with their decisions, only the new lines priced and decided. While it waits, the approved-scope gate reads the revision it replaced, so approved work continues.
+3. Server: pure `job-repair.logic.ts` (work line state machine, time worked, QC gate, parts progress, My jobs tabs and next action); `job-repair.service.ts` and routes (`/repair`, `/my-jobs`); Done records labour through the labour slip service in the same transaction; release creates work lines; Pause moves running lines to Waiting parts; outbox events for a new finding, supplementary approved and parts ready.
+4. Client: `lib/repair.logic.ts`, hooks, `components/repair/` (technician view with Collect and sign, Need a part, Add a finding, Pause; advisor monitoring with work, parts, labour, new-finding banner and the supplementary estimate), `/my-jobs`; old Repair step sections deleted.
+5. Demo seed JC-S23 to JC-S25; tests (logic, integration, Playwright phase 6); docs and manual test guide.
+
+### Status (milestones)
+
+- [x] Migration `20261127150000_jobcard_repair` (additive, with the work line backfill for jobs already at Repair). Generated against a local copy of the phase 5 demo database; the residual diff for phase 6 objects is empty.
+- [x] Server: logic, service, routes, stage hooks, supplementary revision, outbox events; old "Request part" endpoint removed. Unit 24 and integration 3 passing; stage and approval suites updated and passing.
+- [x] Client: repair step (technician and monitoring views), sheets, My jobs page and navigation, supplementary mode of the estimate screens; old parts and labour sections deleted.
+- [x] Demo seed: JC-S23 to JC-S25 on a local copy (`dana_demo_p6`).
+- [x] Server database (27 Nov 2026): `20261127150000_jobcard_repair` applied from a copy of the migrations folder without the two held drops (`20261126125424_jobcard_drop_observations`, `20261127090200_jobcard_drop_opening_estimate`, still held). No phase 6 object existed there before. Demo seed run there for JC-S23 to JC-S25.
+- [x] Docs: `doc/job-cards.md` ("Repair (phase 6)"), `doc/demo-data.md`, manual test guide `doc/testing/jobcard-revamp/phase-6-manual-test.md`.
+
+### Tests (27 Nov 2026)
+
+- Server: new `job-repair.logic.test.ts` (24: work line state machine, time worked, pause, quality check gate, parts rows, work lines from a revision, governing estimate, My jobs actions and Lagos day, finding input, the stage gate, outbox recipients) and `job-repair.integration.test.ts` (3: release, Start and Done with labour on the slip, double tap, pause and resume, Send for quality check; new finding, notice to the advisor, supplementary revision with carried decisions, approved work continuing while it waits, collection rules for technician, branch and job, approval adding work lines, the parts request for new parts only and the notice to the technician; My jobs scoping by technician, branch and tab). Updated: stage integration (the work list must be done), approval gate test, parts request test (now the store notice itself), part issue message, signature message.
+- Touched modules (service, workshop, notification, requisition, inventory, finance) on a local test database: 1,065 passed, 48 failed, 8 skipped (1,121). All 48 are in 7 old integration suites with the known causes: vehicles without a model (booking, labour slip, service documents, workshop, part source), fixtures without the check-in signature and synthetic audit failures (requisition, return slip), a vendor message and the Jest dynamic-import limit. Typecheck clean (server and seed).
+- Client: 142 of 143 (`issue117-components`, missing `BillHeads`, as before). New `test/repair.test.mjs` (6, including a render of the technician view). Typecheck clean, lint 0 errors (74 old warnings), production build passes.
+- Browser (Playwright): phase 6 suite 11 of 11 (My jobs on a phone with tabs, counts and keyboard; work list and blocked quality check; collect and sign with both mistakes, Esc and outside click; Done with labour; Need a part with every mistake and text kept through the part search; pause and resume; advisor monitoring and supplementary estimate with phone approval; tablet approval of new lines only; hand-over to the quality check with the supervisor's notice and My jobs Done; another technician read only and refused by the server; offline failure and Try again; 390, 768, 1024 and 1440 px). Phases 5 and 6 together: 18 of 18.
+
+### Found and fixed in passing
+
+- Sheets and the customer approval form kept their error messages after the mistake was fixed; messages now follow the form once a save was tried.
+- The signature check told technicians to "Ask the customer to sign"; it now says "Sign in the box. A signature is required" (its old unit test expected "PNG" and had failed since phase 5).
+- `workshop-notification-outbox.integration.test.ts` used the removed button function; it now drives the store notice directly.

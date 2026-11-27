@@ -21,7 +21,9 @@ export function CustomerApproval({ step }: { step: JobEstimateStep & { estimate:
   const approve = useApproveEstimate(step.jobCardId);
   const [decisions, setDecisions] = useState<Record<string, LineDecision>>(() => initialDecisions(estimate.lines));
   const [form, setForm] = useState<SignForm>({ signer: "OWNER", name: "", phone: "", signature: null, accepted: false });
-  const [errors, setErrors] = useState<ReturnType<typeof signFormProblems>>({});
+  // After the first try, the messages follow the form, so a fixed mistake clears at once.
+  const [tried, setTried] = useState(false);
+  const errors = tried ? signFormProblems(form) : {};
   const [failure, setFailure] = useState<string | null>(null);
   const [requestId] = useState(() => crypto.randomUUID());
   const live = liveApproval(estimate.lines, decisions, estimate.vatRate);
@@ -32,8 +34,8 @@ export function CustomerApproval({ step }: { step: JobEstimateStep & { estimate:
 
   function submit() {
     if (busy) return;
+    setTried(true);
     const problems = signFormProblems(form);
-    setErrors(problems);
     if (Object.keys(problems).length || !form.signature) return;
     setFailure(null);
     approve
@@ -63,8 +65,17 @@ export function CustomerApproval({ step }: { step: JobEstimateStep & { estimate:
   return (
     <div className="mx-auto max-w-3xl space-y-4 text-base">
       <div>
-        <h3 className="text-xl font-semibold">Your estimate for {step.registration ?? "your vehicle"}</h3>
-        <p className="text-muted-foreground">Approve the work you want us to do. You can decline any item.</p>
+        {estimate.supplementary ? (
+          <>
+            <h3 className="text-xl font-semibold">Extra work found on {step.registration ?? "your vehicle"}</h3>
+            <p className="text-muted-foreground">Approve the extra work you want us to do. You can decline any item. The work you already approved continues.</p>
+          </>
+        ) : (
+          <>
+            <h3 className="text-xl font-semibold">Your estimate for {step.registration ?? "your vehicle"}</h3>
+            <p className="text-muted-foreground">Approve the work you want us to do. You can decline any item.</p>
+          </>
+        )}
       </div>
 
       {groups.length === 0 ? (

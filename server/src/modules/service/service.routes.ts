@@ -5,6 +5,7 @@ import { jobCheckInRoutes, jobPhotoRoutes } from "./job-check-in.routes";
 import { jobDiagnosisRoutes } from "./job-diagnosis.routes";
 import { jobWarrantyRoutes } from "./job-warranty.routes";
 import { jobEstimateRoutes } from "./job-estimate.routes";
+import { jobRepairRoutes, myJobsRoutes } from "./job-repair.routes";
 import { loadOpeningConsent } from "./job-opening-consent";
 import { assertBookable } from "./booking.logic";
 import { projectEstimatePrint } from "./estimate-print";
@@ -15,7 +16,6 @@ import prisma from "../../prisma/client";
 import {
   assertBranchOwnership,
   requireRole,
-  requireAnyPermission,
 } from "../../middleware/authorize";
 import { ROLES } from "../../shared/constants/roles";
 import { JobCardWorkflowService } from "./job-card-workflow.service";
@@ -62,6 +62,8 @@ router.use("/job-cards/:id/photos", jobPhotoRoutes);
 router.use("/job-cards/:id/diagnosis", jobDiagnosisRoutes);
 router.use("/job-cards/:id/warranty", jobWarrantyRoutes);
 router.use("/job-cards/:id/estimate", jobEstimateRoutes);
+router.use("/job-cards/:id/repair", jobRepairRoutes);
+router.use("/my-jobs", myJobsRoutes);
 router.get(
   "/staff",
   requirePermission(PERMISSIONS.JOBCARD_READ),
@@ -1008,48 +1010,6 @@ router.post(
       next(error);
     }
   },
-);
-/**
- * @openapi
- * /service/job-cards/{id}/request-parts:
- *   post:
- *     tags: [Service & Job Cards]
- *     summary: Queue a parts request for the branch store manager
- *     description: Requires partissuance:create or partreturn:create and job branch access. An active non-actor branch store manager must exist. Stores an idempotent outbox event and the first-request timestamp atomically; no stock or requisition is created. Delivery happens after commit through the existing worker. A successful response confirms queuing, not completed delivery. Billed/delivered/cancelled jobs are rejected. The same requestId preserves dedupe keys on retries.
- *     security: [{ BearerAuth: [] }]
- *     parameters:
- *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             additionalProperties: false
- *             required: [requestId]
- *             properties:
- *               requestId: { type: string, format: uuid }
- *           example: { requestId: '11111111-1111-4111-8111-111111111111' }
- *     responses:
- *       200: { description: 'Queued. Returns status=success, message=Parts request queued for the Branch Store Manager, data={}' }
- *       400: { description: 'Invalid fields, closed/billed job, or no eligible store manager. Validation errors include field, message and code.' }
- *       401: { description: Authentication required }
- *       403: { description: Permission or branch access denied }
- *       404: { description: Job card not found }
- */
-router.post(
-  "/job-cards/:id/request-parts",
-  requireAnyPermission(
-    PERMISSIONS.PARTISSUANCE_CREATE,
-    PERMISSIONS.PARTRETURN_CREATE,
-  ),
-  validateRequest(
-    z.object({
-      params: z.object({ id: z.string().uuid() }),
-      body: z.object({ requestId: z.string().uuid() }).strict(),
-    }),
-  ),
-  controller.requestParts,
 );
 router.post(
   "/job-cards/:id/deposit",

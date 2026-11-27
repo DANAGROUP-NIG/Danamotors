@@ -25,6 +25,8 @@ function useApply(id: string) {
     (step: JobEstimateStep) => {
       client.setQueryData(estimateStepKey(id), step);
       void client.invalidateQueries({ queryKey: jobCardKeys.workspace(id) });
+      // A supplementary estimate during repair changes the repair step (findings, work list, gate).
+      void client.invalidateQueries({ queryKey: [...jobCardKeys.detail(id), "repair"] });
       return client.invalidateQueries({ queryKey: jobCardKeys.detail(id), exact: true });
     },
     [client, id],

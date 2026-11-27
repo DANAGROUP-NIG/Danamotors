@@ -1,5 +1,4 @@
 import { Prisma } from '@prisma/client';
-import prisma from '../../prisma/client';
 import { BadRequestError, NotFoundError } from '../../shared/errors/appError';
 import { branchStoreRecipients, enqueueWorkshopNotification } from '../notification/workshop-notification-outbox';
 import { canonicalNotificationStatus } from '../notification/jobcard-notification-policy';
@@ -25,12 +24,4 @@ export async function notifyStoreOfParts(tx: Prisma.TransactionClient, jobCardId
   await enqueueWorkshopNotification(tx, 'PART_REQUESTED', card, occurrence, actorId, true);
   await tx.jobCard.update({ where: { id: card.id }, data: { partsRequestedAt: card.partsRequestedAt ?? new Date() } });
   return recipients;
-}
-
-/** The "Request part" button: a client request ID makes a double click send one notice. */
-export async function requestJobcardParts(jobCardId: string, branchId: string, actorId: string, requestId: string) {
-  await prisma.$transaction(async tx => {
-    await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobCardId} AND "branchId" = ${branchId} FOR UPDATE`);
-    await notifyStoreOfParts(tx, jobCardId, branchId, actorId, `button:${requestId}`);
-  });
 }

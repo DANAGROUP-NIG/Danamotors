@@ -157,6 +157,11 @@ export const VEHICLES = {
   stgEstPhone: { vin: "KNAPM81DMK7000521", registrationNumber: "LSR-531ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2200 },
   stgEstDecline: { vin: "KNAPM81DMK7000522", registrationNumber: "LSR-532ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2200 },
   stgEstFree: { vin: "KNAPX81DMS7000523", registrationNumber: "KJA-533ST", customer: "lakeside", model: "SPORTAGE", saleDaysAgo: 40 },
+  // Repair (phase 6): work in progress with parts to collect (in warranty, the AC on warranty); a new
+  // finding waiting for the supplementary estimate; a supplementary estimate waiting for the customer.
+  stgRepairWork: { vin: "KNAPX81DMS7000524", registrationNumber: "KJA-534ST", customer: "okafor", model: "SPORTAGE", saleDaysAgo: 90 },
+  stgRepairFinding: { vin: "KNAPM81DMK7000525", registrationNumber: "LSR-535ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2200 },
+  stgRepairSupp: { vin: "KNAPM81DMK7000526", registrationNumber: "LSR-536ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2200 },
 } satisfies Record<string, VehicleFixture>;
 
 export type VehicleKey = keyof typeof VEHICLES;
@@ -217,6 +222,12 @@ export const PARTS = {
     unitPrice: 41_000, retailRate: 52_000, warrantyApplicable: true, warrantyRate: 46_000,
     stock: { main: { quantity: 2, minimum: 2, rack: "IGN-03" }, second: { quantity: 5, minimum: 2, rack: "IGN-03" } },
   },
+  // Repair (phase 6): found during repair and priced on a supplementary estimate.
+  wiperBlade: {
+    partNumber: "98850-DM000", name: "Rear wiper blade", category: "Body", partFlag: "O", partType: "S", uom: "PCS",
+    unitPrice: 6_500, retailRate: 8_500, warrantyApplicable: false,
+    stock: { main: { quantity: 10, minimum: 3, rack: "BDY-01" }, second: { quantity: 4, minimum: 2, rack: "BDY-01" } },
+  },
 } satisfies Record<string, PartFixture>;
 
 export type PartKey = keyof typeof PARTS;
@@ -231,6 +242,7 @@ export const LABOUR = {
   brakePads: { code: "DM-BRK-PAD", description: "Replace front brake pads", vehicleSystem: "Brakes", group: "Repair", defaultHours: 1, rate: 15_000 },
   acCheck: { code: "DM-AC-CHK", description: "AC system check and refrigerant recharge", vehicleSystem: "Air conditioning", group: "Repair", defaultHours: 1, rate: 18_000 },
   steering: { code: "DM-WHL-BAL", description: "Wheel balancing and alignment", vehicleSystem: "Steering", group: "Repair", defaultHours: 1, rate: 12_000 },
+  wiper: { code: "DM-BDY-WPR", description: "Replace rear wiper blade", vehicleSystem: "Body", group: "Repair", defaultHours: 0.3, rate: 3_000 },
 } as const;
 
 export type LabourKey = keyof typeof LABOUR;
@@ -300,6 +312,18 @@ export interface FindingFixture {
  * findings: recorded, not sent; review: sent to the service engineer; returned: sent back with a note;
  * confirmed: confirmed by the engineer.
  */
+/**
+ * Repair (phase 6). Work lines are named by labour key, or "serviceType" for the service type's own line.
+ * A finding is raised by the technician; the advisor then prepares (and may present) a supplementary estimate.
+ */
+export interface RepairFixture {
+  done?: (LabourKey | "serviceType")[];
+  started?: (LabourKey | "serviceType")[];
+  waiting?: (LabourKey | "serviceType")[];
+  finding?: { text: string; parts: [PartKey, number][]; labour?: LabourKey[] };
+  supplementary?: "prepared" | "presented";
+}
+
 export interface DiagnosisFixture {
   /** confirmed: the engineer confirms these findings and routing moves the job on (to the warranty check). */
   stop: "findings" | "review" | "returned" | "confirmed";
@@ -336,8 +360,13 @@ export interface JobFixture {
   checkIn?: CheckInLevel;
   /** For a job that stops at diagnosis with a technician: findings and how far they got. */
   diagnosis?: DiagnosisFixture;
-  /** For a job that stops at the estimate (phase 5): prepared as a draft, or prepared and presented to the customer. */
-  estimateStep?: "prepared" | "presented";
+  /**
+   * The staged estimate (phase 5): prepared as a draft, prepared and presented to the customer, or
+   * approved by the customer on the phone (then released when the target is IN_PROGRESS).
+   */
+  estimateStep?: "prepared" | "presented" | "approved";
+  /** Repair (phase 6): how far the technician got with the work list, and a finding raised during repair. */
+  repair?: RepairFixture;
   /** An earlier odometer reading for a vehicle with no visits yet, so check-in shows "Last recorded". */
   priorMileage?: number;
   /** The answer recorded for linked campaigns (FPC) before READY; without it a FREE line must pre-set it. */
@@ -630,7 +659,10 @@ const serviceEstimate = (decided: boolean): EstimateFixture => ({
 const stageJob = (
   id: string,
   vehicle: VehicleKey,
-  fields: Pick<JobFixture, "description" | "complaints" | "mileage" | "withTechnician" | "target" | "checkIn" | "priorMileage" | "diagnosis" | "estimateStep"> & {
+  fields: Pick<JobFixture, "description" | "complaints" | "mileage" | "withTechnician" | "target" | "checkIn" | "priorMileage" | "diagnosis" | "estimateStep" | "repair"> & {
+    /** Repair jobs priced from their diagnosis record labour through the work list, not as legacy lines. */
+    labour?: [LabourKey, number][];
+    issues?: [PartKey, number][];
     stop?: StageStop;
     estimate?: "none" | "pending" | "approved";
     serviceType?: ServiceTypeCode;
@@ -645,14 +677,15 @@ const stageJob = (
   mileage: fields.mileage,
   withTechnician: fields.withTechnician,
   estimates: fields.estimate === "none" ? [] : [serviceEstimate(fields.estimate !== "pending")],
-  labour: fields.target === "OPEN" ? [] : [["service", 1.5]],
-  issues: [],
+  labour: fields.labour ?? (fields.target === "OPEN" ? [] : [["service", 1.5]]),
+  issues: fields.issues ?? [],
   workDone: "Periodic service done. Brakes and air conditioning checked.",
   target: fields.target,
   stop: fields.stop,
   checkIn: fields.checkIn,
   diagnosis: fields.diagnosis,
   estimateStep: fields.estimateStep,
+  repair: fields.repair,
   priorMileage: fields.priorMileage,
   startDaysAgo: 0,
   spanHours: 0,
@@ -836,6 +869,47 @@ export const STAGE_JOBS: JobFixture[] = [
         { request: 1, text: "Compressor clutch not engaging.", possibleWarranty: true, labour: ["acCheck"], parts: [["acCompressor", 1]], warranty: ["acCheck", "acCompressor"] },
       ],
     },
+  }),
+  // Repair (phase 6): released from an approved estimate. The service is done, the brakes are in progress,
+  // the AC repair (warranty) waits for the compressor; pads and oil are issued and ready to collect.
+  stageJob("JC-S23", "stgRepairWork", {
+    description: "Periodic service, noise from the front left wheel when braking, and the AC not cooling well.",
+    complaints: ["Periodic service (5,000 km)", "Noise from front left wheel when braking", "AC not cooling well"],
+    mileage: 5_400, withTechnician: true, target: "IN_PROGRESS", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1], ["engineOil", 1]],
+    diagnosis: {
+      stop: "confirmed",
+      findings: [
+        { request: 0, text: "Due for the 5,000 km service.", labour: [], parts: [["engineOil", 1]] },
+        { request: 1, text: "Front pads worn to 2 mm, disc surface fine.", labour: ["brakePads"], parts: [["brakePads", 1]] },
+        { request: 2, text: "Compressor clutch not engaging.", possibleWarranty: true, labour: ["acCheck"], parts: [["acCompressor", 1]], warranty: ["acCheck", "acCompressor"] },
+      ],
+    },
+    repair: { done: ["serviceType"], started: ["brakePads"], waiting: ["acCheck"] },
+  }),
+  // The technician found a torn rear wiper blade: the advisor sees the banner and prepares the supplementary estimate.
+  stageJob("JC-S24", "stgRepairFinding", {
+    description: "Brakes noisy and the periodic service.",
+    complaints: ["Brakes noisy", "Periodic service"],
+    mileage: 102_600, withTechnician: true, target: "IN_PROGRESS", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1]],
+    diagnosis: {
+      stop: "confirmed",
+      findings: [
+        { request: 0, text: "Front pads worn to 3 mm.", labour: ["brakePads"], parts: [["brakePads", 1]] },
+        { request: 1, text: "Due for the periodic service.", labour: [], parts: [] },
+      ],
+    },
+    repair: { done: ["serviceType", "brakePads"], finding: { text: "Rear wiper blade torn. It smears the rear screen.", parts: [["wiperBlade", 1]], labour: ["wiper"] } },
+  }),
+  // The supplementary estimate for the new finding is with the customer; approved work carries on.
+  stageJob("JC-S25", "stgRepairSupp", {
+    description: "Brakes noisy.",
+    complaints: ["Brakes noisy"],
+    mileage: 108_200, withTechnician: true, target: "IN_PROGRESS", estimate: "none", estimateStep: "approved", labour: [],
+    diagnosis: {
+      stop: "confirmed",
+      findings: [{ request: 0, text: "Front pads worn to 2 mm.", labour: ["brakePads"], parts: [["brakePads", 1]] }],
+    },
+    repair: { started: ["brakePads"], finding: { text: "Rear wiper blade torn.", parts: [["wiperBlade", 1]], labour: ["wiper"] }, supplementary: "presented" },
   }),
   stageJob("JC-S12", "stgSigned", {
     description: "Clicking noise when turning the steering fully.",

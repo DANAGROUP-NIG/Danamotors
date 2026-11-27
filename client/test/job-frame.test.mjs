@@ -292,7 +292,7 @@ test("a blocked handoff shows its reason beside the button, not only in a toolti
 test("an enabled handoff has no reason, and the bar is absent when there is nothing to do", () => {
   const html = bar({ primary: view("SEND_TO_QC", true) });
   assert.equal(html.includes("aria-describedby"), false);
-  assert.ok(html.includes("Send to quality check"));
+  assert.ok(html.includes("Send for quality check"));
   assert.equal(bar({}), "");
   assert.equal(bar({ secondary: [view("RETURN_TO_REPAIR", false, ["Record a failed quality check first."], "secondary")] }), "");
   const more = bar({ danger: [view("CANCEL", true, [], "danger")] });

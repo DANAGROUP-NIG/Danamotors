@@ -85,7 +85,7 @@ it('loads signature evidence through the operation gate without loading the imag
   }]);
   const tx = { estimate: { findMany } } as unknown as Prisma.TransactionClient;
   await expect(assertApprovedOperation(tx, 'job', 'customer', [service, part, labour])).resolves.toMatchObject({ canBill: true });
-  expect(findMany).toHaveBeenCalledWith({ where: { jobCardId: 'job' }, ...latestEstimateQuery });
+  expect(findMany).toHaveBeenCalledWith({ where: { jobCardId: 'job' }, ...latestEstimateQuery, take: 2 });
   expect(latestEstimateQuery.orderBy[0]).toEqual({ version: 'desc' });
   expect(latestEstimateQuery.include.approvals.include.signature.select).toEqual({ estimateVersion: true, totalSigned: true, contentHash: true, hashVersion: true });
   estimate.lines = [{ ...service, description: 'Tampered' }, part, labour];

@@ -32,6 +32,7 @@ import { CustomerApproval } from "./CustomerApproval";
 import { DeclinedAll } from "./DeclinedAll";
 import { EstimateLinesEditor, EstimateSummary, draftTotals } from "./EstimatePrepare";
 import { EstimateReadOnly } from "./EstimateReadOnly";
+import { supplementaryView } from "../../lib/repair.logic";
 import { PhoneApprovalDialog } from "./PhoneApprovalDialog";
 
 const statusOf = (error: unknown) => (error as { response?: { status?: number } } | null)?.response?.status;
@@ -111,7 +112,27 @@ export function EstimateStep({ job, bar, readOnly }: { job: JobCard; bar: StageB
   return <EstimateWork key={step.estimate?.id ?? "none"} job={job} step={step} bar={bar} />;
 }
 
-function EstimateWork({ job, step, bar }: { job: JobCard; step: JobEstimateStep; bar: StageBarProps }) {
+/**
+ * Repair (phase 6): the supplementary revision for new findings, with only its new lines (prepare,
+ * present, customer approval or phone approval). The earlier lines keep the customer's first answer.
+ */
+export function SupplementaryEstimate({ job, bar }: { job: JobCard; bar: StageBarProps }) {
+  const query = useJobEstimate(job.id);
+  if (query.isLoading) return <LoadingSkeleton label="Loading the supplementary estimate" />;
+  if (statusOf(query.error) === 403) return <EstimateAccessDenied />;
+  if (query.isError || !query.data) return <LoadProblem onRetry={() => void query.refetch()} fetching={query.isFetching} />;
+  const step = supplementaryView(query.data);
+  if (!step.access.canEdit || !step.estimate?.supplementary || step.estimate.approval)
+    return (
+      <>
+        <EstimateReadOnly step={step} compact />
+        <StageActionBar {...bar} />
+      </>
+    );
+  return <EstimateWork key={step.estimate.id} job={job} step={step} bar={bar} supplementary />;
+}
+
+function EstimateWork({ job, step, bar, supplementary = false }: { job: JobCard; step: JobEstimateStep; bar: StageBarProps; supplementary?: boolean }) {
   const { hasPermission } = useAuth();
   const live = currentTab(step);
   const [tab, setTab] = useState<EstimateTab>(live);
@@ -124,8 +145,8 @@ function EstimateWork({ job, step, bar }: { job: JobCard; step: JobEstimateStep;
   return (
     <>
       {estimate && !declined && (
-        <nav aria-label="Estimate steps" className="grid grid-cols-3 gap-1 rounded-xl border border-border bg-card p-1">
-          {(["PREPARE", "APPROVAL", "ADVANCE"] as const).map((value, index) => {
+        <nav aria-label="Estimate steps" className={cn("grid gap-1 rounded-xl border border-border bg-card p-1", supplementary ? "grid-cols-2" : "grid-cols-3")}>
+          {(supplementary ? (["PREPARE", "APPROVAL"] as const) : (["PREPARE", "APPROVAL", "ADVANCE"] as const)).map((value, index) => {
             const Icon = TAB_ICONS[value];
             const reachable = index <= ["PREPARE", "APPROVAL", "ADVANCE"].indexOf(live);
             return (
@@ -163,7 +184,7 @@ function EstimateWork({ job, step, bar }: { job: JobCard; step: JobEstimateStep;
           <StageActionBar {...bar} primary={null} secondary={[]} />
         </>
       ) : tab === "PREPARE" ? (
-        <DraftEditor job={job} step={step as DraftStep} bar={bar} decided={!!estimate.approval} onPhone={() => setPhoneOpen(true)} canPrint={hasPermission("estimate:print")} />
+        <DraftEditor job={job} step={step as DraftStep} bar={bar} decided={!!estimate.approval} onPhone={() => setPhoneOpen(true)} canPrint={hasPermission("estimate:print")} showAdvance={!supplementary} />
       ) : tab === "APPROVAL" ? (
         <>
           {estimate.approval ? <EstimateReadOnly step={step} compact /> : <CustomerApproval step={step as DraftStep} />}
@@ -182,6 +203,9 @@ function EstimateWork({ job, step, bar }: { job: JobCard; step: JobEstimateStep;
             }
           />
         </>
+      ) : supplementary ? (
+        // Answered: the repair step takes over (the new work joins the work list).
+        <EstimateReadOnly step={step} compact />
       ) : (
         <>
           <AdvanceRelease step={step as DraftStep} job={job} />
@@ -247,7 +271,23 @@ function PrepareFirst({ job, step, bar }: { job: JobCard; step: JobEstimateStep;
   );
 }
 
-function DraftEditor({ job, step, bar, decided, onPhone, canPrint }: { job: JobCard; step: DraftStep; bar: StageBarProps; decided: boolean; onPhone: () => void; canPrint: boolean }) {
+function DraftEditor({
+  job,
+  step,
+  bar,
+  decided,
+  onPhone,
+  canPrint,
+  showAdvance,
+}: {
+  job: JobCard;
+  step: DraftStep;
+  bar: StageBarProps;
+  decided: boolean;
+  onPhone: () => void;
+  canPrint: boolean;
+  showAdvance: boolean;
+}) {
   const { estimate } = step;
   const save = useSaveEstimateDraft(job.id);
   const present = usePresentEstimate(job.id);
@@ -308,7 +348,7 @@ function DraftEditor({ job, step, bar, decided, onPhone, canPrint }: { job: JobC
             <p className="text-sm text-muted-foreground">Presented to the customer {formatDateTime(estimate.presentedAt)}. Saving a change takes it back to draft.</p>
           )}
         </StageCard>
-        <EstimateSummary totals={totals} vatRate={estimate.vatRate} percent={percent} editable={editable} saving={busy} promisedAt={job.promisedAt ?? null} onPercent={setPercent} />
+        <EstimateSummary totals={totals} vatRate={estimate.vatRate} percent={percent} editable={editable} saving={busy} promisedAt={job.promisedAt ?? null} onPercent={setPercent} showAdvance={showAdvance} />
       </div>
       <StageActionBar
         {...bar}

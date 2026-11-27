@@ -100,7 +100,7 @@ it("requires bounded signature evidence and rejects invalid images before openin
       "tech",
       "data:image/svg+xml;base64,AAAA",
     ),
-  ).rejects.toThrow("PNG");
+  ).rejects.toThrow("Sign in the box. A signature is required");
   expect(prisma.$transaction).not.toHaveBeenCalled();
 });
 

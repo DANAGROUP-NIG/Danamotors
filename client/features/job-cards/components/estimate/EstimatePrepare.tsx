@@ -253,7 +253,10 @@ export function EstimateSummary({
   saving,
   promisedAt,
   onPercent,
+  showAdvance = true,
 }: {
+  /** A supplementary estimate during repair has no advance of its own. */
+  showAdvance?: boolean;
   totals: EstimateTotals;
   vatRate: string;
   percent: string;
@@ -293,7 +296,7 @@ export function EstimateSummary({
           </div>
         )}
       </dl>
-      <fieldset className="space-y-2" disabled={!editable || saving}>
+      {showAdvance && <fieldset className="space-y-2" disabled={!editable || saving}>
         <legend className="text-sm font-semibold">Suggested advance</legend>
         <p className="text-xs text-muted-foreground">The cashier asks for this before work starts. Any positive amount is accepted.</p>
         <div className="grid grid-cols-4 gap-2">
@@ -341,7 +344,7 @@ export function EstimateSummary({
           <span className="text-sm">Advance ({problem ? "check the percentage" : `${Number(percent)}%`})</span>
           <span className="text-lg font-semibold tabular-nums">{advance ? formatMoney(advance) : formatMoney(null)}</span>
         </div>
-      </fieldset>
+      </fieldset>}
       <p className="flex items-center gap-2 text-sm">
         <CalendarDays className="size-4 text-muted-foreground" aria-hidden="true" />
         <span>

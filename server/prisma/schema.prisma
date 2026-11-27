@@ -311,6 +311,7 @@ model User {
   estimationWaiversRequested  EstimationCharge[]      @relation("EstimationChargeWaiverRequestedBy")
   estimationChargesDecided    EstimationCharge[]      @relation("EstimationChargeDecidedBy")
   jobPartsRequests            JobPartsRequest[]       @relation("JobPartsRequestCreatedBy")
+  workLines                   JobWorkLine[]           @relation("WorkLineTechnician")
   externalServicesAdded       ExternalServiceRecord[] @relation("ExternalServiceAddedBy")
   externalServicesRemoved     ExternalServiceRecord[] @relation("ExternalServiceRemovedBy")
   qualityInspectorAssignments JobCard[]               @relation("QualityInspectorAssignments")
@@ -832,6 +833,8 @@ model JobCard {
   advanceExemptedAt      DateTime?
   estimationCharge       EstimationCharge?
   partsRequests          JobPartsRequest[]
+  /// Repair (job card revamp phase 6): the approved work the technician ticks off.
+  workLines              JobWorkLine[]
 
   progress Int? @default(0)
 
@@ -983,6 +986,10 @@ model Estimate {
   presentedAt      DateTime?
   partsRequest     JobPartsRequest?
   estimationCharge EstimationCharge?
+  /// Repair (phase 6): a revision prepared during repair for new findings. Earlier lines are copied
+  /// unchanged with their decisions (carriedOver); only the new lines are priced and decided.
+  supplementary    Boolean           @default(false)
+  answeredFindings JobFinding[]      @relation("FindingSupplementaryEstimate")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1877,6 +1884,7 @@ model JobCardLabour {
   // Who pays for this labour line (warranty / goodwill / free / customer).
   chargeLine   JobCardLine?
   psfCallLines PsfCallLine[]
+  workLine     JobWorkLine?
 
   @@index([labourSlipId])
   @@index([groupId])
@@ -2664,6 +2672,9 @@ model EstimateLine {
   complaintId      String?
   complaint        JobComplaint?   @relation(fields: [complaintId], references: [id], onDelete: SetNull)
   sortOrder        Int             @default(0)
+  /// Supplementary revisions: copied from the revision before, with its decision. The customer decides only the other lines.
+  carriedOver      Boolean         @default(false)
+  workLines        JobWorkLine[]
 
   @@index([estimateId])
   @@index([findingItemId])
@@ -5473,22 +5484,29 @@ model JobDiagnosis {
 /// What the technician found (the paper card's "cause and nature of defect"). One per customer
 /// request, plus findings the customer did not mention (complaintId null).
 model JobFinding {
-  id               String           @id @default(uuid())
-  jobCardId        String
-  jobCard          JobCard          @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
-  complaintId      String?
-  complaint        JobComplaint?    @relation(fields: [complaintId], references: [id], onDelete: SetNull)
-  causeAndDefect   String           @default("")
-  possibleWarranty Boolean          @default(false)
+  id                 String           @id @default(uuid())
+  jobCardId          String
+  jobCard            JobCard          @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  complaintId        String?
+  complaint          JobComplaint?    @relation(fields: [complaintId], references: [id], onDelete: SetNull)
+  causeAndDefect     String           @default("")
+  possibleWarranty   Boolean          @default(false)
   /// Optimistic version for the autosave.
-  version          Int              @default(1)
-  createdById      String
-  createdBy        User             @relation("JobFindingCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedById      String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  items            JobFindingItem[]
-  photos           JobPhoto[]
+  version            Int              @default(1)
+  createdById        String
+  createdBy          User             @relation("JobFindingCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedById        String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  items              JobFindingItem[]
+  photos             JobPhoto[]
+  /// Repair (phase 6): raised by the technician during repair ("Need a part" or "Add a finding"). Needs a supplementary estimate.
+  raisedDuringRepair Boolean          @default(false)
+  /// The client request that raised it during repair, so a double tap records it once.
+  requestId          String?          @unique
+  /// The supplementary revision that prices it. Null until the advisor prepares one.
+  estimateId         String?
+  estimate           Estimate?        @relation("FindingSupplementaryEstimate", fields: [estimateId], references: [id], onDelete: SetNull)
 
   @@unique([jobCardId, complaintId])
   @@index([jobCardId, createdAt])
@@ -5516,6 +5534,54 @@ model JobFindingItem {
   estimateLines EstimateLine[]
 
   @@index([findingId, sortOrder])
+}
+
+/// Repair (job card revamp phase 6): where one approved work line is.
+enum WorkLineStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  WAITING_PARTS
+  DONE
+}
+
+/// One approved piece of work (the service, or a labour operation) on the technician's tick-list.
+/// Created on release from the approved estimate, and on an approved supplementary estimate.
+/// Labour time is recorded through the labour slip when the line is done (labourLineId).
+model JobWorkLine {
+  id             String         @id @default(uuid())
+  jobCardId      String
+  jobCard        JobCard        @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  /// SERVICE:<service type> or LABOUR:<labour item>, one line per piece of work on the job.
+  sourceKey      String
+  /// The approved estimate line it came from (the revision current at release or approval).
+  estimateLineId String?
+  estimateLine   EstimateLine?  @relation(fields: [estimateLineId], references: [id], onDelete: SetNull)
+  kind           String
+  labourItemId   String?
+  description    String
+  /// Approved hours (or 1 for the service and fixed-price operations), charged on the labour slip.
+  quantity       Decimal        @db.Decimal(12, 2)
+  payer          FindingPayer   @default(CUSTOMER)
+  campaignId     String?
+  supplementary  Boolean        @default(false)
+  status         WorkLineStatus @default(NOT_STARTED)
+  technicianId   String?
+  technician     User?          @relation("WorkLineTechnician", fields: [technicianId], references: [id], onDelete: SetNull)
+  startedAt      DateTime?
+  /// Start of the running stretch while IN_PROGRESS; time worked adds up across pauses.
+  resumedAt      DateTime?
+  workedSeconds  Int            @default(0)
+  doneAt         DateTime?
+  labourLineId   String?        @unique
+  labourLine     JobCardLabour? @relation(fields: [labourLineId], references: [id], onDelete: SetNull)
+  /// The last request that changed it, so a double tap changes it once.
+  lastRequestId  String?
+  sortOrder      Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([jobCardId, sourceKey])
+  @@index([technicianId, status])
 }
 
 /// Who pays for a diagnosed item. CAMPAIGN becomes a FREE line charged to the job's linked campaign.

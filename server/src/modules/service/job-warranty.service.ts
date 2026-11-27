@@ -153,7 +153,7 @@ const itemSelect = {
 
 async function loadItems(db: Database, jobCardId: string) {
   const rows = await db.jobFindingItem.findMany({
-    where: { finding: { jobCardId } },
+    where: { finding: { jobCardId, raisedDuringRepair: false } },
     // Customer requests in the order they were entered, then findings the customer did not mention.
     orderBy: [{ finding: { complaintId: { sort: "asc", nulls: "last" } } }, { finding: { createdAt: "asc" } }, { sortOrder: "asc" }],
     select: itemSelect,

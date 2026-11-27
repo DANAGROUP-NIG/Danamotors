@@ -117,7 +117,7 @@ export const ACTION_LABELS: Record<StageAction, string> = {
   SEND_DECLINED_TO_BILLING: "Send to billing",
   PAUSE_FOR_PARTS: "Pause for parts",
   RESUME_REPAIR: "Resume repair",
-  SEND_TO_QC: "Send to quality check",
+  SEND_TO_QC: "Send for quality check",
   QC_PASSED_TO_ADVISOR: "Send to service advisor",
   RETURN_TO_REPAIR: "Return to technician",
   MARK_READY: "Mark vehicle ready",

@@ -137,6 +137,11 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     await labour.addJobCardLine(card.id, { labourItemId, technicianId: users.technician.id }, users.technician.id);
     await db.$transaction(tx => lines.syncLines(tx, card.id));
 
+    // Release created the work list (phase 6); the quality check waits until every line is done.
+    expect(await db.jobWorkLine.count({ where: { jobCardId: card.id } })).toBeGreaterThan(0);
+    await expect(act(card.id, 'SEND_TO_QC', 'technician')).rejects.toMatchObject({ statusCode: 409 });
+    // The work list itself is covered by job-repair.integration.test.ts; here the technician has finished it.
+    await db.jobWorkLine.updateMany({ where: { jobCardId: card.id }, data: { status: 'DONE', doneAt: new Date() } });
     await act(card.id, 'SEND_TO_QC', 'technician');
     await expectAt(card.id, 'QUALITY_CHECK', 'QC');
     await workshop.updateQC(card.id, 'PASSED', 'Road test passed', users.supervisor.id);

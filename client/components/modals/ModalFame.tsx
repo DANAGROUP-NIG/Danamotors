@@ -12,6 +12,8 @@ interface ModalProps {
   size?: "default" | "wide";
   flush?: boolean;
   preventAccidentalClose?: boolean;
+  /** "sheet" rises from the bottom on phones (a bottom sheet) and is centred from the small breakpoint up. */
+  placement?: "center" | "sheet";
 }
 
 export default function ModalFame({
@@ -23,7 +25,9 @@ export default function ModalFame({
   size = "default",
   flush = false,
   preventAccidentalClose = false,
+  placement = "center",
 }: ModalProps) {
+  const sheet = placement === "sheet";
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
   useFocusTrap(panel, isOpen, onClose, !preventAccidentalClose);
@@ -32,7 +36,7 @@ export default function ModalFame({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 sm:p-6"
+      className={`fixed inset-0 z-50 flex justify-center overflow-y-auto ${sheet ? "items-end p-0 sm:items-center sm:p-6" : "items-center p-4 sm:p-6"}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? titleId : undefined}
@@ -48,7 +52,7 @@ export default function ModalFame({
       <div
         ref={panel}
         tabIndex={-1}
-        className={`relative z-10 my-auto w-full ${size === "wide" ? "max-w-6xl" : "max-w-2xl"} rounded-2xl border border-border bg-background shadow-2xl outline-none`}
+        className={`relative z-10 w-full ${size === "wide" ? "max-w-6xl" : "max-w-2xl"} border border-border bg-background shadow-2xl outline-none ${sheet ? "mt-auto rounded-t-2xl sm:my-auto sm:rounded-2xl" : "my-auto rounded-2xl"}`}
       >
         {}
         {title && (

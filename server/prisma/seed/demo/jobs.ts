@@ -14,7 +14,8 @@ import { estimateContentHash } from "../../../src/modules/service/estimate-signa
 import { JobStageService } from "../../../src/modules/service/job-stage.service";
 import { JobDiagnosisService } from "../../../src/modules/service/job-diagnosis.service";
 import { decideCustomerPay } from "./warranty-check";
-import { requestJobcardParts } from "../../../src/modules/service/jobcard-parts-request.service";
+import { notifyStoreOfParts } from "../../../src/modules/service/jobcard-parts-request.service";
+import { JobRepairService, type RepairActor } from "../../../src/modules/service/job-repair.service";
 import { ROLES } from "../../../src/shared/constants/roles";
 import type { StageAction } from "../../../src/modules/service/job-stage.logic";
 import { upfrontAmount } from "../../../src/modules/service/estimate-advance";
@@ -54,7 +55,14 @@ const services = {
   stages: new JobStageService(),
   diagnosis: new JobDiagnosisService(),
   estimates: new JobEstimateService(),
+  repair: new JobRepairService(),
 };
+
+/** A workshop user with the permissions of their role, as the repair screens send them. */
+async function repairActor(userId: string): Promise<RepairActor> {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { role: { include: { permissions: { include: { permission: true } } } } } });
+  return { id: user.id, role: user.role.name, branchId: user.branchId, permissions: user.role.permissions.map((row) => row.permission.name) };
+}
 
 /** The service advisor with the permissions of the role, as the estimate screens send them. */
 async function estimateActor(userId: string): Promise<EstimateActor> {
@@ -123,14 +131,19 @@ export async function seedJob(ctx: DemoContext, ref: Reference, parties: Parties
       await services.labour.addJobCardLine(id, { labourItemId, hours, technicianId: fx.withTechnician ? staff.technician.id : undefined });
       await services.lines.list(id); // creates the charge line, in order
     }
-    // The technician asks the store for the parts first (the existing "Request parts" button). The button
-    // only records the request and tells the branch store officer; without one, the request time is recorded.
+    // The store is told the job needs parts before it issues them (the approved estimate does this on its
+    // own; older scenarios priced outside the staged estimate ask here). Without a store officer, the
+    // request time is recorded.
     if (fx.issues.length && !(await loadJob(id)).partsRequestedAt) {
       const storeOfficer = await prisma.user.findFirst({
         where: { branchId: branch.id, isActive: true, role: { name: ROLES.BRANCH_STORE_MANAGER }, id: { not: staff.technician.id } },
         select: { id: true },
       });
-      if (storeOfficer) await requestJobcardParts(id, branch.id, staff.technician.id, demoUuid(`parts:${fx.id}`));
+      if (storeOfficer)
+        await prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`;
+          await notifyStoreOfParts(tx, id, branch.id, staff.technician.id, `seed:${demoUuid(`parts:${fx.id}`)}`);
+        });
       else await prisma.jobCard.update({ where: { id }, data: { partsRequestedAt: new Date() } });
     }
     for (const [partKey, quantity] of fx.issues) {
@@ -145,6 +158,7 @@ export async function seedJob(ctx: DemoContext, ref: Reference, parties: Parties
   }
 
   if (fx.claim && claimUsesJobLines) await buildClaim(ctx, ref, id, fx.claim, false);
+  if (fx.repair) await workRepair(ctx, ref, fx, id);
 
   await advance(ctx, fx, id);
   await stopInWorkshop(ctx, fx, id);
@@ -263,6 +277,7 @@ async function advance(ctx: DemoContext, fx: JobFixture, id: string) {
     if (RANK[status] === undefined || RANK[status] >= target) return;
 
     if (status === "IN_PROGRESS") {
+      await finishWorkList(ctx, fx, id);
       await stageAction(fx, id, "SEND_TO_QC", staff.technician.id, "Work complete, sent for quality check");
     } else if (status === "QC") {
       await passQualityCheck(ctx, fx, id);
@@ -347,6 +362,20 @@ async function walkToEstimate(ctx: DemoContext, ref: Reference, fx: JobFixture, 
     const advisor = await estimateActor(staff.advisor.id);
     const step = await services.estimates.prepare(id, advisor);
     if (fx.estimateStep === "presented" && step.estimate && !step.estimate.presentedAt) await services.estimates.presentToCustomer(id, advisor, step.estimate.id);
+    // The customer left and approved every item on the phone; they sign at delivery.
+    if (fx.estimateStep === "approved" && step.estimate && !step.estimate.approval) {
+      const customer = await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { customer: { select: { firstName: true, lastName: true, phoneNumber: true } } } });
+      await services.estimates.phoneApproval(id, advisor, {
+        estimateId: step.estimate.id,
+        expectedHash: step.estimate.contentHash,
+        approverName: `${customer.customer?.firstName ?? ""} ${customer.customer?.lastName ?? ""}`.trim() || "Vehicle owner",
+        approverPhone: customer.customer?.phoneNumber || "08035550142",
+        approvedAt: new Date().toISOString(),
+        approvedLineIds: step.estimate.lines.filter((line) => line.payer === "CUSTOMER").map((line) => line.id),
+        note: "Customer approved all items on the phone.",
+        requestId: demoUuid(`phone-approval:${fx.id}`),
+      });
+    }
   }
 }
 
@@ -449,13 +478,86 @@ async function passQualityCheck(ctx: DemoContext, fx: JobFixture, id: string) {
 }
 
 /** Jobs left in the workshop: paused for parts, waiting for QC, or passed QC and waiting for the advisor. */
+/** The work line of a fixture key: the service type's own line, or a labour operation. */
+async function workLineFor(ref: Reference, id: string, key: LabourKey | "serviceType") {
+  return prisma.jobWorkLine.findFirst({ where: { jobCardId: id, ...(key === "serviceType" ? { kind: "SERVICE" } : { labourItemId: ref.labour[key] }) } });
+}
+
+/**
+ * Repair (phase 6) as the technician does it on the phone: Start and Done on the work list (Done records
+ * the labour), Waiting parts, and a finding raised during repair; then the advisor prepares the
+ * supplementary estimate and presents it. Every step is safe to run again.
+ */
+async function workRepair(ctx: DemoContext, ref: Reference, fx: JobFixture, id: string) {
+  const plan = fx.repair!;
+  if ((await loadJob(id)).stage !== "REPAIR") return;
+  const technician = await repairActor(ctx.staff[fx.branch].technician.id);
+  const move = async (key: LabourKey | "serviceType", action: "START" | "DONE" | "WAIT_PARTS") => {
+    const line = await workLineFor(ref, id, key);
+    if (!line) throw new Error(`${fx.id}: no work line for ${key}`);
+    await services.repair.moveLine(id, line.id, technician, { action, requestId: demoUuid(`work:${fx.id}:${key}:${action}`) });
+  };
+  for (const key of plan.done ?? []) {
+    const line = await workLineFor(ref, id, key);
+    if (line?.status === "DONE") continue;
+    if (line?.status !== "IN_PROGRESS") await move(key, "START");
+    await move(key, "DONE");
+  }
+  for (const key of plan.started ?? []) if ((await workLineFor(ref, id, key))?.status === "NOT_STARTED") await move(key, "START");
+  for (const key of plan.waiting ?? []) if ((await workLineFor(ref, id, key))?.status === "NOT_STARTED") await move(key, "WAIT_PARTS");
+  if (plan.finding) {
+    await services.repair.raiseFinding(id, technician, {
+      requestId: demoUuid(`repair-finding:${fx.id}`),
+      kind: "FINDING",
+      description: plan.finding.text,
+      items: [
+        ...plan.finding.parts.map(([key, quantity]) => ({ kind: "PART" as const, referenceId: ref.parts[key], quantity })),
+        ...(plan.finding.labour ?? []).map((key) => ({ kind: "LABOUR" as const, referenceId: ref.labour[key], quantity: 1 })),
+      ],
+    });
+  }
+  if (plan.supplementary) {
+    const advisor = await estimateActor(ctx.staff[fx.branch].advisor.id);
+    const step = await services.estimates.prepareSupplementary(id, advisor);
+    if (plan.supplementary === "presented" && step.estimate && !step.estimate.presentedAt && !step.estimate.approval)
+      await services.estimates.presentToCustomer(id, advisor, step.estimate.id);
+  }
+}
+
+/**
+ * Before the quality check every work line must be done. Older scenarios recorded their labour as job
+ * lines rather than through the work list: those lines are linked to the work line they answer (demo data
+ * only); the rest are started and finished through the repair service, as on the phone.
+ */
+async function finishWorkList(ctx: DemoContext, fx: JobFixture, id: string) {
+  const technician = await repairActor(ctx.staff[fx.branch].technician.id);
+  const lines = await prisma.jobWorkLine.findMany({ where: { jobCardId: id, status: { not: "DONE" } } });
+  for (const line of lines) {
+    const recorded = line.labourItemId
+      ? await prisma.jobCardLabour.findFirst({ where: { jobCardId: id, labourItemId: line.labourItemId, workLine: null }, orderBy: { createdAt: "asc" } })
+      : null;
+    if (recorded) {
+      await prisma.jobWorkLine.update({
+        where: { id: line.id },
+        data: { status: "DONE", startedAt: recorded.createdAt, doneAt: recorded.createdAt, resumedAt: null, labourLineId: recorded.id, workedSeconds: Math.round(recorded.hours * 3600) },
+      });
+      continue;
+    }
+    if (line.status !== "IN_PROGRESS")
+      await services.repair.moveLine(id, line.id, technician, { action: "START", requestId: demoUuid(`work:${fx.id}:${line.id}:START`) });
+    await services.repair.moveLine(id, line.id, technician, { action: "DONE", requestId: demoUuid(`work:${fx.id}:${line.id}:DONE`) });
+  }
+}
+
 async function stopInWorkshop(ctx: DemoContext, fx: JobFixture, id: string) {
   if (fx.target !== "IN_PROGRESS" || !fx.stop) return;
   const technician = ctx.staff[fx.branch].technician.id;
   const status = canonicalJobStatus((await loadJob(id)).status);
   if (fx.stop === "WAITING_PARTS" && status === "IN_PROGRESS") await stageAction(fx, id, "PAUSE_FOR_PARTS", technician, "Oil filter on order from the main store");
-  if (["QUALITY_CHECK", "QC_PASSED"].includes(fx.stop) && status === "IN_PROGRESS")
+  if (["QUALITY_CHECK", "QC_PASSED"].includes(fx.stop) && status === "IN_PROGRESS") {
+    await finishWorkList(ctx, fx, id);
     await stageAction(fx, id, "SEND_TO_QC", technician, "Work complete, sent for quality check");
+  }
   if (fx.stop === "QC_PASSED") await passQualityCheck(ctx, fx, id);
 }
 

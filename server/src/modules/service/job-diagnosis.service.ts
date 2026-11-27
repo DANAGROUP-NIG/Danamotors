@@ -69,7 +69,7 @@ export async function loadDiagnosisFacts(db: Database, id: string) {
     where: { id },
     select: {
       complaints: { select: { id: true } },
-      findings: { select: { complaintId: true, causeAndDefect: true, possibleWarranty: true } },
+      findings: { where: { raisedDuringRepair: false }, select: { complaintId: true, causeAndDefect: true, possibleWarranty: true } },
       diagnosis: { select: { submittedAt: true, returnedAt: true } },
     },
   });
@@ -158,6 +158,39 @@ async function lockForEdit(tx: Tx, id: string, actor: StageActor) {
 
 const fieldError = (field: string, message: string) => new BadRequestError(message).withCode("FIELD_VALIDATION", { field });
 
+/** Checks the chosen work and parts exist and are offered, and takes their names. Used by diagnosis and repair findings. */
+export async function resolveFindingItems(tx: Tx, items: { kind: "LABOUR" | "PART" | "OIL"; referenceId: string; quantity: number }[]) {
+  const labourIds = items.filter((item) => item.kind === "LABOUR").map((item) => item.referenceId);
+  const partIds = items.filter((item) => item.kind !== "LABOUR").map((item) => item.referenceId);
+  const [labour, parts] = await Promise.all([
+    labourIds.length ? tx.labourItem.findMany({ where: { id: { in: labourIds }, active: true }, select: { id: true, description: true } }) : [],
+    partIds.length
+      ? tx.sparePart.findMany({
+          where: { id: { in: partIds }, partStatus: "ACTIVE" },
+          select: { id: true, name: true, taxCategory: true, reportTaxCategoryCode: true },
+        })
+      : [],
+  ]);
+  const labourById = new Map(labour.map((row) => [row.id, row]));
+  const partById = new Map(parts.map((row) => [row.id, row]));
+  return items.map((item, index) => {
+    if (item.kind === "LABOUR") {
+      const row = labourById.get(item.referenceId);
+      if (!row) throw fieldError(`items.${index}.referenceId`, "This work is no longer offered. Remove it and choose another.");
+      return { kind: "LABOUR" as const, referenceId: row.id, description: row.description, quantity: new Prisma.Decimal(1), sortOrder: index };
+    }
+    const row = partById.get(item.referenceId);
+    if (!row) throw fieldError(`items.${index}.referenceId`, "This part is blocked or no longer exists. Remove it and choose another.");
+    return {
+      kind: categoryOf(row) === "OIL" ? ("OIL" as const) : ("PART" as const),
+      referenceId: row.id,
+      description: row.name,
+      quantity: new Prisma.Decimal(itemQuantity(item.kind, item.quantity)),
+      sortOrder: index,
+    };
+  });
+}
+
 export class JobDiagnosisService {
   /** Everything the three diagnosis screens show, and what this person may do on them. */
   async get(id: string, actor: StageActor, options: { canUpdate: boolean }) {
@@ -190,7 +223,7 @@ export class JobDiagnosisService {
             confirmedBy: person,
           },
         },
-        findings: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: findingSelect },
+        findings: { where: { raisedDuringRepair: false }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: findingSelect },
         warrantyCase: { select: { id: true } },
         _count: { select: { campaigns: true } },
       },
@@ -264,40 +297,12 @@ export class JobDiagnosisService {
             const other = await tx.jobFinding.findFirst({ where: { jobCardId: id, complaintId: body.complaintId }, select: { id: true } });
             if (other)
               throw new ConflictError("This request already has a finding from another screen. Load the latest to continue.").withCode("FINDING_VERSION");
-          } else if ((await tx.jobFinding.count({ where: { jobCardId: id, complaintId: null } })) >= MAX_EXTRA_FINDINGS) {
+          } else if ((await tx.jobFinding.count({ where: { jobCardId: id, complaintId: null, raisedDuringRepair: false } })) >= MAX_EXTRA_FINDINGS) {
             throw fieldError("complaintId", `A job can have up to ${MAX_EXTRA_FINDINGS} findings the customer did not mention`);
           }
         }
 
-        const labourIds = body.items.filter((item) => item.kind === "LABOUR").map((item) => item.referenceId);
-        const partIds = body.items.filter((item) => item.kind !== "LABOUR").map((item) => item.referenceId);
-        const [labour, parts] = await Promise.all([
-          labourIds.length ? tx.labourItem.findMany({ where: { id: { in: labourIds }, active: true }, select: { id: true, description: true } }) : [],
-          partIds.length
-            ? tx.sparePart.findMany({
-                where: { id: { in: partIds }, partStatus: "ACTIVE" },
-                select: { id: true, name: true, taxCategory: true, reportTaxCategoryCode: true },
-              })
-            : [],
-        ]);
-        const labourById = new Map(labour.map((row) => [row.id, row]));
-        const partById = new Map(parts.map((row) => [row.id, row]));
-        const items = body.items.map((item, index) => {
-          if (item.kind === "LABOUR") {
-            const row = labourById.get(item.referenceId);
-            if (!row) throw fieldError(`items.${index}.referenceId`, "This work is no longer offered. Remove it and choose another.");
-            return { kind: "LABOUR" as const, referenceId: row.id, description: row.description, quantity: new Prisma.Decimal(1), sortOrder: index };
-          }
-          const row = partById.get(item.referenceId);
-          if (!row) throw fieldError(`items.${index}.referenceId`, "This part is blocked or no longer exists. Remove it and choose another.");
-          return {
-            kind: categoryOf(row) === "OIL" ? ("OIL" as const) : ("PART" as const),
-            referenceId: row.id,
-            description: row.name,
-            quantity: new Prisma.Decimal(itemQuantity(item.kind, item.quantity)),
-            sortOrder: index,
-          };
-        });
+        const items = await resolveFindingItems(tx, body.items);
 
         const data = { causeAndDefect: body.causeAndDefect.trim(), possibleWarranty: body.possibleWarranty, updatedById: actor.id };
         if (existing) {

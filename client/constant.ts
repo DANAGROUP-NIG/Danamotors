@@ -17,6 +17,7 @@ import {
 //icons
 import {
   LayoutDashboard,
+  Wrench,
   Users,
   Bell,
   Car,
@@ -140,6 +141,13 @@ export const NAV_GROUPS: NavGroup[] = [
       "report:credit-note-register",
     ],
     items: [
+      {
+        // The technician's home on a phone: assigned jobs by Today, Waiting parts and Done.
+        label: "My jobs",
+        href: "/my-jobs",
+        icon: Wrench,
+        roles: ["technician"],
+      },
       {
         label: "Job Cards",
         href: "/job-cards",
@@ -608,6 +616,12 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 
 export const BOTTOM_NAV: NavItem[] = [
+  {
+    label: "My jobs",
+    href: "/my-jobs",
+    icon: Wrench,
+    roles: ["technician"],
+  },
   {
     label: "Home",
     href: "/dashboard",

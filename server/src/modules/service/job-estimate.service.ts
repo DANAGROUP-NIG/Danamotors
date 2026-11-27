@@ -30,6 +30,9 @@ import { canWorkStage, type EstimateStageFacts, type StageActor } from "./job-st
 import { serviceChargeReference } from "./job-service-charge";
 import { branchStoreManagers, notifyStoreOfParts } from "./jobcard-parts-request.service";
 import { ServiceService } from "./service.service";
+import { createWorkLines } from "./job-repair.service";
+import { enqueueWorkshopNotification } from "../notification/workshop-notification-outbox";
+import { drainJobcardNotifications } from "../notification/jobcard-notification-router";
 
 export interface EstimateActor extends StageActor {
   permissions: string[];
@@ -165,9 +168,24 @@ async function branchCashiers(db: Prisma.TransactionClient | typeof prisma, bran
   return staff.length ? staff : users;
 }
 
-function access(job: EstimateJob, actor: EstimateActor) {
+/** Repair (phase 6): the latest revision is a supplementary estimate the customer has not answered yet. */
+async function supplementaryOpen(db: Prisma.TransactionClient | typeof prisma, jobId: string) {
+  const latest = await db.estimate.findFirst({
+    where: { jobCardId: jobId },
+    orderBy: [{ version: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+    select: { supplementary: true, approvals: { select: { id: true } } },
+  });
+  return !!latest?.supplementary && !latest.approvals.length;
+}
+
+/**
+ * What this person may do. At the estimate step, the advisor works the estimate; during repair only an
+ * open supplementary revision can be edited, presented and approved (the rest of the step is finished).
+ */
+function access(job: EstimateJob, actor: EstimateActor, openSupplementary = false) {
   const atEstimate = job.stage === "ESTIMATE" && job.jobType !== JobCardType.PDI;
-  const canEdit = atEstimate && has(actor, PERMISSIONS.JOBCARD_UPDATE) && has(actor, PERMISSIONS.ESTIMATE_CREATE) && canWorkStage("ESTIMATE", actor, job.technicianId);
+  const supplementary = job.stage === "REPAIR" && job.jobType !== JobCardType.PDI && openSupplementary;
+  const canEdit = (atEstimate || supplementary) && has(actor, PERMISSIONS.JOBCARD_UPDATE) && has(actor, PERMISSIONS.ESTIMATE_CREATE) && canWorkStage("ESTIMATE", actor, job.technicianId);
   return {
     canEdit,
     canSign: canEdit && has(actor, PERMISSIONS.ESTIMATE_SIGN),
@@ -183,6 +201,13 @@ function assertAccess(allowed: boolean, message: string) {
   if (!allowed) throw new ForbiddenError(message);
 }
 const EDIT_DENIED = "Only the service advisor can change the estimate while the job is at the estimate step.";
+
+/** A supplementary revision: the customer answers the new lines; earlier lines keep their recorded answer. */
+function withCarriedDecisions(estimate: LoadedEstimate, decisions: { lineId: string; decision: LineDecision }[]) {
+  const carried = estimate.lines.filter((line) => line.carriedOver && line.payer === "CUSTOMER" && line.customerDecision);
+  const ids = new Set(carried.map((line) => line.id));
+  return [...decisions.filter((decision) => !ids.has(decision.lineId)), ...carried.map((line) => ({ lineId: line.id, decision: line.customerDecision! }))];
+}
 
 function lineKind(line: LoadedEstimate["lines"][number]) {
   if (line.findingItem?.kind === "OIL") return "OIL" as const;
@@ -207,10 +232,10 @@ export class JobEstimateService {
   /** The estimate step for one job: the draft or decided revision, totals, approval, charge, advance and parts request. */
   async view(jobId: string, actor: EstimateActor) {
     const job = await loadJob(prisma, jobId);
-    const rights = access(job, actor);
+    const rights = access(job, actor, await supplementaryOpen(prisma, jobId));
     const [estimate, findings, settings, cashiers, receipts, requirement, storeManagers] = await Promise.all([
       latestEstimate(prisma, jobId),
-      prisma.jobFindingItem.count({ where: { finding: { jobCardId: jobId } } }),
+      prisma.jobFindingItem.count({ where: { finding: { jobCardId: jobId, raisedDuringRepair: false } } }),
       getBranchSettings(job.branchId),
       branchCashiers(prisma, job.branchId),
       prisma.receipt.findMany({
@@ -260,6 +285,7 @@ export class JobEstimateService {
         id: estimate.id,
         number: estimate.estimateNumber,
         version: estimate.version,
+        supplementary: estimate.supplementary,
         status: estimate.status.toUpperCase(),
         outcome,
         createdAt: estimate.createdAt,
@@ -282,6 +308,7 @@ export class JobEstimateService {
           customerDecision: line.customerDecision,
           findingItemId: line.findingItemId,
           complaintId: line.complaintId,
+          carriedOver: line.carriedOver,
         })),
         totals: totals ?? estimateTotals(estimate.lines, estimate.vatRate),
         approval: approval && {
@@ -365,7 +392,7 @@ export class JobEstimateService {
     assertAccess(access(job, actor).canEdit, EDIT_DENIED);
     if (await latestEstimate(prisma, jobId)) return this.view(jobId, actor);
     const items = await prisma.jobFindingItem.findMany({
-      where: { finding: { jobCardId: jobId } },
+      where: { finding: { jobCardId: jobId, raisedDuringRepair: false } },
       orderBy: [{ finding: { createdAt: "asc" } }, { sortOrder: "asc" }],
       select: { id: true, kind: true, referenceId: true, description: true, quantity: true, payer: true, finding: { select: { complaintId: true } } },
     });
@@ -396,13 +423,20 @@ export class JobEstimateService {
   async saveDraft(jobId: string, actor: EstimateActor, input: z.infer<typeof saveDraftBody>) {
     const body = saveDraftBody.parse(input);
     const job = await loadJob(prisma, jobId);
-    assertAccess(access(job, actor).canEdit, EDIT_DENIED);
+    const open = await supplementaryOpen(prisma, jobId);
+    assertAccess(access(job, actor, open).canEdit, EDIT_DENIED);
+    // A supplementary draft keeps the earlier lines as they are; the advisor edits only the new ones.
+    const latest = open ? await latestEstimate(prisma, jobId) : null;
     await this.service.addEstimate(
       jobId,
-      { description: `Estimate for job ${job.jobNumber}`, upfrontPaymentPercent: body.upfrontPaymentPercent, lines: body.lines },
+      {
+        description: latest ? latest.description : `Estimate for job ${job.jobNumber}`,
+        upfrontPaymentPercent: body.upfrontPaymentPercent,
+        lines: latest ? body.lines.filter((line) => !latest.lines.some((old) => old.carriedOver && old.type.replace("INCLUDED_", "") === line.type && old.referenceId === line.referenceId)) : body.lines,
+      },
       actor.id,
       undefined,
-      { draft: { estimateId: body.estimateId, updatedAt: new Date(body.updatedAt) } },
+      { draft: { estimateId: body.estimateId, updatedAt: new Date(body.updatedAt) }, ...(latest ? { supplementary: { carried: latest.lines.filter((line) => line.carriedOver) } } : {}) },
     );
     return this.view(jobId, actor);
   }
@@ -412,7 +446,7 @@ export class JobEstimateService {
     await prisma.$transaction(async (tx) => {
       await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobId} FOR UPDATE`);
       const job = await loadJob(tx, jobId);
-      assertAccess(access(job, actor).canEdit, EDIT_DENIED);
+      assertAccess(access(job, actor, await supplementaryOpen(tx, jobId)).canEdit, EDIT_DENIED);
       const estimate = await latestEstimate(tx, jobId);
       if (!estimate || estimate.id !== estimateId) throw new ConflictError("This estimate has a newer revision. Reload the estimate.");
       if (estimate.approvals.length) throw new ConflictError("The customer has already answered this estimate.");
@@ -429,7 +463,7 @@ export class JobEstimateService {
   async approve(jobId: string, actor: EstimateActor, input: z.infer<typeof approveBody>, deviceOrIp: string) {
     const body = approveBody.parse(input);
     const job = await loadJob(prisma, jobId);
-    assertAccess(access(job, actor).canSign, "Only the service advisor can take the customer's approval and signature.");
+    assertAccess(access(job, actor, await supplementaryOpen(prisma, jobId)).canSign, "Only the service advisor can take the customer's approval and signature.");
     const estimate = await latestEstimate(prisma, jobId);
     if (!estimate || estimate.id !== body.estimateId) throw new ConflictError("This estimate has a newer revision. Reload the estimate.");
     const replay = await prisma.customerApproval.findUnique({ where: { requestId: body.requestId }, select: { id: true } });
@@ -438,7 +472,7 @@ export class JobEstimateService {
       estimate.id,
       {
         customerId: job.customerId!,
-        decisions: body.decisions,
+        decisions: estimate.supplementary ? withCarriedDecisions(estimate, body.decisions) : body.decisions,
         expectedHash: body.expectedHash,
         consentAccepted: body.consentAccepted,
         signerName: body.signerName,
@@ -451,6 +485,7 @@ export class JobEstimateService {
       { deviceOrIp },
     );
     await this.requestApprovedParts(jobId, estimate.id, actor.id);
+    if (estimate.supplementary) await this.afterSupplementaryDecision(jobId, estimate.id, actor.id);
     return this.view(jobId, actor);
   }
 
@@ -458,7 +493,7 @@ export class JobEstimateService {
   async phoneApproval(jobId: string, actor: EstimateActor, input: z.infer<typeof phoneApprovalBody>) {
     const body = phoneApprovalBody.parse(input);
     const job = await loadJob(prisma, jobId);
-    assertAccess(access(job, actor).canSign, "Only the service advisor can record a phone approval.");
+    assertAccess(access(job, actor, await supplementaryOpen(prisma, jobId)).canSign, "Only the service advisor can record a phone approval.");
     const estimate = await latestEstimate(prisma, jobId);
     if (!estimate || estimate.id !== body.estimateId) throw new ConflictError("This estimate has a newer revision. Reload the estimate.");
     const approvedAt = new Date(body.approvedAt);
@@ -467,14 +502,17 @@ export class JobEstimateService {
     if (approvedAt.getTime() < estimate.createdAt.getTime() - 60 * 1000)
       throw new BadRequestError("The call must be after the estimate was prepared").withCode("FIELD_VALIDATION", { field: "approvedAt" });
     const approved = new Set(body.approvedLineIds);
-    const foreign = body.approvedLineIds.find((id) => !estimate.lines.some((line) => line.id === id && line.payer === "CUSTOMER"));
+    const foreign = body.approvedLineIds.find((id) => !estimate.lines.some((line) => line.id === id && line.payer === "CUSTOMER" && !line.carriedOver));
     if (foreign) throw new BadRequestError("An approved item is no longer on this estimate. Reload the estimate and try again.").withCode("FIELD_VALIDATION", { field: "approvedLineIds" });
     await this.service.addApproval(
       estimate.id,
       {
         customerId: job.customerId!,
         channel: "PHONE",
-        decisions: estimate.lines.filter((line) => line.payer === "CUSTOMER").map((line) => ({ lineId: line.id, decision: approved.has(line.id) ? "APPROVED" : "DECLINED" })),
+        // Earlier lines of a supplementary revision keep the decision the customer already gave.
+        decisions: estimate.lines
+          .filter((line) => line.payer === "CUSTOMER")
+          .map((line) => ({ lineId: line.id, decision: line.carriedOver && line.customerDecision ? line.customerDecision : approved.has(line.id) ? "APPROVED" : "DECLINED" })),
         expectedHash: body.expectedHash,
         phone: { approverName: body.approverName, approverPhone: normalisePhone(body.approverPhone), approvedAt },
         comments: body.note || undefined,
@@ -483,7 +521,65 @@ export class JobEstimateService {
       actor.id,
     );
     await this.requestApprovedParts(jobId, estimate.id, actor.id);
+    if (estimate.supplementary) await this.afterSupplementaryDecision(jobId, estimate.id, actor.id);
     return this.view(jobId, actor);
+  }
+
+  /**
+   * Repair (phase 6): "Prepare supplementary estimate". Revision N+1 through the existing revision logic:
+   * the decided revision's lines are copied unchanged with their decisions, and only the new findings'
+   * work and parts are priced. Repeating it returns the open supplementary revision.
+   */
+  async prepareSupplementary(jobId: string, actor: EstimateActor) {
+    const job = await loadJob(prisma, jobId);
+    if (job.stage !== "REPAIR" || !access({ ...job, stage: "ESTIMATE" }, actor).canEdit)
+      throw new ForbiddenError("Only the service advisor can prepare a supplementary estimate while the job is in repair.");
+    const latest = await latestEstimate(prisma, jobId);
+    if (!latest) throw new ConflictError("This job has no approved estimate. A supplementary estimate adds to an approved one.");
+    const waiting = await prisma.jobFinding.findMany({
+      where: { jobCardId: jobId, raisedDuringRepair: true, estimateId: null },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: { id: true, items: { orderBy: { sortOrder: "asc" }, select: { id: true, kind: true, referenceId: true, quantity: true } } },
+    });
+    let estimateId = latest.id;
+    if (!latest.supplementary || latest.approvals.length) {
+      if (!latest.approvals.length) throw new ConflictError("The customer has not answered the current estimate yet.");
+      if (!waiting.length) throw new ConflictError("There is no new finding waiting for a supplementary estimate.");
+      type Draft = { type: "PART" | "LABOUR"; referenceId: string; quantity: number; payer: "CUSTOMER"; findingItemId: string; complaintId: null };
+      const lines: Draft[] = [];
+      // TODO(confirm): work and parts found during repair are customer pay; the warranty officer is not asked again.
+      for (const item of waiting.flatMap((finding) => finding.items)) {
+        const type = item.kind === "LABOUR" ? "LABOUR" : "PART";
+        const same = lines.find((line) => line.type === type && line.referenceId === item.referenceId);
+        if (same) same.quantity = Number(new Prisma.Decimal(same.quantity).plus(item.quantity));
+        else lines.push({ type, referenceId: item.referenceId, quantity: item.quantity.toNumber(), payer: "CUSTOMER", findingItemId: item.id, complaintId: null });
+      }
+      if (!lines.length) throw new ConflictError("The new findings list no work or parts to price. Ask the technician to add them.");
+      const created = await this.service.addEstimate(
+        jobId,
+        { description: `Supplementary estimate for job ${job.jobNumber}`, upfrontPaymentPercent: Number(latest.upfrontPaymentPercent), lines },
+        actor.id,
+        latest.id,
+        { supplementary: { carried: latest.lines } },
+      );
+      estimateId = created.id;
+    }
+    // The findings this revision answers (also links any raised after it was prepared).
+    if (waiting.length) await prisma.jobFinding.updateMany({ where: { id: { in: waiting.map((finding) => finding.id) }, estimateId: null }, data: { estimateId } });
+    return this.view(jobId, actor);
+  }
+
+  /** After the customer answers a supplementary revision: work lines for the approved new work, and the technician is told. */
+  private async afterSupplementaryDecision(jobId: string, estimateId: string, actorId: string) {
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobId} FOR UPDATE`);
+      const created = await createWorkLines(tx, jobId, { supplementary: true });
+      const approvedNew = await tx.estimateLine.count({ where: { estimateId, carriedOver: false, OR: [{ customerDecision: null }, { customerDecision: "APPROVED" }] } });
+      const card = await tx.jobCard.findUniqueOrThrow({ where: { id: jobId } });
+      if (approvedNew > 0) await enqueueWorkshopNotification(tx, "SUPPLEMENTARY_APPROVED", card, estimateId, actorId);
+      await tx.auditLog.create({ data: { userId: actorId, action: "SUPPLEMENTARY_ESTIMATE_DECIDED", details: JSON.stringify({ jobCardId: jobId, estimateId, workLinesCreated: created, newLinesApproved: approvedNew }) } });
+    }, TX);
+    await drainJobcardNotifications(jobId);
   }
 
   /**
@@ -530,7 +626,8 @@ export class JobEstimateService {
 
   async retryPartsRequest(jobId: string, actor: EstimateActor) {
     const job = await loadJob(prisma, jobId);
-    assertAccess(access(job, actor).canEdit, EDIT_DENIED);
+    // The parts request of an approved supplementary revision can be retried during repair too.
+    assertAccess(access({ ...job, stage: job.stage === "REPAIR" ? "ESTIMATE" : job.stage }, actor).canEdit, EDIT_DENIED);
     const estimate = await latestEstimate(prisma, jobId);
     if (!estimate?.approvals.length) throw new BadRequestError("The customer has not approved the estimate yet.");
     await this.requestApprovedParts(jobId, estimate.id, actor.id);

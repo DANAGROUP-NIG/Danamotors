@@ -285,6 +285,8 @@ export interface StageFacts {
   unansweredCampaigns: number;
   /** Estimate step only (phase 5): where the latest revision is. Absent elsewhere. */
   estimate?: EstimateStageFacts | null;
+  /** Repair only (phase 6): what stops the quality check (work left, new findings without the customer's answer). */
+  repairProblems?: string[];
 }
 
 export interface EstimateStageFacts {
@@ -452,7 +454,11 @@ export const ACTION_RULES: Record<StageAction, ActionRule> = {
     toStatus: "QC",
     roles: WORKSHOP,
     kind: "handoff",
-    gates: (facts) => [...TECHNICIAN_GATE(facts), ...problems(facts.openingSignatureProblem, facts.approvalProblem)],
+    gates: (facts) => [
+      ...TECHNICIAN_GATE(facts),
+      ...(facts.repairProblems ?? []),
+      ...problems(facts.openingSignatureProblem, facts.approvalProblem),
+    ],
   },
   RETURN_TO_REPAIR: {
     from: ["QUALITY_CHECK"],
