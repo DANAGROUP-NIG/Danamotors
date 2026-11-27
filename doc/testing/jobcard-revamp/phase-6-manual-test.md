@@ -237,8 +237,8 @@ Pass if: nobody but the assigned technician (or the workshop supervisor) can cha
    Expected: a red message under that row, for example "The work was not updated. Check your connection and try again.", and a **Try again** button. The row keeps its status.
 3. Turn the network back to **No throttling** and tap **Try again**.
    Expected: the row changes and a toast confirms it.
-4. Turn the network to **Offline**, open **My jobs** and reload the page.
-   Expected: "Your jobs could not be loaded. Check your connection and try again." with **Try again**. Turn the network back and press **Try again**: the cards appear.
+4. Open **My jobs**, turn the network to **Offline**, then tap the **Waiting parts** tab.
+   Expected: within a few seconds, "Your jobs could not be loaded. Check your connection and try again." with **Try again**. Turn the network back to **No throttling** and press **Try again**: the message goes and the tab's cards (or its empty message) appear.
 5. Check the technician's repair page at **390**, **768** and **1024** wide, and the advisor's at **1024** and full desktop.
    Expected: nothing runs off the right edge and no sideways scrolling; tables scroll inside their card if needed; the bar's button is fully visible.
 6. On **My jobs**, press **Tab** until the **Today** tab has a visible outline, then press the **Right arrow** twice.
