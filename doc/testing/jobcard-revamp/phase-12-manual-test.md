@@ -276,10 +276,10 @@ Pass if: every size worked without sideways scrolling, the keyboard reached ever
 
 1. Sign in to the customer portal as the demo customer your administrator gives you (or skip this line if you have no portal account), open **Service history** and the new job.
    Expected: "Step" shows "Closed" for the delivered job (or "Step 5 of 8: Repair" for one in repair), not a percentage.
-2. As the administrator open **Late Deliveries** (both **Date** and **Time** screens).
-   Expected: the new job appears there only if it was delivered after its promised date and time. Dates read like "30 Nov 2026, 16:00", with no "—" or arrows.
-3. Open **PSF** (post-service follow-up).
-   Expected: the new job is listed for a follow-up call on the date shown at delivery.
+2. As the administrator, in the left menu open **Late Deliveries**, then **Promise Date Entry**, and then **Promise Time Entry**.
+   Expected: the new job appears there only if it was delivered after its promised date or time. Dates read like "30 Nov 2026, 16:00", with no long dashes or arrows.
+3. In the address bar, add `/psf` after the site address and press **Enter**. In **Job no.** type your new job number and click **Open**.
+   Expected: the follow-up call screen for the new job, due on the date shown at delivery.
 
 Pass if: the job appears in the reports as before and no screen shows a dash, arrow or odd symbol.
 
