@@ -30,7 +30,7 @@ You can now print the job card the way staff know it from the paper form: page 1
 
 | Plate | Job number | What it is | Used in section |
 |---|---|---|---|
-| LSR-548ST | S37_SERVER (2026000055) | Closed, delivered to Ọlá Ògúnlẹ̀yẹ̀ (a Yoruba name with accents). Nine long customer requests, so the form runs onto a second sheet. Two earlier visits on the same vehicle | A, B, C, E, H, I |
+| LSR-548ST | 2026000073 (2026000055) | Closed, delivered to Ọlá Ògúnlẹ̀yẹ̀ (a Yoruba name with accents). Nine long customer requests, so the form runs onto a second sheet. Two earlier visits on the same vehicle | A, B, C, E, H, I |
 | LSR-547ST | 2026000070 (2026000052) | Closed, delivered to Adaeze Okafor. Two requests, so the form fits one sheet | D |
 | LSR-544ST | 2026000067 (2026000049) | Waiting at Delivery, not delivered yet. If someone has delivered it since, use LSR-545ST 2026000068 (2026000050) instead | F, G |
 
@@ -55,7 +55,7 @@ A4. Look at the box at the top right of the sheet.
 Expected: **Warranty** with an empty box and **Non-warranty** with a ticked box (this vehicle is out of warranty).
 
 A5. Look at the four boxes across the top.
-Expected: **Job number** S37_SERVER, **Service advisor** Chidi Eze, **Km (odometer)** 50,240 km, **Date** the day the job was opened, written like "28 Nov 2026".
+Expected: **Job number** 2026000073, **Service advisor** Chidi Eze, **Km (odometer)** 50,240 km, **Date** the day the job was opened, written like "28 Nov 2026".
 
 A6. Look at **Customer details** and **Vehicle details**.
 Expected: Name Ọlá Ògúnlẹ̀yẹ̀ with every accent mark showing, the phone, the address "14 Sample Way, Lekki, Lagos"; Model "Kia Sorento 2020", Reg. no. LSR-548ST, VIN KNAPM81DMK7000538, Engine no. "Not provided", Sold by and Sold on (a date like "30 Aug 2020").
@@ -86,7 +86,7 @@ Expected: **Last visit:** a date, the job number, 40,060 km, "Periodic service (
 ## B. The back page: terms and conditions
 
 B1. Scroll down below the first sheet.
-Expected: a second white sheet with the company name, "Job S37_SERVER" at the top right, and a dark bar **Terms and conditions**.
+Expected: a second white sheet with the company name, "Job 2026000073" at the top right, and a dark bar **Terms and conditions**.
 
 B2. Count the clauses.
 Expected: 12 clauses, each with its number in a small dark square, the same text as in Settings. Clause 3 shows "₦2,000/-" and clause 4 "₦25,000/-" with the naira sign, not a box or odd letters.
@@ -131,7 +131,7 @@ E2. Click the tab **Documents and prints** and find the card **Other prints**.
 Expected: "Job card, front and back" with **Print job card**, and "Gate pass" with its number and **Print gate pass**.
 
 E3. Click **Print gate pass**.
-Expected: a page with a small slip: the company name, a dark bar **Gate pass**, then **Job number** S37_SERVER, **Gate pass number** (in bold), **Registration (plate)** LSR-548ST (in bold), **Model** Kia Sorento 2020, **Customer** Ọlá Ògúnlẹ̀yẹ̀, **Collected by** Ọlá Ògúnlẹ̀yẹ̀, **Delivered by** Chidi Eze, **Date and time** like "28 Nov 2026, 10:21". Under them **Security signature:** and **Time out:** with blank lines to sign.
+Expected: a page with a small slip: the company name, a dark bar **Gate pass**, then **Job number** 2026000073, **Gate pass number** (in bold), **Registration (plate)** LSR-548ST (in bold), **Model** Kia Sorento 2020, **Customer** Ọlá Ògúnlẹ̀yẹ̀, **Collected by** Ọlá Ògúnlẹ̀yẹ̀, **Delivered by** Chidi Eze, **Date and time** like "28 Nov 2026, 10:21". Under them **Security signature:** and **Time out:** with blank lines to sign.
 
 E4. Click **Print gate pass** at the top right.
 Expected: the print preview shows 1 small sheet (A6, 105 by 148 mm) with the slip only.

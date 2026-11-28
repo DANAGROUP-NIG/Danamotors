@@ -419,6 +419,7 @@ Built on Jayking (no phase branch, at the owner's request).
 - [x] Client: print routes, components, menu and Documents tab; `JobGatePassPrint` deleted with the `onPrintGatePass` prop chain and the `print:hidden` classes that only served it.
 - [x] Demo seed: JC-S37, JC-S37A, JC-S37B. Local e2e template `dana_demo_p11` (phase 10 template plus the new jobs and the server's 12 JOB_CARD clauses copied in).
 - [x] Docs: `doc/job-cards.md` ("Printed job card and gate pass (phase 11)"), manual test guide `doc/testing/jobcard-revamp/phase-11-manual-test.md`.
+- [x] Server database: no migration this phase (`migrate status`: up to date). Demo seed `--stage-only --allow-database=danagroup_danamotors_dev` run on 28 Nov 2026 (the first attempt stopped partway on the slow connection; the second resumed): JC-S37A 2026000071, JC-S37B 2026000072, JC-S37 2026000073 (LSR-548ST, Closed, gate pass 2026000011). The server already holds the 12 JOB_CARD clauses. Print data for 2026000073 read back from the server matches the guide.
 
 ### Tests (28 Nov 2026)
 
