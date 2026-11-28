@@ -453,7 +453,7 @@ Built on Jayking (no phase branch, at the owner's request). No design images.
 - [x] Settings: `prisma/seed/demo/settings.ts`; checklist in `doc/job-cards.md`. Verified on a copy with the rows removed (created) and on a copy with them saved (left alone).
 - [x] Demo seed: journey booking LSR-549ST; the bookings now also seed in `--stage-only`. Local template `dana_demo_p12`.
 - [x] Server database, 28 Nov 2026: demo seed `--stage-only --allow-database=danagroup_danamotors_dev` run: branch settings created for Main Branch and Dana Motors Demo with the job card defaults, the 12 terms left as they were, booking 2026000019 (LSR-549ST, Adaeze Okafor) created. Read back afterwards.
-- [ ] Server database: migration `20261128120000_jobcard_final_cleanup` **not applied yet**. It drops three JobCard columns on a database other teams' branches also use; held for the owner's decision, as the phase 3 and phase 5 drops were.
+- [ ] Server database: migration `20261128120000_jobcard_final_cleanup` **not applied yet**. It drops three JobCard columns on a database other teams' branches also use; held by the owner's decision on 28 Nov 2026: apply it once Jayking is merged into the branches that deploy to this database.
 - [x] Docs: `doc/job-cards.md` ("Final state and settings checklist (phase 12)"), `doc/demo-data.md`, manual test guide `doc/testing/jobcard-revamp/phase-12-manual-test.md`, staff quick guides `doc/staff-guides/`.
 - [ ] Owner's sign-off after the full journey on the test site (section 7 of the phase 12 guide).
 
