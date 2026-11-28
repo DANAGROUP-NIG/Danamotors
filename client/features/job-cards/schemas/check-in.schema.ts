@@ -42,4 +42,3 @@ export const checkInDetailsSchema = z
       ctx.addIssue({ code: "custom", path: ["promisedTime"], message: "Promised delivery must be in the future" });
   });
 
-export type CheckInDetailsValues = z.infer<typeof checkInDetailsSchema>;

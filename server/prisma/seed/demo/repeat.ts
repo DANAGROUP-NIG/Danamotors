@@ -198,7 +198,7 @@ export async function seedRepeat(ctx: DemoContext, ref: Reference): Promise<Repe
   await prisma.branchSettings.upsert({ where: { branchId: ctx.branches.second.id }, update: { repeatWindowDays: 45, repeatWindowKm: 4_000 }, create: { branchId: ctx.branches.second.id, repeatWindowDays: 45, repeatWindowKm: 4_000 } });
 
   const reasons = new Map((await prisma.workshopMaster.findMany({ where: { kind: "REPEAT_REASON" }, select: { id: true, code: true } })).map((row) => [row.code, row.id]));
-  if (!reasons.has("0")) throw new Error("REPEAT_REASON codes 0–6 are missing: run the migrations (20261120100000_repeat_jobs) or the base seed.");
+  if (!reasons.has("0")) throw new Error("REPEAT_REASON codes 0 to 6 are missing: run the migrations (20261120100000_repeat_jobs) or the base seed.");
 
   const customerId = await ensureCustomer(ctx);
   const engineerId = await engineerAtMain(ctx);

@@ -1,4 +1,5 @@
 "use client";
+import { formatQuantity } from "@/lib/format";
 import { useId, useRef, useState, useSyncExternalStore } from "react";
 import { Camera, CircleCheck, Loader2, Mic, MicOff, Minus, Package, Plus, RefreshCw, TriangleAlert, Wrench, X } from "lucide-react";
 import { toast } from "sonner";
@@ -15,7 +16,6 @@ import {
   MAX_PHOTOS_PER_FINDING,
   addItem,
   appendDictation,
-  formatQuantity,
   parseQuantity,
   speechRecognitionAvailable,
   stepQuantity,

@@ -85,7 +85,6 @@ function render(
       }),
     },
     "features/service-transactions/hooks/use-service-transactions": {
-      useServiceAction: () => ({ mutate: () => {}, isPending: false }),
       useServiceData: (url, enabled = true) => {
         queries.push({ url, enabled });
         return {
@@ -201,111 +200,6 @@ function render(
     queries,
   };
 }
-test("requisition stock preview uses the job branch and guards cached data by permission", () => {
-  const props = { partId: "part", branchId: "branch" };
-  const { html } = render("RequisitionStockPreview", {
-    props,
-    permissions: ["sparepart:read", "stock:read"],
-  });
-  for (const text of [
-    "On hand: 10",
-    "Available: 8",
-    "Rack A",
-    "BIN-A",
-    "Normal rate",
-    "Warranty rate",
-  ])
-    assert.ok(html.includes(text));
-  assert.equal(html.includes("Foreign rack"), false);
-  const denied = render("RequisitionStockPreview", { props });
-  for (const text of ["Rack A", "BIN-A", "Normal rate", "Warranty rate"])
-    assert.equal(denied.html.includes(text), false);
-  assert.ok(denied.queries.every((query) => !query.enabled));
-  const failed = render("RequisitionStockPreview", {
-    props,
-    permissions: ["stock:read"],
-    error: true,
-  });
-  assert.ok(failed.html.includes("Could not load stock"));
-  assert.ok(failed.html.includes("Retry stock"));
-});
-
-test("workspace hides all transaction actions without permissions", () =>
-  assert.equal(render("ServiceTransactions").html, ""));
-test("requisition screen has required/issued quantities and hides unauthorized goodwill", () => {
-  const { html } = render("RequisitionPanel", {
-    permissions: ["requisition:create", "requisition:read"],
-  });
-  for (const text of [
-    "Quantity required",
-    "Quantity issued",
-    "Save and issue parts",
-    "No saved documents",
-  ])
-    assert.ok(html.includes(text));
-  assert.equal(html.includes('value="GOODWILL"'), false);
-  assert.ok(
-    render("RequisitionPanel", {
-      permissions: ["requisition:create", "requisition:goodwill"],
-    }).html.includes('value="GOODWILL"'),
-  );
-});
-test("closed-job requisition and labour forms are disabled", () => {
-  for (const name of ["RequisitionPanel", "LabourPanel"]) {
-    const { html } = render(name, {
-      card: { ...job, status: "BILLED" },
-      permissions: ["requisition:create", "jobcard:labour:update"],
-    });
-    assert.ok(html.includes('<fieldset disabled=""'));
-    assert.ok(html.includes("read-only after billing"));
-  }
-});
-test("return screen does not permit an empty return and displays load failures", () => {
-  const { html } = render("ReturnPanel", {
-    permissions: ["requisition:create", "requisition:read"],
-  });
-  assert.match(html, /<button[^>]*disabled=""[^>]*>Save return slip/);
-  assert.ok(
-    render("ReturnPanel", {
-      permissions: ["requisition:read"],
-      error: true,
-    }).html.includes("Could not load documents"),
-  );
-});
-test("labour screen keeps a single technician or employee assignment and separates work done", () => {
-  const { html } = render("LabourPanel", {
-    permissions: ["jobcard:labour:update", "jobcard:update", "employee:read"],
-  });
-  for (const text of [
-    "Charged hours",
-    "Technician login",
-    "Employee mechanic",
-    "Work done",
-    "Mark vehicle ready",
-  ])
-    assert.ok(html.includes(text));
-  assert.match(html, /<button[^>]*disabled=""[^>]*>Mark vehicle ready/);
-  const ready = render("LabourPanel", {
-    permissions: ["jobcard:update"],
-    card: { ...job, status: "QC", inspections: [{ id: "q", result: "PASSED", notes: null, createdAt: "2026-11-27T16:00:00Z", supersededAt: null }] },
-  }).html;
-  const button = ready.match(/<button[^>]*>Mark vehicle ready/)[0];
-  assert.equal(button.includes('disabled=""'), false);
-});
-test("remarks remain editable on delivered jobs with the dedicated permission", () => {
-  const { html } = render("RemarksPanel", {
-    card: { ...job, status: "DELIVERED" },
-    permissions: ["jobcard:read", "jobcard:remarks:update"],
-  });
-  assert.ok(html.includes("Changes are audited"));
-  assert.ok(html.includes("Save remarks"));
-  assert.equal(html.match(/<textarea[^>]*>/)[0].includes("disabled"), false);
-  const readonly = render("RemarksPanel", {
-    permissions: ["jobcard:read"],
-  }).html;
-  assert.equal(readonly.includes("Save remarks"), false);
-  assert.ok(readonly.match(/<textarea[^>]*>/)[0].includes("disabled"));
-});
 test("print permission is checked before fetching an internal document", () => {
   const { html, queries } = render("ServiceDocumentPrint", {
     props: { kind: "job-picking", id: "job" },
@@ -358,11 +252,11 @@ test("picking output renders explicit internal fields and printable totals witho
   for (const text of [
     "PART-001",
     "Quantity required",
-    "Revision 2",
+    "revision 2",
     "Internal job remark",
     "Internal estimate remark",
-    "Africa/Lagos",
-    "24.70",
+    "Lagos time",
+    "₦24.70",
   ])
     assert.ok(html.includes(text));
   assert.equal(html.includes("SECRET-NOT-PRINTABLE"), false);
@@ -413,11 +307,11 @@ test("return print rows distinguish required, issued and returned quantities wit
     ],
   };
   const { html } = render("SlipRows", {
-    source: "SavedSlip",
+    source: "ServiceDocumentPrint",
     props: { document },
   });
   for (const quantity of [5, 3, 1])
-    assert.ok(html.includes(`class="p-2">${quantity}</td>`));
+    assert.ok(html.includes(`tabular-nums">${quantity}</td>`));
   for (const text of [
     "Saved filter",
     "Rack A",
@@ -426,61 +320,6 @@ test("return print rows distinguish required, issued and returned quantities wit
     "Warranty rate:",
   ])
     assert.ok(html.includes(text));
-});
-
-test("saved labour editors restore the campaign and goodwill reason", () => {
-  const base = {
-    id: "line",
-    labourItemId: "operation",
-    description: "Saved operation",
-    rate: 100,
-    amount: 200,
-    chargedHours: 2,
-    technicianId: "login",
-    mechanicId: "employee",
-  };
-  const props = {
-    slipId: "slip",
-    branchId: "branch",
-    campaigns: [{ campaignId: "campaign", campaignTitle: "Saved campaign" }],
-  };
-  const free = render("SavedLabourLine", {
-    permissions: ["employee:read"],
-    props: {
-      ...props,
-      line: {
-        ...base,
-        chargeLine: { chargeType: "FREE", campaignId: "campaign" },
-      },
-    },
-  }).html;
-  assert.match(free, /value="campaign" selected=""/);
-  const goodwill = render("SavedLabourLine", {
-    permissions: ["warranty:update"],
-    props: {
-      ...props,
-      line: {
-        ...base,
-        chargeLine: {
-          chargeType: "GOODWILL",
-          chargeTypeReason: "Saved approval",
-        },
-      },
-    },
-  }).html;
-  assert.ok(goodwill.includes('value="Saved approval"'));
-  const grid = render("SlipRows", {
-    source: "SavedSlip",
-    props: {
-      document: {
-        lines: [
-          { ...base, group: { code: "TEAM-A", description: "Saved team" } },
-        ],
-      },
-    },
-  }).html;
-  assert.ok(grid.includes("Group: TEAM-A"));
-  assert.ok(grid.includes("Saved team"));
 });
 
 test("legacy uppercase cancelled bookings hide editing and conversion actions", () => {
@@ -501,61 +340,6 @@ test("legacy uppercase cancelled bookings hide editing and conversion actions", 
   });
   assert.equal(html.includes("Save booking details"), false);
   assert.equal(html.includes("Convert to job card"), false);
-});
-
-test("remarks show document context and separate internal text from customer explanations", () => {
-  const context = {
-    documentNumber: "EST-001",
-    documentDate: "2026-11-16T09:00:00Z",
-    status: "Approved",
-    jobNumber: "JOB-001",
-    jobDate: "2026-11-15T09:00:00Z",
-    customerName: "Synthetic customer",
-    mileage: 1234,
-    vehicle: {
-      vin: "SYNTHETICVIN",
-      registrationNumber: "REG-001",
-      model: "Model A",
-      trim: "Variant A",
-    },
-    service: { code: "SERVICE-A", description: "Service A" },
-  };
-  const { html } = render("RemarksPanel", {
-    permissions: ["jobcard:read", "jobcard:remarks:update"],
-    data: {
-      document: {
-        id: "job",
-        remarks: "Internal only",
-        customerRemarks: "Customer explanation",
-        context,
-      },
-    },
-  });
-  for (const text of [
-    "EST-001",
-    "JOB-001",
-    "Synthetic customer",
-    "SYNTHETICVIN",
-    "Model A",
-    "Variant A",
-    "SERVICE-A",
-    "Internal remarks",
-    "Customer explanation (prints)",
-  ])
-    assert.ok(html.includes(text));
-  const print = render("CustomerExplanation", {
-    source: "../../../components/CustomerExplanation",
-    props: { text: "Public <explanation>", remarks: "Internal secret" },
-  }).html;
-  assert.ok(print.includes("Public &lt;explanation&gt;"));
-  assert.equal(print.includes("Internal secret"), false);
-  assert.equal(
-    render("CustomerExplanation", {
-      source: "../../../components/CustomerExplanation",
-      props: { text: null },
-    }).html,
-    "",
-  );
 });
 
 test("internal picking headers show the job date, service code and checklist context", () => {
@@ -607,7 +391,7 @@ test("internal picking headers show the job date, service code and checklist con
     permissions: ["jobcard:picking-list:print"],
     data: { pickingList: { ...pickingList, checklist: null } },
   }).html;
-  assert.ok(missing.includes("Checklist code: Not recorded"));
+  assert.ok(missing.includes("Checklist code: Not provided"));
 });
 
 test("booking keeps simple text entry and reuses the request grid for detailed rows", () => {
@@ -640,43 +424,6 @@ test("booking keeps simple text entry and reuses the request grid for detailed r
   assert.equal(detailed.includes("Add request details"), false);
 });
 
-test("alternate chooser keeps catalogue identity and loads options only on demand", () => {
-  const { html, queries } = render("RequisitionPartChooser", {
-    permissions: ["sparepart:read", "stock:read", "requisition:create"],
-    props: {
-      requestedId: "",
-      actualId: "",
-      branchId: "branch",
-      label: "Requested part",
-      chargeType: "CUSTOMER",
-      onRequested() {},
-      onSupply() {},
-    },
-  });
-  assert.ok(html.includes("Choose a requested part"));
-  assert.ok(
-    queries.some(
-      (query) =>
-        query.url.includes("/requisitions/part-options") &&
-        query.enabled === false,
-    ),
-  );
-  const denied = render("RequisitionPartChooser", {
-    props: {
-      requestedId: "private-id",
-      actualId: "private-id",
-      branchId: "branch",
-      label: "Requested part",
-      chargeType: "CUSTOMER",
-      onRequested() {},
-      onSupply() {},
-    },
-  });
-  assert.ok(denied.html.includes("unavailable with your permissions"));
-  assert.equal(denied.html.includes("private-id"), false);
-  assert.ok(denied.queries.every((query) => query.enabled === false));
-});
-
 test("saved internal requisition rows print the requested part and escaped substitution reason", () => {
   const document = {
     lines: [
@@ -696,7 +443,7 @@ test("saved internal requisition rows print the requested part and escaped subst
     ],
   };
   const { html } = render("SlipRows", {
-    source: "SavedSlip",
+    source: "ServiceDocumentPrint",
     props: { document },
   });
   assert.ok(html.includes("REQUEST-001"));

@@ -1,5 +1,4 @@
-import type { LabourDraft } from "./document.types";
-import type { DocumentLine } from "./hooks/use-service-transactions";
+import { NOT_PROVIDED } from "@/lib/format";
 
 const documentLabels: Record<string, string> = {
   CUSTOMER: "Customer",
@@ -18,58 +17,9 @@ const documentLabels: Record<string, string> = {
 export function serviceDocumentLabel(value?: string | null): string {
   return value
     ? (documentLabels[value.toUpperCase()] ?? "Unknown status")
-    : "Not recorded";
+    : NOT_PROVIDED;
 }
 
-export type RequisitionPartDraft = {
-  sparePartId: string;
-  requestedSparePartId?: string;
-  substitutionReason?: string;
-  quantityRequired: number;
-  quantityIssued: number;
-  approvalPercent: number;
-  customerPercent: number;
-};
-export function chooseRequisitionSupply(
-  row: RequisitionPartDraft,
-  id: string,
-): RequisitionPartDraft {
-  if (id === row.sparePartId) return row;
-  return {
-    ...row,
-    requestedSparePartId: row.requestedSparePartId || row.sparePartId,
-    sparePartId: id,
-    quantityIssued: 0,
-    substitutionReason: "",
-  };
-}
-export function requisitionLinePayload(
-  row: RequisitionPartDraft,
-  chargeType: string,
-) {
-  const changed =
-    !!row.requestedSparePartId && row.requestedSparePartId !== row.sparePartId;
-  return {
-    sparePartId: row.sparePartId,
-    requestedSparePartId: row.requestedSparePartId || undefined,
-    substitutionReason: changed
-      ? row.substitutionReason?.trim() || undefined
-      : undefined,
-    quantityRequired: row.quantityRequired,
-    quantityIssued: row.quantityIssued,
-    approvalPercent:
-      chargeType === "GOODWILL" ? row.approvalPercent : undefined,
-    customerPercent:
-      chargeType === "GOODWILL" ? row.customerPercent : undefined,
-  };
-}
-export function lagosDate(iso: string) {
-  return new Date(iso).toLocaleString("en-GB", {
-    timeZone: "Africa/Lagos",
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
 export function lagosInput(iso: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Africa/Lagos",
@@ -89,22 +39,6 @@ export function lagosIso(value: string) {
     /(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? value : `${value}+01:00`,
   ).toISOString();
 }
-export function canWriteTransactions(job: {
-  status: string;
-  billedAt?: string | null;
-  invoices?: { status: string }[];
-}) {
-  return (
-    !job.billedAt &&
-    !["BILLED", "DELIVERED", "CANCELLED", "CANCELED", "CLOSED"].includes(
-      job.status.toUpperCase(),
-    ) &&
-    !(job.invoices ?? []).some(
-      (bill) =>
-        !["CANCELLED", "CANCELED", "VOID"].includes(bill.status.toUpperCase()),
-    )
-  );
-}
 export function remainingReturn(line: {
   quantityIssued?: number;
   returns?: { quantity: number; status: string }[];
@@ -120,13 +54,6 @@ export function remainingReturn(line: {
         .reduce((total, row) => total + row.quantity, 0),
   );
 }
-export const moneyText = (
-  value: string | number | null | undefined,
-  currency = "NGN",
-) =>
-  new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(
-    Number(value ?? 0),
-  );
 export function canEditBooking(booking: {
   bookingStatus?: string;
   status: string;
@@ -140,30 +67,23 @@ export function canEditBooking(booking: {
     !booking.jobCards?.length
   );
 }
-export function labourBody(row: LabourDraft) {
-  return {
-    ...row,
-    technicianId: row.technicianId || undefined,
-    mechanicId: row.mechanicId || undefined,
-    groupId: row.groupId || undefined,
-    campaignId: row.chargeType === "FREE" ? row.campaignId : undefined,
-    reason: row.chargeType === "GOODWILL" ? row.reason?.trim() : undefined,
-  };
-}
 
-/** Restore the saved payer context and represent an employee's login as one assignee. */
-export function savedLabourDraft(line: DocumentLine): LabourDraft {
-  return {
-    labourItemId: line.labourItemId ?? "",
-    technicianId: line.mechanicId
-      ? undefined
-      : (line.technicianId ?? undefined),
-    mechanicId: line.mechanicId ?? undefined,
-    groupId: line.groupId ?? undefined,
-    chargedHours: line.chargedHours ?? line.hours,
-    chargeType: (line.chargeLine?.chargeType ??
-      "CUSTOMER") as LabourDraft["chargeType"],
-    campaignId: line.chargeLine?.campaignId ?? undefined,
-    reason: line.chargeLine?.chargeTypeReason ?? undefined,
-  };
+const SLIP_TOTAL_LABELS: Record<string, { label: string; money: boolean }> = {
+  numberOfItems: { label: "Number of items", money: false },
+  netQuantityIssued: { label: "Net quantity issued", money: false },
+  netQuantityReturned: { label: "Net quantity returned", money: false },
+  approvedAmount: { label: "Approved amount", money: true },
+  warrantyAmount: { label: "Warranty amount", money: true },
+  nonWarrantyAmount: { label: "Customer amount", money: true },
+  freeAmount: { label: "Free amount", money: true },
+  goodwillAmount: { label: "Goodwill amount", money: true },
+  totalAmount: { label: "Total amount", money: true },
+};
+
+/** A slip's footer totals as labelled rows, in a fixed order. Totals the screen has no label for are left out. */
+export function slipTotals(totals: Record<string, number> | undefined): { key: string; label: string; value: number; money: boolean }[] {
+  if (!totals) return [];
+  return Object.entries(SLIP_TOTAL_LABELS)
+    .filter(([key]) => typeof totals[key] === "number")
+    .map(([key, { label, money }]) => ({ key, label, value: totals[key], money }));
 }

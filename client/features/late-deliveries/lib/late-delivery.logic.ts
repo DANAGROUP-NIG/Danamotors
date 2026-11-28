@@ -1,3 +1,4 @@
+import { lagosDayKey } from "@/lib/format";
 import type { LateKind } from "../types/late-delivery.types";
 
 export const LATE_PERMISSIONS = {
@@ -69,25 +70,6 @@ export function isDirty(selected: string[], remarks: string, saved: { reasonIds:
   return selected.join() !== saved.reasonIds.join() || remarks.trim() !== (saved.remarks ?? "");
 }
 
-const LAGOS = "Africa/Lagos";
-
-export function formatDate(value?: string | null) {
-  return value ? new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: LAGOS }) : "—";
-}
-
-export function formatTime(value?: string | null) {
-  return value ? new Date(value).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: LAGOS }) : "—";
-}
-
-export function formatDateTime(value?: string | null) {
-  return value ? `${formatDate(value)}, ${formatTime(value)}` : "—";
-}
-
-/** Local YYYY-MM-DD of an instant (Lagos). */
-export function lagosDay(value: Date): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: LAGOS, year: "numeric", month: "2-digit", day: "2-digit" }).format(value);
-}
-
 /**
  * DATE (later Lagos day), TIME (same day, after the promise) or null, with days and minutes late.
  * Mirrors lateness() on the server.
@@ -97,7 +79,7 @@ export function lateKindOf(promisedAt: string, deliveredAt: string): { kind: Lat
   const delivered = new Date(deliveredAt);
   const delayMs = delivered.getTime() - promised.getTime();
   const minutesLate = delayMs > 0 ? Math.ceil(delayMs / 60_000) : 0;
-  const days = Math.round((Date.parse(`${lagosDay(delivered)}T00:00:00Z`) - Date.parse(`${lagosDay(promised)}T00:00:00Z`)) / 86_400_000);
+  const days = Math.round((Date.parse(`${lagosDayKey(delivered)}T00:00:00Z`) - Date.parse(`${lagosDayKey(promised)}T00:00:00Z`)) / 86_400_000);
   if (days > 0) return { kind: "DATE", daysLate: days, minutesLate };
   if (delayMs > 0) return { kind: "TIME", daysLate: 0, minutesLate };
   return { kind: null, daysLate: 0, minutesLate: 0 };

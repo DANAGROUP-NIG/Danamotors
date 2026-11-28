@@ -8,7 +8,7 @@ import type { JobCardInvoice } from "../../types/job-card.types";
 export function InvoicesTable({ invoices }: { invoices: JobCardInvoice[] }) {
   if (!invoices.length) return <p className="text-sm text-muted-foreground">No bill has been created for this job yet.</p>;
   return (
-    <div className="overflow-x-auto" role="region" aria-label="Bills" tabIndex={0}>
+    <div className="relative overflow-x-auto" role="region" aria-label="Bills" tabIndex={0}>
       <table className="w-full text-sm">
         <thead className="text-left text-muted-foreground">
           <tr>

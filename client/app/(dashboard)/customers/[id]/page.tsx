@@ -16,6 +16,9 @@ import { useJobCards } from "@/features/job-cards/hooks/use-job-cards";
 import { useInvoices } from "@/features/invoices/hooks/use-invoices";
 import { useBranchStore } from "@/store/branch.store";
 import { NOT_PROVIDED } from "@/lib/format";
+import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
+import { JOB_CARD_STATUS_LABELS, JOB_CARD_STATUS_TONES } from "@/features/job-cards/types/job-card-status";
+import { jobStepBadge } from "@/features/job-cards/lib/job-stage.logic";
 import {
   ArrowLeft,
   Loader2,
@@ -252,28 +255,37 @@ export default function CustomerDetailPage() {
                   <th className="py-2 pr-4">Job #</th>
                   <th className="py-2 pr-4">Description</th>
                   <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4">Progress</th>
+                  <th className="py-2 pr-4">Step</th>
                 </tr>
               </thead>
               <tbody>
                 {jobCards.map((j) => (
                   <tr key={j.id} className="border-b last:border-0">
                     <td className="py-2 pr-4 font-mono text-sm text-slate-700">
-                      {j.jobNumber}
+                      <Link href={`/job-cards/${j.id}`} className="text-primary hover:underline">
+                        {j.jobNumber}
+                      </Link>
                     </td>
-                    <td className="max-w-xs truncate py-2 pr-4 text-slate-700">
+                    <td className="max-w-xs truncate py-2 pr-4 text-slate-700" title={j.description}>
                       {j.description}
                     </td>
                     <td className="py-2 pr-4">
-                      <span
-                        className="inline-block rounded-full px-2 py-0.5 text-sm font-medium capitalize
-                        bg-slate-100 text-slate-700"
-                      >
-                        {j.status.replace(/_/g, " ")}
-                      </span>
+                      <StatusBadge
+                        status={JOB_CARD_STATUS_LABELS[j.status] ?? "Status not recorded"}
+                        tone={JOB_CARD_STATUS_TONES[j.status] ?? "gray"}
+                        className="normal-case"
+                      />
                     </td>
-                    <td className="py-2 pr-4 text-slate-700">
-                      {j.progress ?? 0}%
+                    <td className="py-2 pr-4">
+                      {j.stage ? (
+                        <StatusBadge
+                          status={jobStepBadge(j.stage, j.status).label}
+                          tone={jobStepBadge(j.stage, j.status).tone}
+                          className="normal-case"
+                        />
+                      ) : (
+                        <span className="text-muted-foreground">{NOT_PROVIDED}</span>
+                      )}
                     </td>
                   </tr>
                 ))}

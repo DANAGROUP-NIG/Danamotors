@@ -9,7 +9,6 @@ import { WorkshopService } from "./workshop.service";
 import { PERMISSIONS } from "../../shared/constants/roles";
 import {
   assignTechnicianSchema,
-  updateJobProgressSchema,
   receivePartsSchema,
 } from "./workshop.validation";
 const router = Router();
@@ -70,38 +69,6 @@ router.use(authMiddleware);
  *     responses:
  *       200:
  *         description: Technician assigned
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/StandardResponse'
- *
- * /workshop/progress/{id}:
- *   patch:
- *     tags:
- *       - Workshop
- *     summary: Update job progress
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string }
- *         description: Job card ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [status]
- *             properties:
- *               status: { type: string, enum: [IN_PROGRESS, COMPLETED, ON_HOLD] }
- *               progressNotes: { type: string }
- *               percentComplete: { type: integer, minimum: 0, maximum: 100 }
- *     responses:
- *       200:
- *         description: Progress updated
  *         content:
  *           application/json:
  *             schema:
@@ -169,12 +136,6 @@ router.post(
   requirePermission(PERMISSIONS.ASSIGNMENT_CREATE),
   validateRequest(assignTechnicianSchema),
   controller.assignTechnician,
-);
-router.patch(
-  "/progress/:id",
-  requirePermission(PERMISSIONS.JOBPROGRESS_UPDATE),
-  validateRequest(updateJobProgressSchema),
-  controller.updateProgress,
 );
 
 export default router;

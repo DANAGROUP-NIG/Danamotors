@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTime } from "@/lib/format";
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { isAxiosError } from "axios";
@@ -12,7 +13,6 @@ import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useBranchStore } from "@/store/branch.store";
-import { lagosDate } from "@/features/service-transactions/transaction.logic";
 import { canonicalJobStatus, JOB_CARD_STATUS_LABELS, JOB_CARD_STATUS_TONES, type JobCardStatus } from "../types/job-card-status";
 import { useMultiJobVehicles } from "../hooks/use-multi-job-vehicles";
 
@@ -107,7 +107,7 @@ function VehicleResults({ branchId }: { branchId?: string }) {
                       <li key={job.id} className="grid gap-2 py-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
                         <div className="min-w-0">
                           <Link href={`/job-cards/${job.id}`} className="break-words font-medium text-primary underline underline-offset-4">{job.number}</Link>
-                          <p className="text-muted-foreground">{lagosDate(job.date)}</p>
+                          <p className="text-muted-foreground">{formatDateTime(job.date)}</p>
                         </div>
                         <div className="min-w-0 break-words">
                           <p>{job.customer || "Customer not provided"}</p>

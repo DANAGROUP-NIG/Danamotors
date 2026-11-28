@@ -77,7 +77,7 @@ export interface CallDraft {
 
 /** Problem with the call form, or null. Mirrors the server rules. */
 export function callProblem(draft: CallDraft, lines: Pick<PsfLine, "key">[], now = new Date()): string | null {
-  if (!draft.status) return "Choose the outcome of the call (1–5).";
+  if (!draft.status) return "Choose the outcome of the call (1 to 5).";
   const remark = draft.remark.trim();
   if (remark.length > MAX_PSF_REMARK) return `The remark can be at most ${MAX_PSF_REMARK} characters.`;
   if (draft.status === "DISSATISFIED" && !remark) return "Say what the customer is dissatisfied with.";

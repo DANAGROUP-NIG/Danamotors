@@ -63,7 +63,36 @@ export async function expectNoHorizontalOverflow(page: Page, where: string) {
     const main = document.querySelector("main");
     return Math.max(page, main ? main.scrollWidth - main.clientWidth : 0);
   });
-  expect(overflow, `${where} scrolls sideways by ${overflow}px`).toBeLessThanOrEqual(1);
+  // Name the outermost elements that stick out past the window or the content area and are not
+  // clipped by a scrolling box inside it, with the boxes around the first one.
+  const culprits =
+    overflow > 1
+      ? await page.evaluate(() => {
+          const main = document.querySelector("main");
+          const limit = Math.min(window.innerWidth, main ? main.getBoundingClientRect().right : window.innerWidth);
+          const clipped = (element: Element) => {
+            for (let parent = element.parentElement; parent && parent !== main; parent = parent.parentElement) {
+              if (getComputedStyle(parent).overflowX !== "visible" && parent.getBoundingClientRect().right <= limit + 1) return true;
+            }
+            return false;
+          };
+          const label = (element: Element) => `${element.tagName.toLowerCase()}.${String(element.className).split(" ").slice(0, 8).join(".")}`;
+          const width = main ? main.clientWidth : window.innerWidth;
+          const wide = [...document.querySelectorAll("body *")].filter((element) => {
+            const box = element.getBoundingClientRect();
+            const inMain = !!main && main.contains(element);
+            // Absolutely placed elements (screen reader labels, for example) escape a scrolling box that is not positioned.
+            const escapes = ["absolute", "fixed"].includes(getComputedStyle(element).position);
+            return (box.right > limit + 1 || box.left < -1 || (inMain && box.width > width + 1)) && box.width > 0 && (escapes || !clipped(element));
+          });
+          const outer = wide.filter((element) => !wide.includes(element.parentElement as Element)).slice(0, 3);
+          const chain: string[] = [];
+          for (let parent = outer[0]?.parentElement; parent && parent !== main && chain.length < 6; parent = parent.parentElement)
+            chain.push(`${label(parent)}[${getComputedStyle(parent).overflowX}, right ${Math.round(parent.getBoundingClientRect().right)}]`);
+          return [...outer.map((element) => `${label(element)} "${(element.textContent ?? "").trim().slice(0, 40)}" ${Math.round(element.getBoundingClientRect().left)} to ${Math.round(element.getBoundingClientRect().right)}`), `inside: ${chain.join(" < ")}`, `main scrolled ${main?.scrollLeft ?? 0}px, page scrolled ${window.scrollX}px, page ${document.documentElement.scrollWidth}px wide`];
+        })
+      : [];
+  expect(overflow, `${where} scrolls sideways by ${overflow}px: ${culprits.join(" | ")}`).toBeLessThanOrEqual(1);
 }
 
 /** Saves a screenshot into the results folder, for the phase report. */

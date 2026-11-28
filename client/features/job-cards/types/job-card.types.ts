@@ -178,7 +178,6 @@ export type JobCard = {
     issuedAt: string;
   }[];
   allowedTransitions?: string[];
-  depositReceiptId?: string | null;
   labourLines?: { id: string; description: string; hours: number; rate?: number; amount?: number; labourSlipId?: string | null; labourItem: { code?: string; description: string }; technician?: { firstName: string; lastName: string } | null; mechanic?: { name: string } | null }[];
   tyres?: { make: string; number: string }[] | null;
   batteryMake?: string | null;
@@ -266,8 +265,6 @@ export type JobCard = {
   /** Who holds the step now (the job list's With column). */
   stageOwnerRole?: string | null;
   stageOwner?: { id: string; firstName: string; lastName: string } | null;
-  estimatedHours: number;
-  progress: number;
   branchId: string;
   engineerId?: string;
   technicianId?: string;

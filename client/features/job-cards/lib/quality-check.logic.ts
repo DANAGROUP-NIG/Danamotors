@@ -1,3 +1,4 @@
+import { formatKm } from "@/lib/format";
 import type { StatusTone } from "@/components/ui/table-components/StatusBadge";
 import type {
   InspectionResult,
@@ -118,9 +119,11 @@ export function failProblems(fail: FailForm, hasLines: boolean, form: Pick<QcFor
   if (!fail.notes.trim()) problems.notes = "Write what the technician must fix.";
   if (hasLines && !fail.failed.length) problems.lines = "Mark Fail on the work items that need rework.";
   const fields = qcFieldErrors(form);
-  const startOnly = (parseKm(form.startKm) === null) !== (parseKm(form.endKm) === null);
-  if (fields.startKm || fields.endKm || fields.acOutletTempC || startOnly)
-    problems.form = startOnly ? "Enter both road test readings or clear them, then try again." : "Correct the road test or AC temperature on the form, then try again.";
+  // Start km is filled in from check-in, so a fail without a road test leaves only End km empty: that is
+  // no road test, not a mistake. An end reading without a start reading still needs fixing.
+  const endOnly = parseKm(form.startKm) === null && parseKm(form.endKm) !== null;
+  if (fields.startKm || fields.endKm || fields.acOutletTempC || endOnly)
+    problems.form = endOnly ? "Enter both road test readings or clear them, then try again." : "Correct the road test or AC temperature on the form, then try again.";
   return problems;
 }
 
@@ -148,7 +151,8 @@ export function qcPayload(
     lines,
     general: step.generalChecks.map((check: QcGeneralCheck) => ({ code: check.code, passed: !!form.general[check.code] })),
     acOutletTempC: number(parseTemp(form.acOutletTempC)),
-    roadTestStartKm: number(parseKm(form.startKm)),
+    // No end reading means no road test was done: the start reading filled in from check-in is not sent.
+    roadTestStartKm: parseKm(form.endKm) === null ? null : number(parseKm(form.startKm)),
     roadTestEndKm: number(parseKm(form.endKm)),
     roadTestNotes: form.roadTestNotes.trim() || null,
     notes: outcome === "FAIL" ? fail?.notes.trim() || null : null,
@@ -159,6 +163,5 @@ export function qcPayload(
 /** The road test as one line, for example "48,262 km to 48,270 km (8 km)". */
 export function roadTestText(roadTest: { startKm: number | null; endKm: number | null } | null): string | null {
   if (!roadTest || roadTest.startKm === null || roadTest.endKm === null) return null;
-  const km = new Intl.NumberFormat("en-NG");
-  return `${km.format(roadTest.startKm)} km to ${km.format(roadTest.endKm)} km (${km.format(roadTest.endKm - roadTest.startKm)} km)`;
+  return `${formatKm(roadTest.startKm)} to ${formatKm(roadTest.endKm)} (${formatKm(roadTest.endKm - roadTest.startKm)})`;
 }

@@ -1,4 +1,5 @@
 "use client";
+import { formatDateTime, formatMoney } from "@/lib/format";
 import { useEffect, useId, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronDown, Loader2, Search, X } from "lucide-react";
@@ -60,7 +61,7 @@ export type PickerRecord = {
 
 export function recordLabel(row: PickerRecord) {
   if (row.scheduledAt)
-    return `${new Date(row.scheduledAt).toLocaleString()} | ${row.vehicle?.registrationNumber || row.vehicle?.vin || "Booking"}`;
+    return `${formatDateTime(row.scheduledAt)}, ${row.vehicle?.registrationNumber || row.vehicle?.vin || "Booking"}`;
 
   return (
     row.registrationNumber ||
@@ -98,7 +99,7 @@ function recordHint(row: PickerRecord) {
       row.description,
       row.category,
       row.durationMins != null ? `${row.durationMins} min` : null,
-      row.price != null ? `NGN ${row.price.toLocaleString()}` : null,
+      row.price != null ? formatMoney(row.price) : null,
     ]
       .filter(Boolean)
       .join(" | ");

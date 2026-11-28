@@ -1,4 +1,5 @@
 "use client";
+import { lagosDayKey } from "@/lib/format";
 import { useState } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
 import { DateInput } from "@/components/forms/DateInput";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Branch } from "@/store/branch.store";
 import { WorkshopPicker } from "../WorkshopPicker";
-import { lagosDate, type BoardFilters as Filters } from "../../lib/board.logic";
+import { type BoardFilters as Filters } from "../../lib/board.logic";
 
 const CUSTOM = "custom";
 
@@ -30,8 +31,8 @@ export function BoardFilters({
   onChange: (next: Partial<Filters>) => void;
   onClear: () => void;
 }) {
-  const today = lagosDate(now);
-  const yesterday = lagosDate(new Date(now.getTime() - 86_400_000));
+  const today = lagosDayKey(now);
+  const yesterday = lagosDayKey(new Date(now.getTime() - 86_400_000));
   const preset = !filters.date
     ? ""
     : filters.date === today

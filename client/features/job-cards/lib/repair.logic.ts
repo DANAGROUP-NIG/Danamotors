@@ -1,3 +1,4 @@
+import { formatQuantity } from "@/lib/format";
 import type { StatusTone } from "@/components/ui/table-components/StatusBadge";
 import { estimateTotals } from "./estimate.logic";
 import type { JobEstimateStep } from "../types/job-estimate.types";
@@ -43,8 +44,7 @@ export function timeWorkedText(seconds: number): string {
 
 /** "1.5 h" from the approved hours. */
 export function hoursText(hours: string): string {
-  const value = Number(hours);
-  return `${value.toLocaleString("en-NG", { maximumFractionDigits: 2 })} h`;
+  return `${formatQuantity(hours)} h`;
 }
 
 /**
@@ -58,11 +58,6 @@ export function lineButton(line: Pick<WorkLine, "status">, options: { paused: bo
   if (!options.canWork) return { action, label, disabledReason: "Only the assigned technician can update this work." };
   if (options.paused && action === "START") return { action, label, disabledReason: "The job is paused for parts. Resume the job first." };
   return { action, label, disabledReason: null };
-}
-
-/** How many work lines are not done yet. */
-export function workLeft(lines: Pick<WorkLine, "status">[]): number {
-  return lines.filter((line) => line.status !== "DONE").length;
 }
 
 /** "4 of 5 ready to collect at store", or what to say when nothing is ready. */

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
 import { apiErrorMessage } from "@/features/warranty/lib/warranty-format";
-import { formatDateTime, formatTime, NOT_PROVIDED } from "@/lib/format";
+import { NOT_PROVIDED, formatDateTime, formatQuantity, formatTime } from "@/lib/format";
 import { usePrepareSupplementary } from "../../hooks/use-job-repair";
 import type { JobFileTab } from "../../lib/job-frame.logic";
 import { FINDING_STATE_BADGE, PART_STATUS_BADGE, PAYER_TAG, WORK_STATUS_BADGE, hoursText, newFindingBanner, partsSummary, timeWorkedText } from "../../lib/repair.logic";
@@ -115,7 +115,7 @@ export function RepairMonitor({ job, step, bar, onOpenTab }: { job: JobCard; ste
                   <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
                 </div>
               </div>
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full min-w-[34rem] text-sm">
                   <thead className="bg-muted/60">
                     <tr>
@@ -169,7 +169,7 @@ export function RepairMonitor({ job, step, bar, onOpenTab }: { job: JobCard; ste
             ) : (
               <>
                 <p className="text-sm">{partsSummary(step.parts)}</p>
-                <div className="overflow-x-auto">
+                <div className="relative overflow-x-auto">
                   <table className="w-full min-w-[40rem] text-sm">
                     <thead className="bg-muted/60">
                       <tr>
@@ -197,7 +197,7 @@ export function RepairMonitor({ job, step, bar, onOpenTab }: { job: JobCard; ste
                       {step.parts.rows.map((row) => (
                         <tr key={row.sparePartId}>
                           <td className={`${td} font-medium`}>{row.description}</td>
-                          <td className={`${td} text-right tabular-nums`}>{row.requested.toLocaleString("en-NG", { maximumFractionDigits: 2 })}</td>
+                          <td className={`${td} text-right tabular-nums`}>{formatQuantity(row.requested)}</td>
                           <td className={td}>{row.requestedAt ? formatDateTime(row.requestedAt) : NOT_PROVIDED}</td>
                           <td className={td}>
                             {row.issuedAt ? (
@@ -235,7 +235,7 @@ export function RepairMonitor({ job, step, bar, onOpenTab }: { job: JobCard; ste
             {step.labour.length === 0 ? (
               <p className="text-sm text-muted-foreground">No labour recorded yet.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full min-w-[28rem] text-sm">
                   <thead className="bg-muted/60">
                     <tr>
@@ -278,7 +278,7 @@ export function RepairMonitor({ job, step, bar, onOpenTab }: { job: JobCard; ste
                 <div className="min-w-0">
                   <p className="break-words font-medium">{item.description}</p>
                   <p className="text-muted-foreground">
-                    {item.items.map((row) => (row.kind === "LABOUR" ? row.description : `${row.description}, qty ${Number(row.quantity).toLocaleString("en-NG")}`)).join("; ")}
+                    {item.items.map((row) => (row.kind === "LABOUR" ? row.description : `${row.description}, qty ${formatQuantity(row.quantity)}`)).join("; ")}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {item.raisedBy ?? NOT_PROVIDED}, {formatDateTime(item.raisedAt)}

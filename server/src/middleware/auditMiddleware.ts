@@ -61,7 +61,6 @@ const ACTION_MAP: Record<string, string> = {
 
   // ── Workshop ─────────────────────────────────────────────────────────────
   'POST /api/workshop/assign': 'TECHNICIAN_ASSIGN',
-  'PATCH /api/workshop/progress': 'JOB_PROGRESS_UPDATE',
   'PATCH /api/workshop/qc': 'QC_STATUS_UPDATE',
 
   // ── Inventory — Parts ────────────────────────────────────────────────────

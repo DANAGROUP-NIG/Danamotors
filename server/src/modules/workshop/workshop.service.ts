@@ -11,12 +11,10 @@ import {
   ForbiddenError,
 } from "../../shared/errors/appError";
 import prisma from "../../prisma/client";
-import { jobUpdateBody } from "../service/service.validation";
 import { canonicalJobStatus } from "../service/job-card-workflow.service";
 import { syncStage } from "../service/job-stage.writer";
 import { DIAGNOSIS_SUPERVISORS, IN_WORKSHOP_STAGES, availability, canAllocate, diagnosisSubStep } from "../service/job-diagnosis.logic";
 import { ConflictError } from "../../shared/errors/appError";
-import { ServiceService } from "../service/service.service";
 
 export class WorkshopService {
   private workshopRepository: WorkshopRepository;
@@ -335,33 +333,4 @@ export class WorkshopService {
     return updatedJobCard.job;
   }
 
-  async updateProgress(
-    id: string,
-    _progress: number,
-    status?: string,
-    actorId?: string,
-  ) {
-    const jobCard = await this.workshopRepository.findJobCardById(id);
-    if (!jobCard) {
-      throw new NotFoundError("Job card not found");
-    }
-
-    if (jobCard.billedAt)
-      throw new BadRequestError("Billed job cards cannot be edited");
-    if (
-      ["READY", "DELIVERED", "CANCELLED"].includes(
-        canonicalJobStatus(jobCard.status),
-      )
-    )
-      throw new BadRequestError("This job card is no longer open");
-    if (!status)
-      throw new BadRequestError(
-        "Use the job-card lifecycle instead of progress percentages",
-      );
-    return new ServiceService().updateJobCard(
-      id,
-      jobUpdateBody.parse({ status: canonicalJobStatus(status) }),
-      actorId,
-    );
-  }
 }

@@ -13,7 +13,7 @@ export function BookingOpeningConsentModal({ isOpen, ...props }: Props) {
 function ConsentSession({ appointmentId, onClose, onAccept }: Omit<Props, 'isOpen'>) {
   const query = useBookingOpeningConsent(appointmentId);
   return <ModalFame isOpen onClose={onClose} title="Consent to open a job card" description="Review the job card terms before opening the workshop record.">
-    {query.isPending ? <p role="status">Loading job card terms…</p> : query.isError ? <div role="alert" className="space-y-3"><p>Could not load the terms. Consent cannot be given until they are available.</p><Button variant="outline" onClick={() => void query.refetch()}>Retry</Button></div> : <ConsentContent key={query.data.consent.termsHash} consent={query.data.consent} onAccept={onAccept} onClose={onClose} />}
+    {query.isPending ? <p role="status">Loading job card terms</p> : query.isError ? <div role="alert" className="space-y-3"><p>Could not load the terms. Consent cannot be given until they are available.</p><Button variant="outline" onClick={() => void query.refetch()}>Retry</Button></div> : <ConsentContent key={query.data.consent.termsHash} consent={query.data.consent} onAccept={onAccept} onClose={onClose} />}
   </ModalFame>;
 }
 

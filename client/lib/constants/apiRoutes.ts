@@ -76,8 +76,6 @@ export const API_ROUTES = {
       detail: (id: string) => `/service/job-cards/${id}`,
     },
     labourItems: "/service/labour-items",
-    jobCardLabour: (jobCardId: string) => `/service/job-cards/${jobCardId}/labour`,
-    jobCardLabourLine: (lineId: string) => `/service/job-card-labour/${lineId}`,
   },
   services: {
     base: "/services",

@@ -3,22 +3,13 @@ jest.mock('../notification/notification.service', () => ({ NotificationService: 
 import prisma from '../../prisma/client';
 import { WorkshopRepository } from './workshop.repository';
 import { WorkshopService } from './workshop.service';
-import { ServiceService } from '../service/service.service';
 
 describe('JobCard workshop actions', () => {
   beforeEach(() => { jest.restoreAllMocks(); jest.clearAllMocks(); });
 
-  it('routes legacy status actions through the audited lifecycle', async () => {
-    jest.spyOn(WorkshopRepository.prototype, 'findJobCardById').mockResolvedValue({ id: 'card', billedAt: null } as any);
-    const update = jest.spyOn(ServiceService.prototype, 'updateJobCard').mockResolvedValue({ id: 'card' } as any);
-    await new WorkshopService().updateProgress('card', 100, 'Ready', 'actor');
-    expect(update).toHaveBeenCalledWith('card', { status: 'READY' }, 'actor');
-  });
-
-  it('blocks progress and assignment after billing', async () => {
+  it('blocks assignment after billing', async () => {
     jest.spyOn(WorkshopRepository.prototype, 'findJobCardById').mockResolvedValue({ billedAt: new Date() } as any);
     const service = new WorkshopService();
-    await expect(service.updateProgress('card', 50)).rejects.toThrow('Billed');
     await expect(service.assignTechnician('card', 'tech')).rejects.toThrow('Billed');
   });
 

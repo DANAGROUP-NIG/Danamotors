@@ -203,7 +203,7 @@ function DiagnosisLoaded({ job, diagnosis, bar }: { job: JobCard; diagnosis: Job
         )}
 
         {subStep === "ENGINEER_REVIEW" && (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_17rem]">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_17rem]">
             <ReviewTable
               diagnosis={diagnosis}
               title={`Diagnosis by ${technician}`}

@@ -86,31 +86,6 @@ export class WorkshopController {
     }
   };
 
-  updateProgress = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const { id } = req.params;
-      const { progress, status } = req.body;
-      await assertJobAccess(req);
-      const result = await this.workshopService.updateProgress(
-        id,
-        progress,
-        status,
-        req.user?.userId,
-      );
-      res.status(200).json({
-        status: "success",
-        statusCode: 200,
-        message: "Job progress updated successfully",
-        data: { jobCard: result },
-      });
-    } catch (error) {
-      next(error);
-    }
-  };
 }
 
 export default WorkshopController;

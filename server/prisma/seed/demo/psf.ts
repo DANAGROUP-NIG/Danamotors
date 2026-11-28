@@ -118,7 +118,7 @@ async function ensureCustomer(ctx: DemoContext, key: CustomerKey) {
   const created = await prisma.customer.create({
     data: {
       ...fixture, code, type: "INDIVIDUAL", salutation: "Mx.", country: "Nigeria", email: `${key.toLowerCase()}.psf@demo.danamotors.test`,
-      preferredFollowupDay: key === "C61" ? "Monday" : null, preferredFollowupTime: key === "C61" ? "Morning (9–12)" : null, preferredContactMethod: key === "C61" ? "Phone" : null,
+      preferredFollowupDay: key === "C61" ? "Monday" : null, preferredFollowupTime: key === "C61" ? "Morning (9 to 12)" : null, preferredContactMethod: key === "C61" ? "Phone" : null,
       branchId: ctx.branches[branch].id, createdById: ctx.staff[branch].advisor.id,
     },
     select: { id: true },
@@ -221,7 +221,7 @@ export async function seedPsf(ctx: DemoContext, ref: Reference): Promise<PsfSeed
         select: { id: true, jobNumber: true },
       }));
     await seedCalls(card.id, scenario, ctx.staff[scenario.branch].advisor.id);
-    const outcome = !deliveredAt ? "not delivered" : scenario.calls.length ? scenario.calls.map((call) => call.status.toLowerCase().replace("_", " ")).join(" → ") : "not followed up";
+    const outcome = !deliveredAt ? "not delivered" : scenario.calls.length ? scenario.calls.map((call) => call.status.toLowerCase().replace("_", " ")).join(", then ") : "not followed up";
     rows.push({ key: scenario.key, registration: scenario.registration, jobNumber: card.jobNumber, outcome: `${scenario.delivered ? `delivered ${scenario.delivered}, ` : ""}${outcome}` });
   }
   return rows;

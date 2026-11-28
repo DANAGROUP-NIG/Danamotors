@@ -114,7 +114,10 @@ test("Fail and return: notes and failed work are required; the request carries o
     notes: "Write what the technician must fix.",
     lines: "Mark Fail on the work items that need rework.",
   });
-  assert.equal(logic.failProblems({ notes: "x", failed: ["l2"] }, true, { ...form, endKm: "" }).form, "Enter both road test readings or clear them, then try again.");
+  // Failing without a road test: the start km filled in from check-in is not a mistake and is not sent.
+  assert.equal(logic.failProblems({ notes: "x", failed: ["l2"] }, true, { ...form, endKm: "" }).form, undefined);
+  assert.equal(logic.qcPayload({ ...form, endKm: "" }, step, "FAIL", "req", { notes: "x", failed: ["l2"] }).roadTestStartKm, null);
+  assert.equal(logic.failProblems({ notes: "x", failed: ["l2"] }, true, { ...form, startKm: "" }).form, "Enter both road test readings or clear them, then try again.");
   const body = logic.qcPayload(form, step, "FAIL", "req", { notes: " Brake still noisy. ", failed: ["l2"] });
   assert.deepEqual(plain(body.lines), [{ workLineId: "l1", result: "PASS" }, { workLineId: "l2", result: "FAIL" }]);
   assert.equal(body.notes, "Brake still noisy.");

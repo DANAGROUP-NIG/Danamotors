@@ -1,3 +1,5 @@
+import type { JobStage } from "@/features/job-cards/types/job-workspace.types";
+
 export type PortalBranch = {
   id: string;
   name: string;
@@ -62,7 +64,7 @@ export type PortalLatestJobCard = {
   id: string;
   jobNumber: string;
   status: string;
-  progress?: number | null;
+  stage: JobStage;
   description?: string | null;
   createdAt: string;
 };
@@ -77,7 +79,7 @@ export type PortalVehicleJobCard = {
   id: string;
   jobNumber: string;
   status: string;
-  progress?: number | null;
+  stage: JobStage;
   description?: string | null;
   estimatedCost?: number | null;
   createdAt: string;
@@ -122,9 +124,8 @@ export type PortalJobCard = {
   jobNumber: string;
   description?: string | null;
   status: string;
-  estimatedHours?: number | null;
   estimatedCost?: number | null;
-  progress?: number | null;
+  stage: JobStage;
   /** The job's quality check result. */
   qualityCheck: "PENDING" | "PASSED" | "FAILED" | "NOT_REQUIRED";
   assignedTo?: string | null;

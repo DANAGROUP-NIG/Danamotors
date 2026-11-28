@@ -186,6 +186,8 @@ export const VEHICLES = {
   stgDeliverRep: { vin: "KNAPM81DMK7000536", registrationNumber: "LSR-546ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2390 },
   stgDelivered: { vin: "KNAPM81DMK7000537", registrationNumber: "LSR-547ST", customer: "okafor", model: "SORENTO", saleDaysAgo: 2340 },
   stgPrintLong: { vin: "KNAPM81DMK7000538", registrationNumber: "LSR-548ST", customer: "ogunleye", model: "SORENTO", saleDaysAgo: 2280 },
+  // Full journey (phase 12): a booking under warranty that no earlier guide uses, opened by the tester.
+  stgJourney: { vin: "KNAPX81DMS7000539", registrationNumber: "LSR-549ST", customer: "okafor", model: "SPORTAGE", saleDaysAgo: 400 },
 } satisfies Record<string, VehicleFixture>;
 
 export type VehicleKey = keyof typeof VEHICLES;

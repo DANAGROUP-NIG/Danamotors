@@ -31,7 +31,13 @@ function load(relative) {
         esModuleInterop: true,
       },
     }).outputText,
-    { require, module, exports: module.exports, Intl, Date },
+    {
+      require: (spec) => (spec.startsWith("@/") ? load(`${spec.slice(2)}.ts`) : require(spec)),
+      module,
+      exports: module.exports,
+      Intl,
+      Date,
+    },
     { filename: file },
   );
 
@@ -39,39 +45,6 @@ function load(relative) {
 }
 
 const logic = load("features/service-transactions/transaction.logic.ts");
-
-test("changing a supply part preserves the request and resets issue quantity and reason", () => {
-  const row = {
-    sparePartId: "requested",
-    quantityRequired: 3,
-    quantityIssued: 2,
-    approvalPercent: 0,
-    customerPercent: 100,
-  };
-  assert.equal(logic.chooseRequisitionSupply(row, "requested"), row);
-  const next = logic.chooseRequisitionSupply(row, "alternate");
-  assert.equal(next.requestedSparePartId, "requested");
-  assert.equal(next.quantityIssued, 0);
-  const changedAgain = logic.chooseRequisitionSupply(
-    { ...next, substitutionReason: "Old choice" },
-    "source",
-  );
-  assert.equal(changedAgain.requestedSparePartId, "requested");
-  assert.equal(changedAgain.substitutionReason, "");
-  const payload = logic.requisitionLinePayload(
-    { ...changedAgain, substitutionReason: "  Unavailable  " },
-    "CUSTOMER",
-  );
-  assert.equal(payload.substitutionReason, "Unavailable");
-  assert.equal(payload.approvalPercent, undefined);
-  assert.equal(
-    logic.requisitionLinePayload(
-      { ...next, sparePartId: "requested", substitutionReason: "stale" },
-      "CUSTOMER",
-    ).substitutionReason,
-    undefined,
-  );
-});
 
 test("booking date entry and output use Lagos independently of the browser timezone", () => {
   assert.equal(logic.lagosIso("2026-10-21T10:30"), "2026-10-21T09:30:00.000Z");
@@ -96,27 +69,6 @@ test("booking catalogue service remains optional", () => {
       branchName: "branch",
       scheduledAt: "2026-10-21T10:30",
     }).success,
-    true,
-  );
-});
-
-test("transaction write guard accounts for invoices and all terminal statuses", () => {
-  for (const status of ["BILLED", "DELIVERED", "CANCELLED", "Closed"])
-    assert.equal(logic.canWriteTransactions({ status }), false);
-
-  assert.equal(
-    logic.canWriteTransactions({
-      status: "OPEN",
-      invoices: [{ status: "Posted" }],
-    }),
-    false,
-  );
-
-  assert.equal(
-    logic.canWriteTransactions({
-      status: "READY",
-      invoices: [{ status: "VOID" }],
-    }),
     true,
   );
 });
@@ -195,32 +147,6 @@ test("converted, linked and terminal legacy bookings cannot be edited", () => {
   );
 });
 
-test("labour payload keeps one assignee and sends campaign/reason only for the selected payer", () => {
-  const body = logic.labourBody({
-    labourItemId: "operation",
-    chargeType: "CUSTOMER",
-    technicianId: "technician",
-    mechanicId: "",
-    campaignId: "old-campaign",
-    reason: "old reason",
-    groupId: "",
-  });
-  assert.equal(body.technicianId, "technician");
-  assert.equal(body.mechanicId, undefined);
-  assert.equal(body.campaignId, undefined);
-  assert.equal(body.reason, undefined);
-  assert.equal(body.groupId, undefined);
-  assert.equal(
-    logic.labourBody({
-      labourItemId: "operation",
-      chargeType: "GOODWILL",
-      mechanicId: "employee",
-      reason: "  Approved reason  ",
-    }).reason,
-    "Approved reason",
-  );
-});
-
 test("job opening uses the conversion endpoint only for a linked booking", async () => {
   const requests = [];
   const module = { exports: {} };
@@ -271,50 +197,6 @@ test("job opening uses the conversion endpoint only for a linked booking", async
   assert.equal(requests[0].url, "/service/appointments/saved-booking/convert");
   assert.equal(requests[0].body.serviceId, undefined);
   assert.equal(requests[1].url, "/service/job-cards");
-});
-
-test("saved labour edits retain campaign and goodwill context and send one employee assignee", () => {
-  const base = {
-    id: "line",
-    labourItemId: "operation",
-    technicianId: "login",
-    mechanicId: "employee",
-    groupId: "team",
-    hours: 4,
-    rate: 100,
-    amount: 400,
-  };
-  const free = logic.labourBody(
-    logic.savedLabourDraft({
-      ...base,
-      chargeLine: { chargeType: "FREE", campaignId: "campaign" },
-    }),
-  );
-  assert.equal(free.campaignId, "campaign");
-  assert.equal(free.mechanicId, "employee");
-  assert.equal(free.technicianId, undefined);
-  assert.equal(free.groupId, "team");
-  assert.equal(free.chargedHours, 4);
-  const goodwill = logic.labourBody(
-    logic.savedLabourDraft({
-      ...base,
-      chargeLine: {
-        chargeType: "GOODWILL",
-        chargeTypeReason: "  Saved approval  ",
-      },
-    }),
-  );
-  assert.equal(goodwill.reason, "Saved approval");
-  assert.equal(goodwill.campaignId, undefined);
-  const technician = logic.savedLabourDraft({
-    ...base,
-    mechanicId: null,
-    chargedHours: 2,
-    chargeLine: { chargeType: "CUSTOMER" },
-  });
-  assert.equal(technician.technicianId, "login");
-  assert.equal(technician.mechanicId, undefined);
-  assert.equal(technician.chargedHours, 2);
 });
 
 test("legacy terminal booking spellings stay read-only", () => {
@@ -391,4 +273,19 @@ test("detailed booking edits preserve saved codes, decimal amounts and request i
     ]),
     true,
   );
+});
+
+test("slip totals print with labels in a fixed order and money flagged", () => {
+  const rows = logic.slipTotals({ totalAmount: 250.5, numberOfItems: 2, netQuantityIssued: 3, internalCode: 7 });
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(rows.map((row) => [row.label, row.value, row.money]))),
+    [
+      ["Number of items", 2, false],
+      ["Net quantity issued", 3, false],
+      ["Total amount", 250.5, true],
+    ],
+  );
+  assert.equal(logic.slipTotals(undefined).length, 0);
+  assert.equal(logic.serviceDocumentLabel(null), "Not provided");
+  assert.equal(logic.serviceDocumentLabel("goodwill"), "Goodwill");
 });

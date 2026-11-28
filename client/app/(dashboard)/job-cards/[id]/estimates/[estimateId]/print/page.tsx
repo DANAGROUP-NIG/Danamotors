@@ -9,10 +9,9 @@ import { apiGet } from "@/lib/api/apiClient";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
-import { moneyText } from "@/features/service-transactions/transaction.logic";
 import { payerSections } from "@/features/job-cards/lib/estimate.logic";
 import type { EstimatePayer } from "@/features/job-cards/types/job-estimate.types";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatMoney, formatQuantity } from "@/lib/format";
 
 const TYPE_LABEL: Record<string, string> = { PART: "Part", LABOUR: "Labour", SERVICE: "Service" };
 type PrintData = {
@@ -71,8 +70,6 @@ type PrintData = {
   footer: string | null;
   printedAt: string;
 };
-const date = (value: string) =>
-  new Date(value).toLocaleString("en-NG", { timeZone: "Africa/Lagos" });
 export default function EstimatePrintPage() {
   const { id, estimateId } = useParams<{ id: string; estimateId: string }>();
   const { hasPermission } = useAuth();
@@ -91,10 +88,9 @@ export default function EstimatePrintPage() {
   if (isError || !data)
     return <p role="alert">Estimate could not be loaded.</p>;
   const { estimate, company, branch, customer, vehicle, job } = data;
-  const money = (value: number) => moneyText(value, estimate.currency);
   return (
     <article className="estimate-print mx-auto max-w-4xl space-y-5 bg-white p-6 text-black print:p-0">
-      <style>{`@page {size:A4 portrait;margin:15mm 12mm 18mm;@bottom-left {content:"Printed ${date(data.printedAt).replaceAll('"', "")}, Africa/Lagos";font-size:8pt;}@bottom-right {content:"Page " counter(page) " of " counter(pages);font-size:8pt;}} @media print {body {background:white;}body * {visibility:hidden;} .estimate-print,.estimate-print * {visibility:visible;} .estimate-print {position:absolute;left:0;top:0;width:100%;max-width:none;font-size:10pt;} .estimate-print .print-controls {display:none;} .estimate-print tr,.signature-block {break-inside:avoid;} .estimate-print thead {display:table-header-group;}}`}</style>
+      <style>{`@page {size:A4 portrait;margin:15mm 12mm 18mm;@bottom-left {content:"Printed ${formatDateTime(data.printedAt).replaceAll('"', "")}, Lagos time";font-size:8pt;}@bottom-right {content:"Page " counter(page) " of " counter(pages);font-size:8pt;}} @media print {body {background:white;}body * {visibility:hidden;} .estimate-print,.estimate-print * {visibility:visible;} .estimate-print {position:absolute;left:0;top:0;width:100%;max-width:none;font-size:10pt;} .estimate-print .print-controls {display:none;} .estimate-print tr,.signature-block {break-inside:avoid;} .estimate-print thead {display:table-header-group;}}`}</style>
       <div className="print-controls flex gap-3">
         <Button onClick={() => window.print()}>Print estimate</Button>
         <a className="underline" href={`/job-cards/${id}`}>
@@ -117,7 +113,7 @@ export default function EstimatePrintPage() {
         </h2>
         <p>
           {estimate.estimateNumber ?? "Legacy estimate"},{" "}
-          {date(estimate.estimateDate)}
+          {formatDateTime(estimate.estimateDate)}
         </p>
         <strong>Not a bill</strong>
         {estimate.supersededBy && (
@@ -146,7 +142,7 @@ export default function EstimatePrintPage() {
       <section>
         <h3 className="font-semibold">Job {job.number}</h3>
         <p>
-          {date(job.date)}, {job.serviceType}
+          {formatDateTime(job.date)}, {job.serviceType}
         </p>
         <h4>Customer complaints</h4>
         <ul>
@@ -183,9 +179,9 @@ export default function EstimatePrintPage() {
                       {line.customerDecision === "DECLINED" ? " (Recommended, declined)" : ""}
                     </td>
                     <td>{TYPE_LABEL[line.type] ?? "Other"}</td>
-                    <td className="text-right tabular-nums">{line.quantity.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</td>
-                    <td className="text-right tabular-nums">{money(line.rate)}</td>
-                    <td className="text-right tabular-nums">{money(line.amount)}</td>
+                    <td className="text-right tabular-nums">{formatQuantity(line.quantity)}</td>
+                    <td className="text-right tabular-nums">{formatMoney(line.rate)}</td>
+                    <td className="text-right tabular-nums">{formatMoney(line.amount)}</td>
                   </tr>
                 ))
               )}
@@ -196,26 +192,26 @@ export default function EstimatePrintPage() {
       <dl className="ml-auto w-full max-w-sm space-y-1 text-sm">
         <div className="flex justify-between gap-4">
           <dt>Customer subtotal</dt>
-          <dd className="tabular-nums">{money(estimate.totals.customerSubtotal)}</dd>
+          <dd className="tabular-nums">{formatMoney(estimate.totals.customerSubtotal)}</dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt>VAT ({estimate.vatRate}%)</dt>
-          <dd className="tabular-nums">{money(estimate.totals.vat)}</dd>
+          <dd className="tabular-nums">{formatMoney(estimate.totals.vat)}</dd>
         </div>
         <div className="flex justify-between gap-4 text-lg font-bold">
           <dt>Customer total</dt>
-          <dd className="tabular-nums">{money(estimate.totals.customerTotal)}</dd>
+          <dd className="tabular-nums">{formatMoney(estimate.totals.customerTotal)}</dd>
         </div>
         {estimate.lines.some((line) => line.customerDecision) && (
           <div className="flex justify-between gap-4 font-semibold">
             <dt>Approved by the customer, with VAT</dt>
-            <dd className="tabular-nums">{money(estimate.totals.approvedTotal)}</dd>
+            <dd className="tabular-nums">{formatMoney(estimate.totals.approvedTotal)}</dd>
           </div>
         )}
         {estimate.totals.otherPayerTotal > 0 && (
           <div className="flex justify-between gap-4">
             <dt>Warranty and other payers (not charged to the customer)</dt>
-            <dd className="tabular-nums">{money(estimate.totals.otherPayerTotal)}</dd>
+            <dd className="tabular-nums">{formatMoney(estimate.totals.otherPayerTotal)}</dd>
           </div>
         )}
       </dl>
@@ -230,7 +226,7 @@ export default function EstimatePrintPage() {
           <section className="space-y-1 text-right text-sm">
             <p>
               Suggested advance ({estimate.upfrontPaymentPercent ?? 60}%):{" "}
-              {money(estimate.upfrontAmount)}
+              {formatMoney(estimate.upfrontAmount)}
             </p>
             <p>
               Recommendation only. Any positive eligible advance meets the
@@ -274,10 +270,10 @@ export default function EstimatePrintPage() {
                 {estimate.signature.consentStatement}
               </p>
             )}
-            <p>{date(estimate.signature.signedAt)}, Africa/Lagos</p>
+            <p>{formatDateTime(estimate.signature.signedAt)}, Africa/Lagos</p>
             <p>
               Revision {estimate.signature.estimateVersion}, Total signed{" "}
-              {money(estimate.signature.totalSigned)}
+              {formatMoney(estimate.signature.totalSigned)}
             </p>
           </>
         ) : (
@@ -295,7 +291,7 @@ export default function EstimatePrintPage() {
       </section>
       <footer className="border-t pt-3 text-sm">
         <p>{data.footer}</p>
-        <p>Printed {date(data.printedAt)}, Africa/Lagos</p>
+        <p>Printed {formatDateTime(data.printedAt)}, Africa/Lagos</p>
       </footer>
     </article>
   );

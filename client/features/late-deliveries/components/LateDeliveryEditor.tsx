@@ -1,4 +1,5 @@
 "use client";
+import { NOT_PROVIDED, formatDate, formatDateTime, formatTime } from "@/lib/format";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CalendarClock, Check, History, Keyboard, Loader2, MessageSquareText, RotateCcw, Save, Truck } from "lucide-react";
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { AlertBanner, DetailField, SectionCard } from "@/features/warranty/components/ui";
 import { cn } from "@/lib/utils";
 import { useSaveLateReasons } from "../hooks/use-late-deliveries";
-import { formatDate, formatDateTime, formatTime, isDirty, LATE_KIND, lateByText, MAX_LATE_REASONS, MAX_LATE_REMARKS, saveProblem, toggleReason } from "../lib/late-delivery.logic";
+import { isDirty, LATE_KIND, lateByText, MAX_LATE_REASONS, MAX_LATE_REMARKS, saveProblem, toggleReason } from "../lib/late-delivery.logic";
 import type { LateDetail, LateHistoryEntry, LateKind, LateReasonOption } from "../types/late-delivery.types";
 import { LateKindBadge } from "./late-ui";
 
@@ -61,7 +62,7 @@ export function LateDeliveryEditor({ kind, detail, reasons, onDirtyChange, onPre
   };
 
   const late = detail.lateness;
-  const vehicle = [detail.model, detail.variant].filter(Boolean).join(" · ") || "Model not set";
+  const vehicle = [detail.model, detail.variant].filter(Boolean).join(", ") || "Model not set";
 
   return (
     <div className="space-y-4">
@@ -74,8 +75,8 @@ export function LateDeliveryEditor({ kind, detail, reasons, onDirtyChange, onPre
             {late.kind && <LateKindBadge kind={late.kind} />}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            <span className="font-semibold tracking-wide text-slate-700">{detail.registration ?? "No registration"}</span> · {vehicle}
-            {detail.customer && <> · {detail.customer}</>}
+            <span className="font-semibold tracking-wide text-slate-700">{detail.registration ?? "No registration"}</span>, {vehicle}
+            {detail.customer && <>, {detail.customer}</>}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -97,17 +98,17 @@ export function LateDeliveryEditor({ kind, detail, reasons, onDirtyChange, onPre
       </section>
 
       <div className="grid gap-x-6 gap-y-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
-        <DetailField label="Service type" value={detail.serviceType ?? "—"} />
-        <DetailField label="Service advisor" value={detail.serviceAdvisor ?? "—"} />
-        <DetailField label="Delivered by" value={detail.deliveryAdvisor ?? "—"} />
-        <DetailField label="Gate pass" value={detail.gatePassNumber ?? "—"} mono />
+        <DetailField label="Service type" value={detail.serviceType ?? NOT_PROVIDED} />
+        <DetailField label="Service advisor" value={detail.serviceAdvisor ?? NOT_PROVIDED} />
+        <DetailField label="Delivered by" value={detail.deliveryAdvisor ?? NOT_PROVIDED} />
+        <DetailField label="Gate pass" value={detail.gatePassNumber ?? NOT_PROVIDED} mono />
       </div>
 
       <SectionCard
         icon={<CalendarClock />}
         title="Reasons for the delay"
         note={`${selected.length} / ${MAX_LATE_REASONS} selected`}
-        action={<span className="hidden items-center gap-1 text-xs text-muted-foreground md:inline-flex"><Keyboard className="size-3.5" /> Press 1–{Math.min(options.length, 6)} to toggle</span>}
+        action={<span className="hidden items-center gap-1 text-xs text-muted-foreground md:inline-flex"><Keyboard className="size-3.5" /> Press 1 to {Math.min(options.length, 6)} to toggle</span>}
       >
         {options.length === 0 ? (
           <p className="text-sm text-muted-foreground">No late-delivery reasons are configured. Ask an administrator to add them in Workshop masters (Late delivery reason).</p>
@@ -133,7 +134,7 @@ export function LateDeliveryEditor({ kind, detail, reasons, onDirtyChange, onPre
                   )}
                 >
                   <span className={cn("grid size-7 shrink-0 place-items-center rounded-md font-mono text-sm font-semibold", on ? "bg-primary text-primary-foreground" : "bg-slate-100 text-slate-600")}>
-                    {on ? <Check className="size-4" /> : reason.code.length <= 2 ? reason.code : "•"}
+                    {on ? <Check className="size-4" /> : reason.code.length <= 2 ? reason.code : null}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{reason.description}</span>
@@ -200,12 +201,12 @@ function Arrow() {
 }
 
 function HistoryCard({ detail, byId }: { detail: LateDetail; byId: Map<string, LateReasonOption> }) {
-  const codes = (ids: string[]) => (ids.length ? ids.map((id) => byId.get(id)?.code ?? "?").join(", ") : "none");
+  const codes = (ids: string[]) => (ids.length ? ids.map((id) => byId.get(id)?.code ?? "a removed reason").join(", ") : "none");
   const change = (entry: LateHistoryEntry) => {
     const parts: string[] = [];
-    if (entry.before.reasonIds.join() !== entry.after.reasonIds.join()) parts.push(`reasons ${codes(entry.before.reasonIds)} → ${codes(entry.after.reasonIds)}`);
+    if (entry.before.reasonIds.join() !== entry.after.reasonIds.join()) parts.push(`reasons from ${codes(entry.before.reasonIds)} to ${codes(entry.after.reasonIds)}`);
     if ((entry.before.remarks ?? "") !== (entry.after.remarks ?? "")) parts.push(entry.before.remarks ? (entry.after.remarks ? "remarks changed" : "remarks removed") : "remarks added");
-    return parts.join(" · ") || "saved";
+    return parts.join(", ") || "saved";
   };
   return (
     <SectionCard icon={<History />} title="History">
@@ -215,7 +216,7 @@ function HistoryCard({ detail, byId }: { detail: LateDetail; byId: Map<string, L
             <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" aria-hidden />
             <div>
               <p className="text-slate-800"><span className="font-medium">{entry.by ?? "Unknown user"}</span> {change(entry)}</p>
-              <p className="text-xs text-muted-foreground">{formatDateTime(entry.at)} · on the {LATE_KIND[entry.kind].title.toLowerCase()} screen</p>
+              <p className="text-xs text-muted-foreground">{formatDateTime(entry.at)}, on the {LATE_KIND[entry.kind].title.toLowerCase()} screen</p>
             </div>
           </li>
         ))}
@@ -223,7 +224,7 @@ function HistoryCard({ detail, byId }: { detail: LateDetail; byId: Map<string, L
           <span className="mt-1.5 size-2 shrink-0 rounded-full bg-slate-300" aria-hidden />
           <div>
             <p className="text-slate-800">Delivered{detail.deliveryAdvisor ? <> by <span className="font-medium">{detail.deliveryAdvisor}</span></> : null}</p>
-            <p className="text-xs text-muted-foreground">{formatDateTime(detail.deliveredAt)}{detail.gatePassNumber ? ` · gate pass ${detail.gatePassNumber}` : ""}</p>
+            <p className="text-xs text-muted-foreground">{formatDateTime(detail.deliveredAt)}{detail.gatePassNumber ? `, gate pass ${detail.gatePassNumber}` : ""}</p>
           </div>
         </li>
       </ol>

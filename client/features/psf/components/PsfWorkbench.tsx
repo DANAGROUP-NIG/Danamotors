@@ -1,4 +1,5 @@
 "use client";
+import { DiscardChangesDialog } from "@/components/modals/DiscardChangesDialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -7,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { apiErrorCode, apiErrorMessage, formatDate, lagosDay } from "@/features/late-deliveries/lib/late-delivery.logic";
+import { apiErrorCode, apiErrorMessage } from "@/features/late-deliveries/lib/late-delivery.logic";
+import { NOT_PROVIDED, formatDate, formatQuantity, lagosDayKey } from "@/lib/format";
 import { AlertBanner, FilterPills } from "@/features/warranty/components/ui";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
@@ -31,7 +33,7 @@ export function PsfWorkbench() {
   const selectedId = searchParams.get("job");
 
   const [range, setRange] = useState(() => {
-    const today = lagosDay(new Date());
+    const today = lagosDayKey(new Date());
     return { from: addDays(today, -30), to: today };
   });
   const [search, setSearch] = useState("");
@@ -45,15 +47,26 @@ export function PsfWorkbench() {
   const [findError, setFindError] = useState<string | null>(null);
   const find = useFindPsfJob();
   const dirty = useRef(false);
+  // The job to open once the user agrees to drop unsaved changes.
+  const [leavingTo, setLeavingTo] = useState<{ id: string | null } | null>(null);
   const setDirty = useCallback((value: boolean) => {
     dirty.current = value;
   }, []);
 
+  const leave = () => {
+    if (!leavingTo) return;
+    dirty.current = false;
+    router.replace(leavingTo.id ? `${pathname}?job=${leavingTo.id}` : pathname, { scroll: false });
+    setLeavingTo(null);
+  };
+
   const open = useCallback(
     (id: string | null) => {
       if (id === selectedId) return;
-      if (dirty.current && !window.confirm("You have an unsaved call on this job. Leave without saving?")) return;
-      dirty.current = false;
+      if (dirty.current) {
+        setLeavingTo({ id });
+        return;
+      }
       router.replace(id ? `${pathname}?job=${id}` : pathname, { scroll: false });
     },
     [pathname, router, selectedId],
@@ -88,6 +101,13 @@ export function PsfWorkbench() {
 
   return (
     <div className="space-y-5 px-4 py-6 lg:px-6">
+      <DiscardChangesDialog
+        open={!!leavingTo}
+        title="Leave without saving the call?"
+        description="The call you started on this job is not saved yet."
+        onStay={() => setLeavingTo(null)}
+        onLeave={leave}
+      />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Post-service follow-up</p>
@@ -102,11 +122,11 @@ export function PsfWorkbench() {
       </div>
 
       <section aria-label="Delivered in the period" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Stat label="Delivered" value={counts?.all} sub={`${formatDate(`${range.from}T12:00:00Z`)} – ${formatDate(`${range.to}T12:00:00Z`)}`} />
+        <Stat label="Delivered" value={counts?.all} sub={`${formatDate(`${range.from}T12:00:00Z`)} to ${formatDate(`${range.to}T12:00:00Z`)}`} />
         <Stat label="To call" value={counts?.toCall} sub="Not followed up or not reached" tone="text-amber-700" />
         <Stat label="Satisfied" value={counts?.satisfied} tone="text-emerald-700" />
         <Stat label="Dissatisfied (open)" value={counts?.dissatisfied} tone="text-red-700" />
-        <Stat label="Satisfaction" value={satisfaction === null ? "—" : `${satisfaction.toLocaleString("en-NG")}%`} sub="Satisfied ÷ reached (open)" tone="text-primary" />
+        <Stat label="Satisfaction" value={satisfaction === null ? NOT_PROVIDED : `${formatQuantity(satisfaction)}%`} sub="Satisfied ÷ reached (open)" tone="text-primary" />
       </section>
 
       <form
@@ -170,7 +190,7 @@ export function PsfWorkbench() {
 
           {meta && meta.totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2 text-xs text-muted-foreground">
-              <span>Page {meta.page} of {meta.totalPages} · {meta.total} jobs</span>
+              <span>Page {meta.page} of {meta.totalPages}, {meta.total} jobs</span>
               <div className="flex gap-1">
                 <Button variant="ghost" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} aria-label="Previous page"><ChevronLeft className="size-4" /></Button>
                 <Button variant="ghost" size="sm" disabled={page >= meta.totalPages} onClick={() => setPage((p) => p + 1)} aria-label="Next page"><ChevronRight className="size-4" /></Button>
@@ -219,7 +239,7 @@ function Stat({ label, value, sub, tone }: { label: string; value: number | stri
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
       <p className="text-xs font-medium uppercase tracking-wider text-slate-500">{label}</p>
-      <p className={cn("mt-1 text-2xl font-bold tabular-nums text-slate-900", tone)}>{value === undefined ? "…" : typeof value === "number" ? value.toLocaleString("en-NG") : value}</p>
+      <p className={cn("mt-1 text-2xl font-bold tabular-nums text-slate-900", tone)}>{value === undefined ? "Loading" : typeof value === "number" ? value.toLocaleString("en-NG") : value}</p>
       {sub && <p className="truncate text-xs text-slate-500">{sub}</p>}
     </div>
   );
@@ -237,10 +257,10 @@ function WorkItem({ item, active, onOpen }: { item: PsfListItem; active: boolean
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2">
             <span className="font-mono text-sm font-semibold text-slate-900">{item.jobNumber}</span>
-            <span className="truncate text-xs font-medium tracking-wide text-slate-500">{item.registration ?? "—"}</span>
+            <span className="truncate text-xs font-medium tracking-wide text-slate-500">{item.registration ?? NOT_PROVIDED}</span>
           </p>
           <p className="truncate text-xs text-slate-700">{item.customer ?? "No customer"}</p>
-          <p className="truncate text-xs text-muted-foreground">{[item.model, item.serviceType].filter(Boolean).join(" · ") || "—"}</p>
+          <p className="truncate text-xs text-muted-foreground">{[item.model, item.serviceType].filter(Boolean).join(", ") || NOT_PROVIDED}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <span className="text-xs text-slate-500">{formatDate(item.deliveredAt)}</span>

@@ -38,6 +38,7 @@ function loader(stubs = {}) {
 
 const load = loader();
 const logic = load("features/job-cards/lib/diagnosis.logic.ts");
+const format = load("lib/format.ts");
 const stage = load("features/job-cards/lib/job-stage.logic.ts");
 const frame = load("features/job-cards/lib/job-frame.logic.ts");
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -122,7 +123,7 @@ test("findings: cards per request, extras, payload and summaries", () => {
 test("items: no prices, quantities in plain numbers, steppers and duplicates", () => {
   assert.equal(logic.itemLine({ kind: "LABOUR", description: "Replace front brake pads", quantity: 1 }), "Replace front brake pads");
   assert.equal(logic.itemLine({ kind: "OIL", description: "Engine oil 5W-30", quantity: 4.5 }), "Engine oil 5W-30 (qty 4.5)");
-  assert.equal(logic.formatQuantity(2), "2");
+  assert.equal(format.formatQuantity(2), "2");
   assert.equal(logic.stepQuantity("PART", 1, -1), 1);
   assert.equal(logic.stepQuantity("PART", 1, 1), 2);
   assert.equal(logic.stepQuantity("OIL", 4, 1), 4.5);

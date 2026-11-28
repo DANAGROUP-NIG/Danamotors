@@ -16,7 +16,7 @@ import { WarrantyCheckPanel, ackRequiredCheck } from "@/features/warranty/compon
 import type { WarrantyCheck } from "@/features/warranty/types/warranty.types";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { apiGet } from "@/lib/api/apiClient";
-import { formatDate, formatDateTime, formatKm, NOT_PROVIDED } from "@/lib/format";
+import { NOT_PROVIDED, formatDate, formatDateTime, formatKm, lagosDayKey } from "@/lib/format";
 import { getCustomerRequest } from "@/features/customers/api/customer.api";
 import { getVehicleRequest } from "@/features/vehicles/api/vehicle.api";
 import { OpeningRepeatCheck } from "@/features/repeat-jobs/components/OpeningRepeatCheck";
@@ -28,15 +28,13 @@ import { WorkshopPicker, customerLabel, customerOption, type PickerRecord } from
 import { ServiceTypePicker } from "./ServiceTypePicker";
 import { CustomerDetailsCard } from "./opening/CustomerDetailsCard";
 import { CustomerRequestsTab, emptyRequest } from "./opening/CustomerRequestsTab";
-import { OpeningCard, OpeningDatePicker, OpeningField, OpeningTimePicker, ReadOnlyField, localDate, openingGrid, openingInput } from "./opening/opening-ui";
+import { OpeningCard, OpeningDatePicker, OpeningField, OpeningTimePicker, ReadOnlyField, openingGrid, openingInput } from "./opening/opening-ui";
 
 /** The earliest promised date: the day after the booking or the opening, in Lagos. */
 const getMinDate = (scheduledAt?: string | Date, openedAt?: string | Date): string => {
   const baseDate = new Date(scheduledAt ?? openedAt ?? Date.now());
   const nextDay = new Date(baseDate.getTime() + 24 * 60 * 60 * 1000);
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(nextDay);
-  const get = (type: string) => parts.find((p) => p.type === type)!.value;
-  return `${get("year")}-${get("month")}-${get("day")}`;
+  return lagosDayKey(nextDay);
 };
 
 function defaults(branchName: string, values?: Partial<CreateJobCardFormValues>): Partial<CreateJobCardFormValues> {
@@ -385,7 +383,7 @@ export function JobCardCreateForm({
                     <ServiceTypePicker
                       canConfigure={isAdminOrAbove}
                       vehicleId={vehicleId}
-                      date={localDate(openedAt)}
+                      date={lagosDayKey(openedAt)}
                       value={field.value}
                       onChange={field.onChange}
                       onBlur={field.onBlur}

@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import type { Customer } from "@/features/customers/types/customer.types";
-import { ReadOnlyField, openingGrid, OpeningCard, formatDate } from "./opening-ui";
+import { ReadOnlyField, openingGrid, OpeningCard } from "./opening-ui";
+import { formatDate } from "@/lib/format";
 import type { ReactNode } from "react";
 
 export function CustomerDetailsCard(

@@ -2,7 +2,7 @@
 
 ## Staged job card (job card revamp, phase 0)
 
-The job card is being rebuilt as "one job, one step, one owner" (`doc/plans/jobcard-ux-revamp-prompts.md`). Phase 0 added the model underneath. Phase 1 replaced the job card page with the staged frame described below.
+The job card is "one job, one step, one owner" (`doc/plans/jobcard-ux-revamp-prompts.md`). Phase 0 added the model underneath, phases 1 to 11 built the eight steps, the board and the prints, and phase 12 removed the old job card code (see "Final state and settings checklist (phase 12)").
 
 ### Stage model
 
@@ -312,7 +312,7 @@ Every write takes the job row lock first. The estimate routes accept the supplem
 | | Needs | Then |
 |---|---|---|
 | **Pass quality check** | Every work line Pass ("Check every work item: N left."; a Fail mark: "A work item is marked Fail. Use Fail and return to technician."), every general check ("Confirm every general check: ..."), road test start and end km ("Enter the road test start and end km."; "End km must be the same as or higher than start km."), the signature ("Sign the certification."). 409 `QC_BLOCKED` with the reasons | `QC_PASSED_TO_ADVISOR`: Quality check to Billing with the service advisor. The status stays QC until the advisor marks the vehicle ready (phase 8) |
-| **Fail and return to technician** | A note ("Write what the technician must fix.") and at least one failed line ("Mark Fail on the work items that need rework."), 400 naming the field. Road test km are optional but checked | `RETURN_TO_REPAIR` (QC to IN_PROGRESS through the workflow): the failed inspection is kept as history, the failed work lines go back to Not started with `reopenedAt` set, labour already recorded for them is not charged again |
+| **Fail and return to technician** | A note ("Write what the technician must fix.") and at least one failed line ("Mark Fail on the work items that need rework."), 400 naming the field. Road test km are optional but checked. On the screen, a start km (filled from check-in) with no end km counts as no road test and is not sent (phase 12) | `RETURN_TO_REPAIR` (QC to IN_PROGRESS through the workflow): the failed inspection is kept as history, the failed work lines go back to Not started with `reopenedAt` set, labour already recorded for them is not charged again |
 
 Only the quality check roles (workshop supervisor, general workshop manager, service manager, admins) with `qcstatus:update` and `jobcard:update` may record it (403 `QC_FORBIDDEN`, "Only the workshop supervisor or the service manager can do the quality check."); the job must be at the quality check (409 `QC_BLOCKED`, "This job is not at the quality check. Reload the job."). Migration `20261127180100_qc_supervisor_permission` gives `qcstatus:update` to the service manager (ROLE_PERMISSIONS too); general workshop managers inherit it from workshop managers. Repeating a request ID records once.
 
@@ -465,6 +465,64 @@ Nothing captured prints blank name and date lines for a pen signature. Every oth
 | `GET /service/job-cards/:id/print/gate-pass` | `jobcard:read`, job branch | The slip. 409 `GATE_PASS_NOT_ISSUED` before delivery |
 
 No migration: every printed value was already stored. **Removed:** the in-page gate pass (`JobGatePassPrint`), the `onPrintGatePass` callbacks, and the `print:hidden` classes on the job page that only let the gate pass print alone.
+
+### Final state and settings checklist (phase 12)
+
+#### The journey
+
+A job goes through eight steps, each with one owner. Every step change goes through `JobStageService` (`job-stage.service.ts`) on top of `job-card-workflow.service.ts` and `job-transitions.ts`; nothing else changes `JobCard.status` or `JobCard.stage`.
+
+| Step | Owner | Moves on with | Next owner is told |
+|---|---|---|---|
+| 1 Check-in | Service advisor | Details, walk-around and the customer's consent signature, then **Send to workshop supervisor** | Workshop supervisor |
+| 2 Diagnosis | Workshop supervisor, then technician, then service engineer | Assign technician and bay; findings; **Confirm and send to warranty officer** (or to the advisor when nothing may be warranty) | Technician, engineer, then the next owner |
+| 3 Warranty | Warranty officer | Who pays for every item, a reason when the service history is not regular; **Return to service advisor** | Service advisor |
+| 4 Estimate | Service advisor (cashier for the advance) | Customer approval or phone approval, advance or exemption; **Release to workshop** | Technician, store |
+| 5 Repair | Technician | Every work line done, new findings answered by a supplementary estimate; **Send for quality check** | Workshop supervisor |
+| 6 Quality check | Workshop supervisor | Pass with the road test and signature, or fail back to repair with a note | Service advisor (pass) or technician (fail) |
+| 7 Billing | Service advisor (billing staff for the invoice and payment) | Ready notice, invoice, paid or credit approved; **Send to delivery** | Service advisor |
+| 8 Delivery | Service advisor | Belongings, collector, delivery signature, late reasons when late; **Complete delivery and print gate pass** | Follow-up call list |
+
+Jobs that existed before the revamp sit on the step their status implies (phase 0 mapping). Earlier steps with no information show "Not provided".
+
+#### Removed in phase 12
+
+- The `/repairs` page and `client/features/repairs` (a second job list; the board and the job table on `/job-cards` replace it).
+- The old job card transaction tabs that no screen opened any more: `ServiceTransactions`, `RequisitionPanel`, `RequisitionPartChooser`, `RequisitionStockPreview`, `ReturnPanel`, `LabourPanel`, `RemarksPanel`, `SavedSlip` (slip list and editor), `SavedLabourLine`, `LabourLineEditor`, `TransactionFields`, `use-requisition-part-options`, `useServiceAction`, and their helpers and tests. Parts now move through the approved estimate (phase 5) and parts collection (phase 6); labour is recorded when a work line is marked done.
+- The direct labour line endpoints `GET/POST /service/job-cards/:id/labour` and `PUT/DELETE /service/job-card-labour/:lineId`, and `PATCH /workshop/progress/:id` (a second way to change the status, by percentage).
+- Columns `JobCard.depositReceiptId` (advances live on `Receipt.advanceJobCardId`), `JobCard.progress` (the customer portal now shows the step) and `JobCard.estimatedHours`, in migration `20261128120000_jobcard_final_cleanup`. No data conversion: no job used the deposit column, and the other two held only portal sample values.
+- The local money, date and number helpers in job cards, service documents and late deliveries. They all use `client/lib/format.ts` (`formatMoney`, `formatDate`, `formatDateTime`, `formatTime`, `formatKm`, `formatQuantity`, `lagosDayKey`, `NOT_PROVIDED`).
+
+The internal print page for picking lists and saved slips (`/service-transactions/[kind]/[id]/print`) stays; it now uses the shared formatters and labelled totals.
+
+#### Settings checklist
+
+Check these before the journey is tested on a branch. The demo seed (`yarn prisma:seed:demo`) creates the branch rows and the job card terms where none exist yet; it never overwrites saved values. Values read from the server database on 28 Nov 2026.
+
+| Setting | Where | Value the guides expect | Server, 28 Nov 2026 |
+|---|---|---|---|
+| Job card terms | **Settings**, **Terms & Conditions**, Job card | 12 clauses (clause 3 storage, clause 4 estimation charge, clause 7 delivery only to the signer) | 12 company-wide clauses |
+| Service history rule | **Settings**, **Warranty**, **Service history rule** tab | Every 3 months or 5,000 km, 4 services a year, grace 0 km and 0 days | 3 months, 5,000 km, 4 a year, grace 0 and 0 |
+| Periodic service types | **Settings**, **Workshop Masters**, Service type, tick "Periodic maintenance (counts in the warranty service history)" | 1F, 2F, 3F, 1P, 2P, 3P, 4P, RG and KS flagged; DI, SC, PD, BD and repairs not flagged | As expected. `KP79:1F`, `KP79:3F` and `KP79:RG` (KIA PLAZA copies) are not flagged. TODO(confirm) with the warranty lead whether they count |
+| Step time targets | **Settings**, **Company & Branch Settings**, the branch, "Workshop board time targets" | Check-in 30 min, diagnosis 2 h, warranty 2 h, estimate 2 h, quality check 1 h | Main Branch and Dana Motors Demo: created by the seed with these values |
+| Storage charge | **Settings**, **Company & Branch Settings**, the branch, "Storage charge" | Free for 48 hours after the ready notice, then ₦2,000.00 per day | Same |
+| Estimation charge | **Settings**, **Company & Branch Settings**, the branch, "Estimation charge" | The larger of ₦25,000.00 or 10% of the customer total | Same |
+| Follow-up call | **Settings**, **Company & Branch Settings**, the branch, "Follow-up call" | 2 days after delivery | Same |
+| Roles and permissions | `ROLE_PERMISSIONS` in `server/src/shared/constants/roles.ts` (the role seed resets the database from it) | See below | Matches, except the server's ServiceAdviser role also has `invoice:job-bill:create` (granted by hand, not in `ROLE_PERMISSIONS`) |
+
+Job card permissions per role in `ROLE_PERMISSIONS`:
+
+| Role | Job card permissions |
+|---|---|
+| ServiceAdviser (advisor) | `jobcard:read`, `jobcard:create`, `jobcard:update`, `estimate:create`, `estimate:print`, `warranty:read`, `invoice:create`, `workshop:read` |
+| WorkshopManager (supervisor) | the advisor's job card set plus `assignment:create`, `jobprogress:update`, `qcstatus:update`, `jobcard:late-reason:update` |
+| Technician | `jobcard:read`, `jobcard:update`, `jobprogress:update`, `workshop:read` |
+| Engineer | `jobcard:read`, `jobcard:update`, `workshop:read` |
+| WarrantyOfficer | `jobcard:read`, `jobcard:update`, `warranty:read`, `warranty:update` |
+| BillingOfficer (cashier) | `jobcard:read`, `receipt:create`, `invoice:job-bill:create` |
+| ServiceManager | `jobcard:read`, `jobcard:create`, `qcstatus:update`, `estimate:create`, `estimate:print`, `warranty:read`, `invoice:create`, `jobcard:late-reason:update`, `workshop:read`; credit and release approvals are by role |
+
+Main Branch on the server has no active Engineer, so an Admin confirms diagnoses there (admins may act as the service engineer). TODO(confirm): add an Engineer account at Main Branch before go-live.
 
 ### Vehicles with multiple job cards (issue 142)
 
@@ -783,7 +841,7 @@ Targeted checks: backend `estimate-revision`, `estimate-signature`, `estimate-ap
 
 ## Service transactions (issue #113)
 
-The **Service transactions** section on a job card contains Requisition, Returns, Labour and Remarks tabs. Booking creation and conversion remain in **Appointments**. The six reference screens are represented by these existing flows and internal print pages; no second customer, vehicle, appointment, labour or stock model was introduced. Customer and vehicle selectors retain their existing inline creation forms and duplicate warnings.
+The job card's old **Service transactions** tabs (Requisition, Returns, Labour and Remarks) were removed in phase 12 of the job card revamp; parts and labour now follow the staged job card. The endpoints below stay for the store, inventory and print screens. Booking creation and conversion remain in **Appointments**. The six reference screens are represented by these existing flows and internal print pages; no second customer, vehicle, appointment, labour or stock model was introduced. Customer and vehicle selectors retain their existing inline creation forms and duplicate warnings.
 
 All API paths below are relative to `/api`. Authentication and the listed permission are required. Staff are restricted to their branch; foreign-branch requests return 403 unless they have `branch:all` or are SuperAdmin. An unassigned legacy standalone estimate needs a branch before remarks/print actions, even for all-branch staff. Client controls do not replace these server checks. Dates use **Africa/Lagos**; send timestamps with an explicit offset or `Z`, and interpret date-only booking filters as Lagos days.
 

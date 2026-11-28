@@ -50,11 +50,8 @@ import {
   serviceIdParamSchema,
   jobCardIdParamSchema,
   estimateIdParamSchema,
-  labourLineIdParamSchema,
   createLabourItemSchema,
   updateLabourItemSchema,
-  createJobCardLabourSchema,
-  updateJobCardLabourSchema,
   stageActionSchema,
 } from "./service.validation";
 
@@ -315,33 +312,6 @@ router.put(
  *     summary: Update a labour catalogue item
  *     responses:
  *       200: { description: Labour item updated }
- * /service/job-cards/{id}/labour:
- *   get:
- *     tags: [Service & Job Cards]
- *     summary: List labour recorded on a job card
- *     responses:
- *       200: { description: Job-card labour lines }
- *   post:
- *     tags: [Service & Job Cards]
- *     summary: Add a labour line to an open job card
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           example: { labourItemId: '550e8400-e29b-41d4-a716-446655440000', hours: 2, technicianId: '550e8400-e29b-41d4-a716-446655440001' }
- *     responses:
- *       201: { description: Job-card labour line created with a rate snapshot }
- * /service/job-card-labour/{lineId}:
- *   put:
- *     tags: [Service & Job Cards]
- *     summary: Update an unbilled job-card labour line
- *     responses:
- *       200: { description: Job-card labour line updated }
- *   delete:
- *     tags: [Service & Job Cards]
- *     summary: Remove an unbilled job-card labour line
- *     responses:
- *       200: { description: Job-card labour line removed }
  */
 router.get(
   "/labour-items",
@@ -367,30 +337,6 @@ router.put(
   requirePermission(PERMISSIONS.LABOUR_ITEM_UPDATE),
   validateRequest(updateLabourItemSchema),
   controller.updateLabourItem,
-);
-router.get(
-  "/job-cards/:id/labour",
-  requirePermission(PERMISSIONS.JOBCARD_READ),
-  validateRequest(jobCardIdParamSchema),
-  controller.listJobCardLabour,
-);
-router.post(
-  "/job-cards/:id/labour",
-  requirePermission(PERMISSIONS.JOBLABOUR_UPDATE),
-  validateRequest(createJobCardLabourSchema),
-  controller.addJobCardLabour,
-);
-router.put(
-  "/job-card-labour/:lineId",
-  requirePermission(PERMISSIONS.JOBLABOUR_UPDATE),
-  validateRequest(updateJobCardLabourSchema),
-  controller.updateJobCardLabour,
-);
-router.delete(
-  "/job-card-labour/:lineId",
-  requirePermission(PERMISSIONS.JOBLABOUR_UPDATE),
-  validateRequest(labourLineIdParamSchema),
-  controller.removeJobCardLabour,
 );
 
 /**

@@ -744,8 +744,6 @@ model JobCard {
   externalServiceRecords   ExternalServiceRecord[]
   advanceReceipts          Receipt[]               @relation("JobAdvances")
   consolidatedInvoices     Invoice[]               @relation("WarrantyJobBills")
-  depositReceiptId         String?                 @unique
-  depositReceipt           Receipt?                @relation("JobDeposit", fields: [depositReceiptId], references: [id], onDelete: Restrict)
   followUpAppointments     ServiceAppointment[]    @relation("BookingFollowUp")
   requisitions             PartRequisition[]
   returnSlips              PartReturnSlip[]
@@ -833,7 +831,6 @@ model JobCard {
   stageOwnerRole         String?
   stageEnteredAt         DateTime          @default(now())
   stageEvents            JobStageEvent[]
-  estimatedHours         Float?
   tyres                  Json?
   batteryMake            String?
   batteryNumber          String?
@@ -854,8 +851,6 @@ model JobCard {
   workLines              JobWorkLine[]
   /// Billing (phase 8): every time the customer was told the vehicle is ready. The first starts the storage counter.
   customerContacts       CustomerContact[]
-
-  progress Int? @default(0)
 
   qualityInspectorId String?
   qualityInspector   User?   @relation("QualityInspectorAssignments", fields: [qualityInspectorId], references: [id], onDelete: SetNull)
@@ -2025,7 +2020,6 @@ model Receipt {
   advanceJobCardId String?
   advanceJobCard   JobCard? @relation("JobAdvances", fields: [advanceJobCardId], references: [id], onDelete: Restrict)
   advanceSnapshot  Json?
-  depositJobCard   JobCard? @relation("JobDeposit")
   id               String   @id @default(uuid())
   branchId         String?
   branch           Branch?  @relation(fields: [branchId], references: [id], onDelete: Restrict)

@@ -54,7 +54,6 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/invoices": ["invoice:read"],
   "/labour-catalogue": ["labour-item:read"],
   "/inspections": ["inspection:read"],
-  "/repairs": ["jobcard:update", "workshop:read"],
   "/technicians": ["workshop:read"],
   "/inventory/part-query": [INVENTORY_PERMISSIONS.STOCK_READ],
   "/inventory/part-catalogue": [INVENTORY_PERMISSIONS.SPAREPART_READ],

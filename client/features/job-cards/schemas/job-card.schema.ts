@@ -71,4 +71,3 @@ export const createJobCardSchema = z
   });
 
 export type CreateJobCardFormValues = z.infer<typeof createJobCardSchema>;
-export type CreateJobCardFormInput = z.input<typeof createJobCardSchema>;

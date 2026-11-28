@@ -1,24 +1,18 @@
 "use client";
+import { formatDate } from "@/lib/format";
 import { useId, useRef, useState, type ReactNode } from "react";
 import { CalendarDays, ChevronDown, Clock, LockKeyhole } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 import { openingTimeParts, openingTimeValue, type OpeningTimeParts } from "./opening-time";
 export const openingInput =
   "h-10 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60";
+/** A picked calendar day (local midnight from the date picker) as YYYY-MM-DD. */
+const pickedDay = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
 export const openingGrid =
   "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3";
 
-export const money = (value: number) =>
-  new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-    minimumFractionDigits: 2,
-  }).format(value);
-
-export const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString("en-GB") : "Not recorded";
-export const localDate = (date: Date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
 export function OpeningField({
   label,
@@ -297,7 +291,7 @@ export function OpeningDatePicker({
         className={`${openingInput} flex items-center justify-between gap-2 text-left`}
       >
         <span className={value ? "" : "text-muted-foreground"}>
-          {value ? formatDate(`${value}T00:00:00`) : "dd/mm/yyyy"}
+          {value ? formatDate(`${value}T12:00:00+01:00`) : "dd/mm/yyyy"}
         </span>
         <CalendarDays className="h-4 w-4 text-muted-foreground" />
       </button>
@@ -317,7 +311,7 @@ export function OpeningDatePicker({
             disabled={minimum ? { before: minimum } : undefined}
             onSelect={(date) => {
               if (!date || (minimum && date < minimum)) return;
-              onChange(localDate(date));
+              onChange(pickedDay(date));
               close();
             }}
             className="relative mx-auto w-fit"

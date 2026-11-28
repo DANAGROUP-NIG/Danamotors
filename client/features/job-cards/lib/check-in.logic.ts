@@ -3,7 +3,7 @@
  * consent steps. Components only render what these return.
  */
 import type { StatusTone } from "@/components/ui/table-components/StatusBadge";
-import { formatDate, formatKm, NOT_PROVIDED } from "@/lib/format";
+import { NOT_PROVIDED, formatDate, formatKm, formatTime } from "@/lib/format";
 import type {
   CheckInGates,
   CheckInServiceHistory,
@@ -177,8 +177,6 @@ export const PHOTO_SLOT_LABELS: Record<CheckInPhotoSlot, string> = {
   ODOMETER: "Odometer",
 };
 
-const time = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Africa/Lagos" });
-
 export type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved"; at: string } | { kind: "error"; message: string } | { kind: "conflict" };
 
 /** The words beside the walk-around: "Saving", "Saved 10:42", or what went wrong. */
@@ -189,7 +187,7 @@ export function saveStateText(state: SaveState): string {
     case "saving":
       return "Saving";
     case "saved":
-      return `Saved ${time.format(new Date(state.at))}`;
+      return `Saved ${formatTime(state.at)}`;
     case "error":
       return `Not saved. ${state.message}`;
     case "conflict":

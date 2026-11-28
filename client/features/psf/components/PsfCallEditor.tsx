@@ -20,8 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { formatDate, formatDateTime, lagosDay } from "@/features/late-deliveries/lib/late-delivery.logic";
-import { NOT_PROVIDED } from "@/lib/format";
+import { NOT_PROVIDED, formatDate, formatDateTime, lagosDayKey } from "@/lib/format";
 import { AlertBanner, DetailField, SectionCard } from "@/features/warranty/components/ui";
 import { cn } from "@/lib/utils";
 import { usePsfServiceTypes, useRecordPsfCall } from "../hooks/use-psf";
@@ -53,7 +52,7 @@ interface EditorProps {
 }
 
 function emptyDraft(detail: PsfDetail): CallDraft {
-  const tomorrow = addDays(lagosDay(new Date()), 1);
+  const tomorrow = addDays(lagosDayKey(new Date()), 1);
   return { status: null, remark: "", lineStatuses: initialLineStatuses(detail.lines), booking: { enabled: false, date: tomorrow, time: "09:00", serviceTypeId: "", notes: "" } };
 }
 
@@ -115,9 +114,9 @@ export function PsfCallEditor({ detail, onDirtyChange, onPrevious, onNext }: Edi
     setTouched(false);
   };
 
-  const today = lagosDay(new Date());
-  const deliveredDays = daysSince(lagosDay(new Date(detail.deliveredAt)), today);
-  const vehicle = [detail.model, detail.variant].filter(Boolean).join(" · ") || "Model not set";
+  const today = lagosDayKey(new Date());
+  const deliveredDays = daysSince(lagosDayKey(new Date(detail.deliveredAt)), today);
+  const vehicle = [detail.model, detail.variant].filter(Boolean).join(", ") || "Model not set";
 
   return (
     <div className="space-y-4">
@@ -130,7 +129,7 @@ export function PsfCallEditor({ detail, onDirtyChange, onPrevious, onNext }: Edi
             {detail.followUp && <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">{detail.followUp.callCount} call{detail.followUp.callCount === 1 ? "" : "s"}</span>}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            <span className="font-semibold tracking-wide text-slate-700">{detail.registration ?? "No registration"}</span> · {vehicle}
+            <span className="font-semibold tracking-wide text-slate-700">{detail.registration ?? "No registration"}</span>, {vehicle}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -166,7 +165,7 @@ export function PsfCallEditor({ detail, onDirtyChange, onPrevious, onNext }: Edi
               icon={<PhoneCall />}
               title={detail.followUp ? "Record another call" : "Record the call"}
               note={detail.followUp ? `Attempt ${detail.followUp.callCount + 1}` : "First attempt"}
-              action={<span className="hidden items-center gap-1 text-xs text-muted-foreground md:inline-flex"><Keyboard className="size-3.5" /> Press 1–5</span>}
+              action={<span className="hidden items-center gap-1 text-xs text-muted-foreground md:inline-flex"><Keyboard className="size-3.5" /> Press 1 to 5</span>}
             >
               <div role="radiogroup" aria-label="Outcome of the call" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
                 {PSF_STATUS_ORDER.map((status) => {
@@ -332,7 +331,7 @@ function LinesTable({
 
 function BookingFields({ detail, draft, contacted, onChange }: { detail: PsfDetail; draft: CallDraft; contacted: boolean; onChange: (booking: Partial<CallDraft["booking"]>) => void }) {
   const serviceTypes = usePsfServiceTypes();
-  const today = lagosDay(new Date());
+  const today = lagosDayKey(new Date());
   return (
     <div className={cn("mt-5 rounded-lg border p-3", draft.booking.enabled ? "border-primary/30 bg-primary/5" : "border-slate-200")}>
       <label className={cn("flex items-center gap-2 text-sm font-medium", contacted ? "text-slate-700" : "text-slate-400")}>
@@ -344,7 +343,7 @@ function BookingFields({ detail, draft, contacted, onChange }: { detail: PsfDeta
         <div className="mt-3 space-y-3">
           {detail.activeBooking && (
             <p className="rounded-md bg-white px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200">
-              This vehicle already has booking <span className="font-mono font-semibold">{detail.activeBooking.bookingNumber ?? "—"}</span> on {formatDateTime(detail.activeBooking.scheduledAt)}. Saving links the call to it instead of creating a new one.
+              This vehicle already has booking <span className="font-mono font-semibold">{detail.activeBooking.bookingNumber ?? NOT_PROVIDED}</span> on {formatDateTime(detail.activeBooking.scheduledAt)}. Saving links the call to it instead of creating a new one.
             </p>
           )}
           <div className="grid gap-3 sm:grid-cols-3">
@@ -361,7 +360,7 @@ function BookingFields({ detail, draft, contacted, onChange }: { detail: PsfDeta
               <select value={draft.booking.serviceTypeId} onChange={(event) => onChange({ serviceTypeId: event.target.value })} className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800 shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                 <option value="">Not specified</option>
                 {(serviceTypes.data ?? []).map((type) => (
-                  <option key={type.id} value={type.id}>{type.code} · {type.description}</option>
+                  <option key={type.id} value={type.id}>{type.code}, {type.description}</option>
                 ))}
               </select>
             </label>
@@ -382,7 +381,7 @@ function CallHistory({ detail }: { detail: PsfDetail }) {
           <span className="mt-1.5 size-2 shrink-0 rounded-full bg-slate-300" aria-hidden />
           <div>
             <p className="flex items-center gap-1.5 text-slate-800"><Truck className="size-3.5 text-slate-400" /> Delivered{detail.deliveryAdvisor ? <> by <span className="font-medium">{detail.deliveryAdvisor}</span></> : null}</p>
-            <p className="text-xs text-muted-foreground">{formatDateTime(detail.deliveredAt)} · {detail.branch.name}</p>
+            <p className="text-xs text-muted-foreground">{formatDateTime(detail.deliveredAt)}, {detail.branch.name}</p>
           </div>
         </li>
       </ol>
@@ -399,7 +398,7 @@ function CallEntry({ call, attempt }: { call: PsfCall; attempt: number }) {
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-2">
           <PsfStatusBadge status={call.status} />
-          <span className="text-xs text-muted-foreground">Attempt {attempt} · {formatDateTime(call.calledAt)}{call.calledBy ? ` · ${call.calledBy}` : ""}</span>
+          <span className="text-xs text-muted-foreground">Attempt {attempt}, {formatDateTime(call.calledAt)}{call.calledBy ? `, ${call.calledBy}` : ""}</span>
         </p>
         {call.remark && <p className="mt-1 text-slate-700">“{call.remark}”</p>}
         {unhappy.length > 0 && (
@@ -414,8 +413,8 @@ function CallEntry({ call, attempt }: { call: PsfCall; attempt: number }) {
         {call.bookingAt && (
           <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-primary/5 px-2 py-1 text-xs text-slate-700">
             <CalendarPlus className="size-3.5 text-primary" /> Booked for {formatDateTime(call.bookingAt)}
-            {call.bookingServiceType ? ` · ${call.bookingServiceType.code}` : ""}
-            {call.appointment?.bookingNumber ? <span className="font-mono"> · {call.appointment.bookingNumber}</span> : null}
+            {call.bookingServiceType ? `, ${call.bookingServiceType.code}` : ""}
+            {call.appointment?.bookingNumber ? <span className="font-mono">, {call.appointment.bookingNumber}</span> : null}
           </p>
         )}
       </div>

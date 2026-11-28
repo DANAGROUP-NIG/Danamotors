@@ -28,7 +28,7 @@ export function EstimateReadOnly({ step, compact = false }: { step: JobEstimateS
             {section.lines.length === 0 ? (
               <p className="px-3 py-2 text-sm text-muted-foreground">No items.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full min-w-[30rem] text-sm">
                   <thead>
                     <tr className="border-b border-border text-left text-xs text-muted-foreground">

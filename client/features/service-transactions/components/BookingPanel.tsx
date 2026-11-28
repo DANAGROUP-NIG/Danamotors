@@ -1,4 +1,5 @@
 "use client";
+import { formatDateTime, formatMoney } from "@/lib/format";
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -18,10 +19,8 @@ import { BookingFields } from "./BookingFields";
 import { bookingExtras, bookingOpeningValues, bookingRequestPayload, bookingRequestsEqual } from "../booking.logic";
 import {
   canEditBooking,
-  lagosDate,
   lagosInput,
   lagosIso,
-  moneyText,
 } from "../transaction.logic";
 export function BookingPanel({ appointment }: { appointment: Appointment }) {
   const { hasPermission } = useAuth();
@@ -57,7 +56,7 @@ export function BookingPanel({ appointment }: { appointment: Appointment }) {
         </div>
         <div>
           <dt className="text-muted-foreground">Booked on (Lagos)</dt>
-          <dd>{lagosDate(appointment.createdAt)}</dd>
+          <dd>{formatDateTime(appointment.createdAt)}</dd>
         </div>
       </dl>
       {appointment.cancelReason && (
@@ -113,7 +112,7 @@ export function BookingPanel({ appointment }: { appointment: Appointment }) {
                   .replace("estimated", "")
                   .replace("Total", "Total estimate") || key}
               </dt>
-              <dd>{moneyText(value)}</dd>
+              <dd>{formatMoney(value)}</dd>
             </div>
           ))}
         </dl>

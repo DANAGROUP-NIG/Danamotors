@@ -40,6 +40,7 @@ import { printSummary } from "./summary";
 import { CAMPAIGNS, DEMO_TAG, JOBS, STAGE_JOBS } from "./fixtures";
 import { seedStageBooking } from "./check-in";
 import { prepareWarrantyDemo } from "./warranty-check";
+import { ensureJobCardSettings } from "./settings";
 
 const USAGE = "Usage: npm run prisma:seed:demo -- [--reset-test] [--pdi-only] [--repeat-only] [--csc-only] [--late-only] [--psf-only] [--stage-only] [--allow-database=<name>] [--main-branch=<name>] [--second-branch=<name>]";
 
@@ -111,6 +112,7 @@ async function main() {
 
   const ref = await ensureReference(ctx);
   console.log("Reference data ready: workshop models, labour operations, parts and opening stock");
+  for (const note of await ensureJobCardSettings(ctx)) console.log(`  ${note}`);
   if (options.repeatOnly) {
     await printRepeat(ctx, ref);
     console.log(`\n${DEMO_TAG}: repeat job demo done. Running it again changes nothing.`);
@@ -146,6 +148,8 @@ async function main() {
       seeded.set(job.id, result);
       console.log(`job card ${result.jobNumber}`);
     }
+    await seedStageBooking(ctx, ref, parties);
+    console.log("  Bookings ready to open: KJA-523ST and LSR-549ST (when not opened yet)");
     console.log(`\n${DEMO_TAG}: staged job card jobs done. Running it again changes nothing.`);
     return;
   }

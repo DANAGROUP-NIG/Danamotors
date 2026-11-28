@@ -42,6 +42,7 @@ function loader(stubs = {}) {
 
 const load = loader({ "next/link": { __esModule: true, default: (props) => React.createElement("a", { ...props, href: props.href }, props.children) } });
 const logic = load("features/job-cards/lib/board.logic.ts");
+const format = load("lib/format.ts");
 const plain = (value) => JSON.parse(JSON.stringify(value));
 const params = (query) => new URLSearchParams(query);
 const now = new Date("2026-11-27T14:00:00.000Z"); // 15:00 in Lagos
@@ -78,7 +79,7 @@ test("durations, targets and the promised time in Lagos", () => {
   assert.equal(logic.isOverdue("IN_REPAIR", "2026-11-27T13:59:00.000Z", now), true);
   assert.equal(logic.isOverdue("READY", "2026-11-27T13:59:00.000Z", now), false);
   assert.equal(logic.isOverdue("IN_REPAIR", null, now), false);
-  assert.equal(logic.lagosDate(new Date("2026-11-27T23:30:00.000Z")), "2026-11-28");
+  assert.equal(format.lagosDayKey(new Date("2026-11-27T23:30:00.000Z")), "2026-11-28");
 });
 
 test("owner wording and initials", () => {

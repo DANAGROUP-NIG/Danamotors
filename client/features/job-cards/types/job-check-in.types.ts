@@ -81,10 +81,6 @@ export interface CheckInDetailsInput {
   instructionsToTechnician: string | null;
 }
 
-export interface WalkAroundInput extends WalkAroundDraft {
-  expectedVersion: number;
-}
-
 export interface DamageMarkInput {
   requestId: string;
   type: DamageType;

@@ -1,7 +1,7 @@
 import { assertApprovedOperation } from './estimate-approval';
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
-import { BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
+import { BadRequestError, NotFoundError } from '../../shared/errors/appError';
 import { canonicalJobStatus } from './job-card-workflow.service';
 import { resetQualityCheck } from './job-stage.writer';
 import { setNotificationActor } from '../notification/jobcard-notification-router';
@@ -67,20 +67,6 @@ export class LabourService {
     });
   }
 
-  async listJobCardLines(jobCardId: string) {
-    const jobCard = await prisma.jobCard.findUnique({ where: { id: jobCardId }, select: { id: true } });
-    if (!jobCard) throw new NotFoundError('Job card not found');
-    return prisma.jobCardLabour.findMany({
-      where: { jobCardId },
-      include: {
-        labourItem: { select: { id: true, code: true, description: true } },
-        technician: { select: { id: true, firstName: true, lastName: true } },
-        mechanic: { select: { id: true, code: true, name: true } },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
-  }
-
   private async lockJobCard(transaction: Prisma.TransactionClient, jobCardId: string) {
     await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobCardId} FOR UPDATE`);
   }
@@ -94,18 +80,16 @@ export class LabourService {
     return jobCard;
   }
 
-  async resolveLine(transaction: Prisma.TransactionClient, input: { labourItemId: string; hours?: number; rate?: number; standardHours?: number; pricing?: string; storeChargedHours?: boolean; technicianId?: string | null; mechanicId?: string | null; keepMechanic?: boolean; branchId: string; vehicleId?: string | null }) {
+  async resolveLine(transaction: Prisma.TransactionClient, input: { labourItemId: string; hours?: number; rate?: number; standardHours?: number; pricing?: string; storeChargedHours?: boolean; technicianId?: string | null; mechanicId?: string | null; branchId: string; vehicleId?: string | null }) {
     const labourItem = await transaction.labourItem.findFirst({ where: { id: input.labourItemId, active: true } });
     if (!labourItem) throw new NotFoundError('Active labour item not found');
     // The mechanic is an employee of the job card's branch; their login, if any, becomes the technician.
     let technicianId = input.technicianId ?? null;
     if (input.mechanicId) {
-      if (!input.keepMechanic) {
-        const mechanic = await transaction.employee.findFirst({ where: { id: input.mechanicId, ...currentEmployeeWhere() } });
-        if (!mechanic) throw new NotFoundError('Current employee not found');
-        if (mechanic.branchId !== input.branchId) throw new BadRequestError('The mechanic must belong to the job card branch');
-        technicianId = mechanic.userId;
-      }
+      const mechanic = await transaction.employee.findFirst({ where: { id: input.mechanicId, ...currentEmployeeWhere() } });
+      if (!mechanic) throw new NotFoundError('Current employee not found');
+      if (mechanic.branchId !== input.branchId) throw new BadRequestError('The mechanic must belong to the job card branch');
+      technicianId = mechanic.userId;
     } else if (input.technicianId) {
       const technician = await transaction.user.findUnique({ where: { id: input.technicianId }, include: { role: true } });
       if (!technician || !technician.isActive || technician.role.name !== ROLES.TECHNICIAN) throw new NotFoundError('Active technician not found');
@@ -150,52 +134,6 @@ export class LabourService {
         data: { jobCardId: jobCard.id, ...values },
         include: { labourItem: true, technician: { select: { id: true, firstName: true, lastName: true } }, mechanic: { select: { id: true, code: true, name: true } } },
       });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 15000 });
-  }
-
-  async updateJobCardLine(id: string, input: { labourItemId?: string; hours?: number; rate?: number; technicianId?: string | null; mechanicId?: string | null }, actorId?: string) {
-    return prisma.$transaction(async (transaction) => {
-      await setNotificationActor(transaction, actorId);
-      const existing = await transaction.jobCardLabour.findUnique({ where: { id } });
-      if (!existing) throw new NotFoundError('Job-card labour line not found');
-      if (existing.labourSlipId) throw new ConflictError('Edit the labour slip to change this labour line');
-      await this.lockJobCard(transaction, existing.jobCardId);
-      const jobCard = await this.assertJobCardOpen(existing.jobCardId, transaction);
-      const values = await this.resolveLine(transaction, {
-        vehicleId: jobCard.vehicleId,
-        labourItemId: input.labourItemId ?? existing.labourItemId,
-        hours: input.hours ?? existing.hours,
-        rate: input.rate ?? existing.rate,
-        standardHours: !input.labourItemId || input.labourItemId === existing.labourItemId ? existing.standardHours ?? undefined : undefined,
-        pricing: !input.labourItemId || input.labourItemId === existing.labourItemId ? existing.pricing ?? undefined : undefined,
-        // A line assigned by mechanic keeps its mechanic unless another is chosen.
-        mechanicId: input.mechanicId !== undefined ? input.mechanicId : input.technicianId !== undefined ? null : existing.mechanicId,
-        // An unchanged mechanic stays valid even after they leave.
-        keepMechanic: input.mechanicId === undefined || input.mechanicId === existing.mechanicId,
-        technicianId: input.technicianId === undefined ? existing.technicianId : input.technicianId,
-        branchId: (await transaction.jobCard.findUniqueOrThrow({ where: { id: existing.jobCardId }, select: { branchId: true } })).branchId,
-      });
-      const previous = await transaction.jobCardLabour.findMany({ where: { jobCardId: existing.jobCardId, labourItemId: values.labourItemId, id: { not: id } } });
-      await assertApprovedOperation(transaction, existing.jobCardId, jobCard.customerId, [...previous, values].map(line => ({ type: 'LABOUR', referenceId: line.labourItemId, description: line.description, quantity: line.pricing === 'FIXED' ? 1 : line.hours, rate: line.rate, amount: line.amount })));
-      await resetQualityCheck(transaction, existing.jobCardId, actorId ?? null);
-      return transaction.jobCardLabour.update({
-        where: { id },
-        data: values,
-        include: { labourItem: true, technician: { select: { id: true, firstName: true, lastName: true } }, mechanic: { select: { id: true, code: true, name: true } } },
-      });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 15000 });
-  }
-
-  async removeJobCardLine(id: string, actorId?: string) {
-    await prisma.$transaction(async (transaction) => {
-      await setNotificationActor(transaction, actorId);
-      const existing = await transaction.jobCardLabour.findUnique({ where: { id } });
-      if (!existing) throw new NotFoundError('Job-card labour line not found');
-      if (existing.labourSlipId) throw new ConflictError('Document-managed labour cannot be removed through the legacy labour endpoint');
-      await this.lockJobCard(transaction, existing.jobCardId);
-      await this.assertJobCardOpen(existing.jobCardId, transaction);
-      await resetQualityCheck(transaction, existing.jobCardId, actorId ?? null);
-      await transaction.jobCardLabour.delete({ where: { id } });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 15000 });
   }
 }

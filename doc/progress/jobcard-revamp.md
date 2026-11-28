@@ -431,3 +431,65 @@ Built on Jayking (no phase branch, at the owner's request).
 
 - The shared `ActionMenu` rendered its items at the end of the page, so keyboard users could open a menu but never reach its items with Tab. Opening a menu now focuses its first item; the arrow keys, Tab, Home and End move through the items; Esc closes it and returns focus to the button.
 - Chrome does not accept the `A6` page keyword (the slip came out Letter size); the slip's page size is given in millimetres.
+
+## Phase 12: Final clean-up and verification (28 Nov 2026)
+
+Built on Jayking (no phase branch, at the owner's request). No design images.
+
+### Plan
+
+1. Find old job card code by reachability from the app's pages (client) and the server entry points, then unused exports and endpoints no client calls.
+2. Delete it with its tests; drop the obsolete columns in one migration with the readers updated (customer portal shows the step instead of a percentage).
+3. Move job cards, service documents and late deliveries fully onto `client/lib/format.ts`.
+4. Settings: a demo seed step that creates the branch settings and the job card terms where none exist; the checklist in `doc/job-cards.md` with the server values.
+5. Verify once: server and client suites, typecheck, lint, build, character scan, migrate and seed the server, one job through all 8 steps in the browser at 1440, 1024 and 390 px.
+6. Docs: `doc/job-cards.md`, this file, the phase 12 manual test guide and six staff quick guides in `doc/staff-guides/`.
+
+### Status (milestones)
+
+- [x] Recon: client reachability from the app's pages, unused exports, server routes no client calls, columns no reader needs.
+- [x] Clean-up: client and server code removed (list below); migration `20261128120000_jobcard_final_cleanup` generated against a copy of the phase 11 demo database (`dana_dev_p12`) and trimmed to the JobCard changes (the generated diff also carried other teams' drift); residual JobCard diff is only the pre-existing `engineerId` foreign key drift.
+- [x] Shared formatters: job cards, service documents and late deliveries use `client/lib/format.ts` only (`formatQuantity` and `lagosDayKey` added).
+- [x] Settings: `prisma/seed/demo/settings.ts`; checklist in `doc/job-cards.md`. Verified on a copy with the rows removed (created) and on a copy with them saved (left alone).
+- [x] Demo seed: journey booking LSR-549ST; the bookings now also seed in `--stage-only`. Local template `dana_demo_p12`.
+- [x] Server database, 28 Nov 2026: demo seed `--stage-only --allow-database=danagroup_danamotors_dev` run: branch settings created for Main Branch and Dana Motors Demo with the job card defaults, the 12 terms left as they were, booking 2026000019 (LSR-549ST, Adaeze Okafor) created. Read back afterwards.
+- [ ] Server database: migration `20261128120000_jobcard_final_cleanup` **not applied yet**. It drops three JobCard columns on a database other teams' branches also use; held for the owner's decision, as the phase 3 and phase 5 drops were.
+- [x] Docs: `doc/job-cards.md` ("Final state and settings checklist (phase 12)"), `doc/demo-data.md`, manual test guide `doc/testing/jobcard-revamp/phase-12-manual-test.md`, staff quick guides `doc/staff-guides/`.
+- [ ] Owner's sign-off after the full journey on the test site (section 7 of the phase 12 guide).
+
+### Removed
+
+Client:
+- `/repairs` page, `features/repairs` (api, keys, hook, page), the `/repairs` entries in `proxy.ts` and the dashboard route permissions. No menu linked to it; the board and job table replace it.
+- `features/service-transactions`: `ServiceTransactions`, `RequisitionPanel`, `RequisitionPartChooser`, `RequisitionStockPreview`, `ReturnPanel`, `LabourPanel`, `RemarksPanel`, `SavedSlip` (`SlipList`, `SavedSlip`), `SavedLabourLine`, `LabourLineEditor`, `TransactionFields` (`PayerFields`, `AssignmentFields`), `hooks/use-requisition-part-options`, `useServiceAction`; from `transaction.logic.ts` `chooseRequisitionSupply`, `requisitionLinePayload`, `RequisitionPartDraft`, `canWriteTransactions`, `labourBody`, `savedLabourDraft`, `lagosDate`, `moneyText`; from `document.types.ts` `slipListKeys`, `ChargeType`, `TransactionJob`, `RemarksDocument`, `Payer`, `LabourDraft`. Unhooked from the job card in phase 6, never deleted.
+- `features/job-cards`: `components/signature-fields.ts` (old signature dialog rule), `CampaignPrintBox`, `PAYER_LABEL`, `EXEMPTION_LABEL`, `duplicateLine`, `workLeft`, `notProvided`, `formatQuantity` (diagnosis copy), `lagosDate` (board copy), opening-ui `money`, `formatDate`, `localDate`; types `CreateJobCardFormInput`, `CheckInDetailsValues`, `WalkAroundInput`, and `depositReceiptId`, `estimatedHours`, `progress` on `JobCard`.
+- `lib/constants/apiRoutes.ts`: `service.jobCardLabour`, `service.jobCardLabourLine`.
+- Late deliveries' local `formatDate`, `formatTime`, `formatDateTime`, `lagosDay` (PSF used them too and now uses the shared ones).
+- Tests for the deleted code: 10 render tests in `service-transactions-ui.test.mjs`, 4 in `service-transactions.test.mjs`, the signature rule in `issue117-components.test.mjs`.
+
+Server:
+- `GET/POST /service/job-cards/:id/labour`, `PUT/DELETE /service/job-card-labour/:lineId` (routes, OpenAPI block, controller methods, `createJobCardLabourSchema`, `updateJobCardLabourSchema`, `labourLineIdParamSchema`, `LabourService.listJobCardLines`, `updateJobCardLine`, `removeJobCardLine` and the now unused `keepMechanic` option).
+- `PATCH /workshop/progress/:id` (route, OpenAPI block, controller, `WorkshopService.updateProgress`, `updateJobProgressSchema`, the audit map entry, `jobCardStatus`). It was a second way to change the job status.
+- `estimatedHours` in the opening schema; an unused `scopeJobCard` import.
+- Columns `JobCard.depositReceiptId` (with its unique index, foreign key and the `Receipt.depositJobCard` relation), `JobCard.progress`, `JobCard.estimatedHours`: migration `20261128120000_jobcard_final_cleanup`.
+- Kept on purpose: `LabourService.addJobCardLine` (integration tests of warranty, stage, workshop and labour slips use it to build legacy labour lines through the real approval gate); `JobCard.inHouse` (17 jobs on the server carry a real value); `JobCard.customField1` (the demo seed's idempotency key).
+
+Outside the revamp and left alone: orphaned dashboards (`AccountantDashboard`, `AdminDashboard`, `ServiceAdvisorDashboard`, `TechnicianDashboard`, `WorkshopManagerDashboard`, unused since 24 Oct), `workshop.openapi.routes.ts`, a few unused UI primitives.
+
+### Tests (28 Nov 2026)
+
+- Server, the full suite once on the local test database (fast transpile-only Jest): 2,400 passed, 56 failed, 9 skipped (2,465 tests in 219 suites). The 56 failures are in 12 suites, each on a cause outside this phase: vehicles created without a model (booking, labour slip, workshop integration), negative job card line amounts (return slip), a synthetic audit failure fixture (requisition), a Jest dynamic-import limit (service document), registration required (FPC), the phase 5 advance rule in an old fixture (warranty), receipt dates (books closed), part source rules (part source), stock transfer fixtures, and a `ROLE_PERMISSIONS` expectation table (`roles.issue117`, roles unchanged here). Touched modules (service, workshop, customer portal, middleware, quality check, stage): 303 passed. Server typecheck clean.
+- Client: all tests 156 of 157 (`issue117-components`, missing `BillHeads`, as before; 15 tests for deleted code removed, 1 added for the slip totals; the quality check test covers the new fail rule). Typecheck clean, lint 0 errors (74 old warnings), production build passes with no `/repairs` route.
+- Browser (Playwright): new `phase-12-journey.spec.ts` 9 of 9: LSR-549ST from booking to gate pass with the advisor, supervisor, technician (phone), engineer, warranty officer and cashier; a declined item, a supplementary part approved by the customer, a failed then passed quality check, invoice and payment, delivery to the owner, the closed job and its Activity; every step owner's screen at 1440, 1024 and 390 px with no sideways scrolling and no forbidden text, 47 screenshots. Phases 5 (8 of 8), 7 (5 of 5) and 8 (7 of 7) again after the estimate, table and quality check changes.
+- Character scan of every changed code file: no emoji, replacement character, mojibake, dashes, glyphs, browser dialogs or raw "undefined", "null" or "NaN". Remaining hits are the test lists of forbidden characters, URL query handling (`split('?')`) and the app shell's two existing background colours in `app/(dashboard)/layout.tsx` (shell left as it is).
+
+### Found and fixed in passing
+
+- The customer portal showed "Progress 45%" from a column nothing updates; it now shows "Step 5 of 8: Repair". The staff customer page showed raw statuses ("in progress") and a 0% progress column; it now shows the shared status and step badges and links each job.
+- The internal print page (picking list, requisition, return and labour slips) showed "?" where middle dots and dashes had been lost, raw totals keys ("total Amount") and "Africa/Lagos"; rewritten on the shared formatters with labelled totals and "Not provided".
+- `window.confirm` on the late delivery and follow-up call screens replaced by a shared `DiscardChangesDialog`.
+- Dashes, middle dots, arrows, ellipses and a bullet glyph in late deliveries, follow-up calls, the advance receipt, the booking panel and a service type message; emojis in the portal seed output.
+- The job opening form used the browser's local date for the opening day; it now uses the Lagos day.
+- Failing a quality check without a road test showed "Enter both road test readings or clear them, then try again.", because Start km is filled in from check-in. A start km with no end km now means no road test on a fail and is not sent; an end km without a start km still asks for both.
+- The advisor's estimate draft scrolled sideways by 403 px at 390 px: the hidden "Remove" column label (absolutely placed for screen readers) escaped the table's scrolling box. Every scrolling table box on the job card is now `relative`; the step grids also got a shrinkable base column.
+- The not-found page read "404 — This page does not exist"; it now reads "This page does not exist" with a link to the dashboard.

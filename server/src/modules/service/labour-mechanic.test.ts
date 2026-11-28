@@ -41,11 +41,3 @@ it('rejects a mechanic from another branch or who has left', async () => {
   await expect(service.addJobCardLine('job', { labourItemId: 'lab', mechanicId: 'emp' })).rejects.toMatchObject({ statusCode: 404 });
   expect(tx.jobCardLabour.create).not.toHaveBeenCalled();
 });
-
-it('keeps a mechanic who has since left when only the hours change', async () => {
-  tx.jobCardLabour.findUnique.mockResolvedValue({ id: 'line', jobCardId: 'job', labourItemId: 'lab', hours: 1, rate: 1000, mechanicId: 'emp', technicianId: 'user-1' });
-  await service.updateJobCardLine('line', { hours: 2 });
-  expect(tx.employee.findFirst).not.toHaveBeenCalled();
-  expect(tx.user.findUnique).not.toHaveBeenCalled();
-  expect(tx.jobCardLabour.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ mechanicId: 'emp', technicianId: 'user-1', hours: 2 }) }));
-});

@@ -15,7 +15,7 @@ export const useLateJobs = (params: LateListParams) =>
 export const useLateDetail = (id: string | null, kind: LateKind) =>
   useQuery({ queryKey: lateKeys.detail(id ?? "", kind), queryFn: () => api.getLateDetail(id!, kind), enabled: !!id, retry: false });
 
-/** Legacy Find: job number or registration → the job to open (errors explain why a job cannot be opened). */
+/** Legacy Find: job number or registration to the job to open (errors explain why a job cannot be opened). */
 export const useFindLateJob = (kind: LateKind, branchId?: string) => useMutation({ mutationFn: (q: string) => api.findLateJob(kind, q, branchId) });
 
 export function useSaveLateReasons(id: string) {

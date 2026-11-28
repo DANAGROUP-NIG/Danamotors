@@ -1,6 +1,6 @@
 /**
- * The app's shared formatters: money in naira (en-NG, NGN) and dates in Lagos time.
- * New code uses these. Older features keep their local helpers until they are next changed.
+ * The app's shared formatters: money in naira (en-NG, NGN), numbers in en-NG and dates in Lagos time.
+ * The job card, service documents and late deliveries use only these.
  */
 
 /** The one fallback for a missing value, everywhere in the app. */
@@ -82,6 +82,20 @@ export function formatMonthYear(value: DateValue): string {
 }
 
 const whole = new Intl.NumberFormat("en-NG", { maximumFractionDigits: 0 });
+const quantity = new Intl.NumberFormat("en-NG", { maximumFractionDigits: 2 });
+
+/** 1,250.5: a quantity or hours, up to two decimals. Decimal strings are accepted. Missing values show NOT_PROVIDED. */
+export function formatQuantity(value: number | string | null | undefined): string {
+  const parsed = typeof value === "string" && DECIMAL.test(value.trim()) ? Number(value) : value;
+  return typeof parsed === "number" && Number.isFinite(parsed) ? quantity.format(parsed) : NOT_PROVIDED;
+}
+
+const dayKey = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: LAGOS });
+
+/** The Lagos calendar day as YYYY-MM-DD, for date inputs, filters and same-day checks (not for display). */
+export function lagosDayKey(value: Date): string {
+  return dayKey.format(value);
+}
 
 /** 48,250 km. Missing or unreadable readings show NOT_PROVIDED. */
 export function formatKm(value: number | null | undefined): string {

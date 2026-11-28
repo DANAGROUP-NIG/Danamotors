@@ -94,18 +94,6 @@ export const updateAppointmentSchema = z.object({
   }),
 });
 
-export const jobCardStatus = z.enum([
-  "Open",
-  "Pending",
-  "In Progress",
-  "On Hold",
-  "Quality Check",
-  "Ready",
-  "Completed",
-  "Closed",
-  "Cancelled",
-]);
-
 const jobCardDate = z
   .string()
   .refine(
@@ -197,7 +185,6 @@ export const jobOpeningBody = z
     customField1: z.string().trim().max(500).optional(),
     acType: z.enum(["FACTORY", "DEALER", "NONE"]).optional(),
     serviceCharge: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
-    estimatedHours: z.number().nonnegative().optional(),
   })
   .strict()
   .superRefine((data, ctx) => {
@@ -317,12 +304,6 @@ export const createApprovalSchema = z.object({
   }),
 });
 
-export const labourLineIdParamSchema = z.object({
-  params: z.object({
-    lineId: z.string().uuid("Invalid labour line ID"),
-  }),
-});
-
 export const createLabourItemSchema = z.object({
   body: z
     .object({
@@ -373,46 +354,6 @@ export const updateLabourItemSchema = z.object({
 
   params: z.object({
     id: z.string().uuid("Invalid labour item ID"),
-  }),
-});
-
-export const createJobCardLabourSchema = z.object({
-  body: z
-    .object({
-      labourItemId: z.string().uuid("Invalid labour item ID"),
-      hours: z.number().positive().optional(),
-      rate: z.number().nonnegative().optional(),
-      technicianId: z.string().uuid("Invalid technician ID").optional(),
-      mechanicId: z.string().uuid("Invalid mechanic ID").optional(),
-    })
-    .strict(),
-
-  params: z.object({
-    id: z.string().uuid("Invalid job card ID"),
-  }),
-});
-
-export const updateJobCardLabourSchema = z.object({
-  body: z
-    .object({
-      labourItemId: z.string().uuid("Invalid labour item ID").optional(),
-      hours: z.number().positive().optional(),
-      rate: z.number().nonnegative().optional(),
-      technicianId: z
-        .string()
-        .uuid("Invalid technician ID")
-        .nullable()
-        .optional(),
-      mechanicId: z.string().uuid("Invalid mechanic ID").nullable().optional(),
-    })
-    .strict()
-    .refine(
-      (body) => Object.keys(body).length > 0,
-      "At least one field is required",
-    ),
-
-  params: z.object({
-    lineId: z.string().uuid("Invalid labour line ID"),
   }),
 });
 

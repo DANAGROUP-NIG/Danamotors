@@ -4,7 +4,7 @@ import { CalendarDays, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { inputCls } from "@/components/forms/FormField";
 import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
-import { formatDateTime, formatMoney } from "@/lib/format";
+import { formatDateTime, formatMoney, formatQuantity } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   ADVANCE_PRESETS,
@@ -16,6 +16,7 @@ import {
   quantityProblem,
   suggestedAdvance,
   type DraftLine,
+  quantityText,
 } from "../../lib/estimate.logic";
 import type { EstimatePayer, EstimateTotals } from "../../types/job-estimate.types";
 import { ItemPicker } from "../diagnosis/ItemPicker";
@@ -136,7 +137,7 @@ function PayerSection({
       {rows.length === 0 ? (
         <p className="px-3 py-3 text-sm text-muted-foreground">No customer-pay items. Add a line if the customer asked for more work.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full min-w-[34rem] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -212,7 +213,7 @@ function LineRow({
             )}
           </>
         ) : (
-          <span>{Number(line.quantity).toLocaleString("en-NG", { minimumFractionDigits: 2 })}{line.kind === "LABOUR" ? " h" : ""}</span>
+          <span>{quantityText(line)}</span>
         )}
       </td>
       <td className={cn("px-3 py-2", money)}>{line.rate ? formatMoney(line.rate) : <span className="text-muted-foreground">Priced on save</span>}</td>
@@ -269,7 +270,7 @@ export function EstimateSummary({
   const problem = percentProblem(percent);
   const errorId = useId();
   const advance = problem ? null : suggestedAdvance(totals.customerTotal, percent);
-  const vat = Number(vatRate).toLocaleString("en-NG", { maximumFractionDigits: 2 });
+  const vat = formatQuantity(vatRate);
   return (
     <aside aria-label="Estimate summary" className="space-y-4 rounded-xl border border-border bg-card p-4 sm:p-5 lg:sticky lg:top-40">
       <h3 className="text-base font-semibold">Estimate summary</h3>

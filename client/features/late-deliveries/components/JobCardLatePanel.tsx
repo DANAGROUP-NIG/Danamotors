@@ -4,7 +4,8 @@ import { CalendarClock, PencilLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useLateReasons } from "../hooks/use-late-deliveries";
-import { formatDateTime, LATE_KIND, LATE_PERMISSIONS, lateByText, lateKindOf } from "../lib/late-delivery.logic";
+import { formatDateTime } from "@/lib/format";
+import { LATE_KIND, LATE_PERMISSIONS, lateByText, lateKindOf } from "../lib/late-delivery.logic";
 import { LateKindBadge, LateReasonChips } from "./late-ui";
 
 interface Props {

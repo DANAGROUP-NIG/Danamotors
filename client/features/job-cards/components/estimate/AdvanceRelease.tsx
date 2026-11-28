@@ -95,7 +95,7 @@ export function AdvanceRelease({ step, job }: { step: Step; job: { id: string; c
         };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <StageCard title="Before work starts" description="Confirm that everything needed before work is in place.">
         <ul className="space-y-2">
           {[approvalRow, advanceRow, partsRow].map((row) => (

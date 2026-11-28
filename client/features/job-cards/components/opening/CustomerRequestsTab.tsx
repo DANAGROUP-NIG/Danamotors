@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { getJobCardRequest } from "../../api/job-card.api";
 import type { CreateJobCardFormValues } from "../../schemas/job-card.schema";
 import { WorkshopPicker, type PickerRecord } from "../WorkshopPicker";
-import { CurrencyInput, OpeningCard, openingInput, money, formatDate } from "./opening-ui";
+import { CurrencyInput, OpeningCard, openingInput } from "./opening-ui";
+import { formatDate, formatKm, formatMoney } from "@/lib/format";
 
 type DefectOption = PickerRecord & { estimate?: { partAmount: number; oilAmount: number; labourAmount: number } | null };
 
@@ -179,7 +180,7 @@ export function CustomerRequestsTab(
                         onBlur={field.onBlur}
                         error={errors.complaints?.[index]?.[key]?.message} />} /></div>,
                 )}<div className="space-y-1.5"><p className="text-sm font-medium">Total</p><p
-                    className="flex h-10 items-center justify-end rounded-lg bg-muted/50 px-3 text-sm font-semibold tabular-nums">{money(
+                    className="flex h-10 items-center justify-end rounded-lg bg-muted/50 px-3 text-sm font-semibold tabular-nums">{formatMoney(
                       (Math.round((rows[index]?.spare || 0) * 100) + Math.round((rows[index]?.oil || 0) * 100) + Math.round((rows[index]?.labour || 0) * 100)) / 100,
                     )}</p></div></div>}
             </div>,
@@ -192,7 +193,7 @@ export function CustomerRequestsTab(
             ["Total labour", totals.labour],
             ["Grand total", totals.spare + totals.oil + totals.labour],
           ].map(
-            ([label, amount]) => <div key={String(label)}><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold tabular-nums">{money(Number(amount))}</p></div>,
+            ([label, amount]) => <div key={String(label)}><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold tabular-nums">{formatMoney(Number(amount))}</p></div>,
           )}</div>}
         {/* A list-level error (no requests at all) arrives on .root from the field array, or on .message. */}
         {(errors.complaints?.message ?? errors.complaints?.root?.message) && <p role="alert" className="mt-3 text-sm text-destructive">{errors.complaints?.message ?? errors.complaints?.root?.message}</p>}
@@ -225,7 +226,7 @@ function LastVisitCard(
               ["Service type", job.serviceType?.description],
               ["Attended by", job.technician ? `${job.technician.firstName} ${job.technician.lastName}` : null],
               ["Delivery date", formatDate(job.deliveredAt)],
-              ["Mileage", job.mileage == null ? null : `${job.mileage.toLocaleString()} km`],
+              ["Mileage", job.mileage == null ? null : formatKm(job.mileage)],
               [
                 "Delivered by",
                 job.deliveryAdvisor ? `${job.deliveryAdvisor.firstName} ${job.deliveryAdvisor.lastName}` : null,

@@ -1,5 +1,5 @@
+import { formatQuantity } from "@/lib/format";
 import type {
-  AdvanceExemption,
   DraftLinePayload,
   EstimateLine,
   EstimatePayer,
@@ -96,13 +96,6 @@ export const PAYER_SECTION: Record<EstimatePayer, string> = {
   CAMPAIGN: "Campaign (not charged to customer)",
 };
 
-export const PAYER_LABEL: Record<EstimatePayer, string> = {
-  CUSTOMER: "Customer",
-  WARRANTY: "Warranty",
-  GOODWILL: "Goodwill",
-  CAMPAIGN: "Campaign",
-};
-
 export const KIND_LABEL: Record<LineKind, string> = {
   PART: "Part",
   OIL: "Oil",
@@ -117,14 +110,6 @@ export const EXEMPTION_OPTIONS: { value: ManualExemption; label: string }[] = [
   { value: "CREDIT_APPROVED", label: "Credit approved" },
 ];
 
-export const EXEMPTION_LABEL: Record<AdvanceExemption, string> = {
-  WARRANTY_ONLY: "Warranty only",
-  FREE_SERVICE: "Free service",
-  CAMPAIGN: "Campaign",
-  INTERNAL: "Internal job",
-  CREDIT_APPROVED: "Credit approved",
-};
-
 const PAYER_ORDER: EstimatePayer[] = ["CUSTOMER", "WARRANTY", "GOODWILL", "CAMPAIGN"];
 
 /** Lines in sections by payer; the customer section is always shown (it has Add line). */
@@ -135,9 +120,9 @@ export function payerSections<T extends { payer: EstimatePayer }>(lines: T[]) {
   });
 }
 
-/** "1.00 h" for labour, "4.50" for parts and oil. */
+/** "1 h" for labour, "4.5" for parts and oil. */
 export function quantityText(line: Pick<EstimateLine, "kind" | "quantity">): string {
-  const value = Number(line.quantity).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const value = formatQuantity(line.quantity);
   return line.kind === "LABOUR" ? `${value} h` : value;
 }
 
@@ -257,11 +242,6 @@ export function draftPayload(lines: DraftLine[]): DraftLinePayload[] {
     findingItemId: line.findingItemId,
     complaintId: line.complaintId,
   }));
-}
-
-/** A part or labour already on the draft cannot be added twice. */
-export function duplicateLine(lines: DraftLine[], type: DraftLine["type"], referenceId: string): DraftLine | undefined {
-  return lines.find((line) => line.type === type && line.referenceId === referenceId);
 }
 
 // ---------------------------------------------------------------------------------------------

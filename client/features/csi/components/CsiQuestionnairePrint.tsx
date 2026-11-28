@@ -1,8 +1,8 @@
 "use client";
 
+import { formatDateTime } from "@/lib/format";
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { lagosDate } from "@/features/service-transactions/transaction.logic";
 import { fmtDate } from "@/features/reports/lib/report-format";
 import type { CsiQuestionnaire } from "../hooks/use-csi-issuance";
 
@@ -141,7 +141,7 @@ export function CsiQuestionnairePrint({
               </div>
               <footer className="break-words text-xs text-muted-foreground">
                 Questionnaire for job {job.jobNumber}. Generated{" "}
-                {lagosDate(survey.generatedAt)}. Reprints retain the original
+                {formatDateTime(survey.generatedAt)}. Reprints retain the original
                 job details and questionnaire version.
               </footer>
             </article>

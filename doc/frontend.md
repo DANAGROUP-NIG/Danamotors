@@ -28,7 +28,6 @@ authenticated workspace is in the `(dashboard)` group.
 | `/job-cards`         | Job cards list (filter/search/paginate)                                |
 | `/job-cards/[id]`    | Job card detail: inspections, estimates, part issuances, invoices      |
 | `/inspections`       | Inspections list                                                       |
-| `/repairs`           | Repairs list (backed by job cards)                                     |
 | `/quotations`        | Estimates/quotations list (links to job card)                          |
 | `/technicians`       | Technicians list                                                       |
 | `/customers`         | Customers list                                                         |

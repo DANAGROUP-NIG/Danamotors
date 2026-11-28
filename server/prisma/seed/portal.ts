@@ -157,8 +157,6 @@ export default async function seedCustomerPortal(
           // Canonical lifecycle status, with the stage that status implies (job-stage.logic.ts).
           status: jobSeq % 2 === 0 ? "IN_PROGRESS" : "OPEN",
           stage: stageForLegacyStatus(jobSeq % 2 === 0 ? "IN_PROGRESS" : "OPEN"),
-          progress: jobSeq % 2 === 0 ? 45 : 10,
-          estimatedHours: 6,
         },
       });
 
@@ -202,10 +200,10 @@ export default async function seedCustomerPortal(
       });
     }
 
-    console.log(`  👤 Demo customer '${demo.email}' (${demo.firstName} ${demo.lastName})`);
+    console.log(`  Demo customer '${demo.email}' (${demo.firstName} ${demo.lastName})`);
   }
 
-  console.log(`✅ Seeded customer portal demo data (password: ${CUSTOMER_PASSWORD})`);
+  console.log(`Seeded customer portal demo data (password: ${CUSTOMER_PASSWORD})`);
 }
 
 // Self-execute when run directly: `npx ts-node prisma/seed/portal.ts`

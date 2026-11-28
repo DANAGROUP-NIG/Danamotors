@@ -1,4 +1,5 @@
 "use client";
+import { formatQuantity } from "@/lib/format";
 import { useId, useState } from "react";
 import { Check, Loader2, Package } from "lucide-react";
 import { toast } from "sonner";
@@ -67,7 +68,7 @@ export function CollectPartsSheet({ jobCardId, parts, onClose }: { jobCardId: st
                     />
                     <Package className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                     <span className="min-w-0 flex-1 break-words font-medium">{part.description}</span>
-                    <span className="shrink-0 text-sm tabular-nums text-muted-foreground">Qty {part.quantity.toLocaleString("en-NG")}</span>
+                    <span className="shrink-0 text-sm tabular-nums text-muted-foreground">Qty {formatQuantity(part.quantity)}</span>
                   </label>
                   {failure && (
                     <p role="alert" className="px-3 pb-2 text-sm text-destructive">

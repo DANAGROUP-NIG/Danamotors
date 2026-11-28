@@ -1,9 +1,5 @@
 import type { StatusTone } from "@/components/ui/table-components/StatusBadge";
-import {
-  NOT_PROVIDED,
-  formatDateTime,
-  formatTime,
-} from "@/lib/format";
+import { NOT_PROVIDED, formatDateTime, formatTime, lagosDayKey } from "@/lib/format";
 import type { BoardCard, BoardColumnKey } from "../types/job-board.types";
 import type { JobCard } from "../types/job-card.types";
 import { ownerRoleLabel } from "./job-stage.logic";
@@ -91,28 +87,17 @@ export function targetText(targetMinutes: number | null): string | null {
   return targetMinutes ? `Target ${durationText(targetMinutes)}` : null;
 }
 
-const lagosDay = new Intl.DateTimeFormat("en-CA", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  timeZone: "Africa/Lagos",
-});
-
-/** The Lagos calendar day as YYYY-MM-DD, as the Received filter sends it. */
-export function lagosDate(value: Date): string {
-  return lagosDay.format(value);
-}
 
 /** "Promised: Today, 16:00", "Promised: Tomorrow, 09:00" or "Promised: 30 Nov 2026, 10:00". */
 export function promisedText(promisedAt: string | null, now: Date): string {
   if (!promisedAt) return `Promised: ${NOT_PROVIDED}`;
   const promised = new Date(promisedAt);
   if (!Number.isFinite(promised.getTime())) return `Promised: ${NOT_PROVIDED}`;
-  const day = lagosDate(promised);
-  if (day === lagosDate(now)) return `Promised: Today, ${formatTime(promised)}`;
-  if (day === lagosDate(new Date(now.getTime() + 86_400_000)))
+  const day = lagosDayKey(promised);
+  if (day === lagosDayKey(now)) return `Promised: Today, ${formatTime(promised)}`;
+  if (day === lagosDayKey(new Date(now.getTime() + 86_400_000)))
     return `Promised: Tomorrow, ${formatTime(promised)}`;
-  if (day === lagosDate(new Date(now.getTime() - 86_400_000)))
+  if (day === lagosDayKey(new Date(now.getTime() - 86_400_000)))
     return `Promised: Yesterday, ${formatTime(promised)}`;
   return `Promised: ${formatDateTime(promised)}`;
 }

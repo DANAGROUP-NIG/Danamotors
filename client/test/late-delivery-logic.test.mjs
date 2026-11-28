@@ -13,7 +13,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 function load(relative) {
   const file = path.join(root, relative);
   const module = { exports: {} };
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText, { require, module, exports: module.exports, Intl, Date, Math, Number, Set, Map }, { filename: file });
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText, { require: (spec) => (spec.startsWith('@/') ? load(`${spec.slice(2)}.ts`) : require(spec)), module, exports: module.exports, Intl, Date, Math, Number, Set, Map }, { filename: file });
   return module.exports;
 }
 

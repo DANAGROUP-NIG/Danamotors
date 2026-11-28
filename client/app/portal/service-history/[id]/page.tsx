@@ -11,6 +11,7 @@ import { StatusBadge } from "@/features/customer-portal/components/StatusBadge";
 import { EstimateApprovalActions } from "@/features/customer-portal/components/EstimateApprovalActions";
 import { usePortalJobCard } from "@/features/customer-portal/hooks/use-portal";
 import { QC_RESULT_BADGE, QC_STATE_LABEL } from "@/features/job-cards/lib/quality-check.logic";
+import { phoneStepLabel } from "@/features/job-cards/lib/job-stage.logic";
 import { formatCurrency, formatDate, formatDateTime } from "@/features/customer-portal/lib/format";
 
 export default function PortalServiceHistoryDetailPage() {
@@ -51,8 +52,8 @@ export default function PortalServiceHistoryDetailPage() {
                 </dd>
               </div>
               <div className="flex items-start justify-between gap-3">
-                <dt className="shrink-0 text-muted-foreground">Progress</dt>
-                <dd className="font-medium">{job.progress != null ? `${job.progress}%` : "Not recorded"}</dd>
+                <dt className="shrink-0 text-muted-foreground">Step</dt>
+                <dd className="font-medium">{phoneStepLabel(job.stage)}</dd>
               </div>
               <div className="flex items-start justify-between gap-3">
                 <dt className="shrink-0 text-muted-foreground">Quality check</dt>

@@ -155,7 +155,7 @@ function CampaignAttendance({ jobCardId, campaign, canEdit }: { jobCardId: strin
           <label className="grid gap-1 text-xs font-medium text-muted-foreground">
             Reason
             <select className={cn(inputCls, "h-9")} value={reason} onChange={(e) => setReason(e.target.value as NotAttendedReason | "")} autoFocus>
-              <option value="">Choose a reason…</option>
+              <option value="">Choose a reason</option>
               {(Object.keys(NOT_ATTENDED_REASONS) as NotAttendedReason[]).map((key) => (
                 <option key={key} value={key}>{NOT_ATTENDED_REASONS[key]}</option>
               ))}
@@ -230,22 +230,3 @@ export function LinkedCampaignsCard({ jobCard, canEdit }: { jobCard: JobCard; ca
   );
 }
 
-/** Print only: the job card text of each linked campaign marked "print on job card". */
-export function CampaignPrintBox({ jobCard }: { jobCard: JobCard }) {
-  const printed = (jobCard.campaigns ?? []).filter((c) => c.campaign.printOnJobCard);
-  if (printed.length === 0) return null;
-  return (
-    <section className="hidden break-inside-avoid border-2 border-black p-2 text-black print:block" aria-label="FPC / campaign">
-      <p className="text-[9pt] font-bold uppercase tracking-widest">FPC / campaign</p>
-      <ul className="mt-1 space-y-0.5 font-mono text-[10pt]">
-        {printed.map((c) => (
-          <li key={c.campaignId} className="flex gap-3">
-            <span className="w-[16ch] shrink-0 font-semibold">{c.campaignCode}</span>
-            <span className="min-w-0 flex-1">{c.campaign.jobCardText || c.campaignTitle}</span>
-            <span className="shrink-0">Done: ____</span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}

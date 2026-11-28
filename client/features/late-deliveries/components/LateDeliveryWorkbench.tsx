@@ -1,4 +1,6 @@
 "use client";
+import { DiscardChangesDialog } from "@/components/modals/DiscardChangesDialog";
+import { NOT_PROVIDED, formatDateTime, formatTime, lagosDayKey } from "@/lib/format";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -11,7 +13,7 @@ import { AlertBanner, FilterPills } from "@/features/warranty/components/ui";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 import { useFindLateJob, useLateDetail, useLateJobs, useLateReasons } from "../hooks/use-late-deliveries";
-import { apiErrorCode, apiErrorMessage, formatDate, formatTime, LATE_KIND, LATE_PERMISSIONS, lagosDay, lateByText, monthRange } from "../lib/late-delivery.logic";
+import { apiErrorCode, apiErrorMessage, LATE_KIND, LATE_PERMISSIONS, lateByText, monthRange } from "../lib/late-delivery.logic";
 import type { LateKind, LateListItem, ReasonFilter } from "../types/late-delivery.types";
 import { LateDeliveryEditor, NotLateBanner } from "./LateDeliveryEditor";
 
@@ -29,7 +31,7 @@ export function LateDeliveryWorkbench({ kind }: { kind: LateKind }) {
   const selectedId = searchParams.get("job");
   const findParam = searchParams.get("find");
 
-  const [range, setRange] = useState(() => monthRange(lagosDay(new Date())));
+  const [range, setRange] = useState(() => monthRange(lagosDayKey(new Date())));
   const [search, setSearch] = useState("");
   const [reasons, setReasons] = useState<ReasonFilter>("all");
   const [page, setPage] = useState(1);
@@ -42,15 +44,26 @@ export function LateDeliveryWorkbench({ kind }: { kind: LateKind }) {
   const [findError, setFindError] = useState<{ message: string; query: string } | null>(null);
   const find = useFindLateJob(kind);
   const dirty = useRef(false);
+  // The job to open once the user agrees to drop unsaved changes.
+  const [leavingTo, setLeavingTo] = useState<{ id: string | null } | null>(null);
   const setDirty = useCallback((value: boolean) => {
     dirty.current = value;
   }, []);
 
+  const leave = () => {
+    if (!leavingTo) return;
+    dirty.current = false;
+    router.replace(leavingTo.id ? `${pathname}?job=${leavingTo.id}` : pathname, { scroll: false });
+    setLeavingTo(null);
+  };
+
   const open = useCallback(
     (id: string | null) => {
       if (id === selectedId) return;
-      if (dirty.current && !window.confirm("You have unsaved changes on this job. Leave without saving?")) return;
-      dirty.current = false;
+      if (dirty.current) {
+        setLeavingTo({ id });
+        return;
+      }
       router.replace(id ? `${pathname}?job=${id}` : pathname, { scroll: false });
     },
     [pathname, router, selectedId],
@@ -98,6 +111,13 @@ export function LateDeliveryWorkbench({ kind }: { kind: LateKind }) {
 
   return (
     <div className="space-y-5 px-4 py-6 lg:px-6">
+      <DiscardChangesDialog
+        open={!!leavingTo}
+        title="Leave without saving the late reasons?"
+        description="The reasons and remarks you changed on this job are not saved yet."
+        onStay={() => setLeavingTo(null)}
+        onLeave={leave}
+      />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Late deliveries</p>
@@ -191,7 +211,7 @@ export function LateDeliveryWorkbench({ kind }: { kind: LateKind }) {
 
           {meta && meta.totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2 text-xs text-muted-foreground">
-              <span>Page {meta.page} of {meta.totalPages} · {meta.total} jobs</span>
+              <span>Page {meta.page} of {meta.totalPages}, {meta.total} jobs</span>
               <div className="flex gap-1">
                 <Button variant="ghost" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} aria-label="Previous page"><ChevronLeft className="size-4" /></Button>
                 <Button variant="ghost" size="sm" disabled={page >= meta.totalPages} onClick={() => setPage((p) => p + 1)} aria-label="Next page"><ChevronRight className="size-4" /></Button>
@@ -247,11 +267,11 @@ function WorkItem({ item, kind, active, onOpen }: { item: LateListItem; kind: La
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2">
             <span className="font-mono text-sm font-semibold text-slate-900">{item.jobNumber}</span>
-            <span className="truncate text-xs font-medium tracking-wide text-slate-500">{item.registration ?? "—"}</span>
+            <span className="truncate text-xs font-medium tracking-wide text-slate-500">{item.registration ?? NOT_PROVIDED}</span>
           </p>
-          <p className="truncate text-xs text-muted-foreground">{[item.model, item.serviceAdvisor].filter(Boolean).join(" · ") || "—"}</p>
+          <p className="truncate text-xs text-muted-foreground">{[item.model, item.serviceAdvisor].filter(Boolean).join(", ") || NOT_PROVIDED}</p>
           <p className="mt-0.5 text-xs text-slate-500">
-            {formatDate(item.promisedAt)} {formatTime(item.promisedAt)} → {kind === "DATE" ? `${formatDate(item.deliveredAt)} ` : ""}{formatTime(item.deliveredAt)}
+            Promised {formatDateTime(item.promisedAt)}, delivered {kind === "DATE" ? formatDateTime(item.deliveredAt) : formatTime(item.deliveredAt)}
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">

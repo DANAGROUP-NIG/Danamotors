@@ -124,7 +124,7 @@ export function ComparisonCard({ step }: { step: JobBillingStep }) {
       {!rows ? (
         <Muted>{step.comparison.problem ?? "The amounts could not be worked out yet."}</Muted>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full min-w-[22rem] text-sm tabular-nums">
             <caption className="sr-only">Estimated and actual amounts</caption>
             <thead className="text-muted-foreground">

@@ -1,4 +1,5 @@
 "use client";
+import { formatQuantity } from "@/lib/format";
 import { useId } from "react";
 import { Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -112,7 +113,7 @@ function ItemName({ item }: { item: DecisionItem }) {
     <div className="grid min-w-0 gap-0.5">
       <span className="break-words font-semibold">
         {item.description}
-        {item.quantity !== 1 && <span className="font-normal text-muted-foreground">, quantity {item.quantity.toLocaleString("en-NG")}</span>}
+        {item.quantity !== 1 && <span className="font-normal text-muted-foreground">, quantity {formatQuantity(item.quantity)}</span>}
       </span>
       <span className="text-xs text-muted-foreground">{item.request ? `For: ${item.request}` : "Not mentioned by the customer"}</span>
       {item.possibleWarranty && (

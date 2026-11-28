@@ -137,24 +137,33 @@ export async function completeCheckIn(fx: JobFixture, jobCardId: string, advisor
   else await prisma.jobCard.update({ where: { id: jobCardId }, data: { openingSignatureRequired: false } });
 }
 
-/** A booking ready to open as a job card, for the "open a job from a booking" test. */
+/**
+ * Bookings ready to open as job cards: KJA-523ST for the "open a job from a booking" test (phase 2) and
+ * LSR-549ST for the full journey (phase 12). A vehicle that already has an open booking is left alone.
+ */
 export async function seedStageBooking(ctx: DemoContext, ref: Reference, parties: Parties) {
-  const vehicle = parties.vehicles.stgBooking;
-  const existing = await prisma.serviceAppointment.findFirst({ where: { vehicleId: vehicle.id, bookingStatus: "BOOKED" }, select: { id: true } });
-  if (existing) return;
+  const bookings = [
+    { vehicle: parties.vehicles.stgBooking, mileage: 21_400, lastMileage: 16_050, requests: ["Periodic service (20,000 km)", "Rattle from the rear when driving over bumps"] },
+    { vehicle: parties.vehicles.stgJourney, mileage: 18_900, lastMileage: 14_200, requests: ["Periodic service (20,000 km)", "Engine shakes when cold in the morning"] },
+  ];
   const staff = ctx.staff.main;
-  await prisma.vehicle.updateMany({
-    where: { id: vehicle.id, lastRecordedMileage: null },
-    data: { lastRecordedMileage: 16_050, lastMileageAt: new Date(Date.now() - 120 * 86_400_000) },
-  });
-  await createBooking({
-    customerId: vehicle.customerId!,
-    vehicleId: vehicle.id,
-    branchId: ctx.branches.main.id,
-    serviceTypeId: ref.serviceTypes.RG,
-    mileage: 21_400,
-    scheduledAt: new Date(Date.now() + 2 * 3_600_000),
-    requests: [{ description: "Periodic service (20,000 km)" }, { description: "Rattle from the rear when driving over bumps" }],
-    createdById: staff.advisor.id,
-  });
+  for (const booking of bookings) {
+    const { vehicle } = booking;
+    const existing = await prisma.serviceAppointment.findFirst({ where: { vehicleId: vehicle.id, bookingStatus: "BOOKED" }, select: { id: true } });
+    if (existing) continue;
+    await prisma.vehicle.updateMany({
+      where: { id: vehicle.id, lastRecordedMileage: null },
+      data: { lastRecordedMileage: booking.lastMileage, lastMileageAt: new Date(Date.now() - 120 * 86_400_000) },
+    });
+    await createBooking({
+      customerId: vehicle.customerId!,
+      vehicleId: vehicle.id,
+      branchId: ctx.branches.main.id,
+      serviceTypeId: ref.serviceTypes.RG,
+      mileage: booking.mileage,
+      scheduledAt: new Date(Date.now() + 2 * 3_600_000),
+      requests: booking.requests.map((description) => ({ description })),
+      createdById: staff.advisor.id,
+    });
+  }
 }

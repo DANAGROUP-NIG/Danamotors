@@ -1,5 +1,5 @@
 "use client";
-import { NOT_PROVIDED, formatMoney } from "@/lib/format";
+import { NOT_PROVIDED, formatMoney, formatQuantity } from "@/lib/format";
 
 import { useState } from "react";
 import { Info, Lock, Wrench } from "lucide-react";
@@ -143,7 +143,7 @@ export function JobCardLinesCard({ jobCardId }: { jobCardId: string }) {
                     </td>
                     <td className={`${tdCls} font-mono text-xs`}>{line.sparePart?.partNumber ?? line.operationCode ?? NOT_PROVIDED}</td>
                     <td className={tdCls}>{line.description}</td>
-                    <td className={`${tdCls} text-right`}>{line.kind === "LABOUR" ? line.quantity.toFixed(1) : line.quantity}</td>
+                    <td className={`${tdCls} text-right`}>{formatQuantity(line.quantity)}</td>
                     <td className={`${tdCls} text-right`}>{formatMoney(line.rate)}</td>
                     <td className={`${tdCls} text-right`}>{formatMoney(line.amount)}</td>
                     <td className={tdCls}>
@@ -197,7 +197,7 @@ export function JobCardLinesCard({ jobCardId }: { jobCardId: string }) {
               <span className="font-semibold text-foreground">Customer parts & labour</span>
               <span className="text-right">
                 <span className="text-base font-bold tabular-nums text-foreground">{formatMoney(totals.customerInvoiceTotal)}</span>
-                <span className="block text-xs text-muted-foreground">incl. {(data.vatRate * 100).toFixed(1)}% VAT</span>
+                <span className="block text-xs text-muted-foreground">Includes {formatQuantity(data.vatRate * 100)}% VAT</span>
               </span>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">Before the service charge and bill discounts.</p>

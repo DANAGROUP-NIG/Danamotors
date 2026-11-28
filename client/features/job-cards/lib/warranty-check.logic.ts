@@ -1,5 +1,5 @@
 import type { StatusTone } from "@/components/ui/table-components/StatusBadge";
-import { formatDate, formatKm, formatMonthYear, NOT_PROVIDED } from "@/lib/format";
+import { formatDate, formatKm, formatMonthYear, formatQuantity } from "@/lib/format";
 import type {
   CoverageStatus,
   DecisionItem,
@@ -57,7 +57,7 @@ const COVERAGE_BADGE: Record<CoverageStatus, { label: string; tone: StatusTone }
 
 export const coverageBadge = (status: CoverageStatus) => COVERAGE_BADGE[status];
 
-const plural = (count: number, word: string) => `${count.toLocaleString("en-NG")} ${word}${count === 1 ? "" : "s"}`;
+const plural = (count: number, word: string) => `${formatQuantity(count)} ${word}${count === 1 ? "" : "s"}`;
 
 /** The Service history card's badge. */
 export function verdictBadge(verdict: ServiceVerdict): { label: string; tone: StatusTone } {
@@ -111,7 +111,7 @@ export function coverageView(coverage: WarrantyCoverage, asOf: string | null) {
         : null,
     distance:
       coverage.kmUsedPercent !== null && coverage.mileage !== null && coverage.kmLimit !== null
-        ? { label: `Distance: ${coverage.mileage.toLocaleString("en-NG")} of ${formatKm(coverage.kmLimit)}`, percent: coverage.kmUsedPercent }
+        ? { label: `Distance: ${formatQuantity(coverage.mileage)} of ${formatKm(coverage.kmLimit)}`, percent: coverage.kmUsedPercent }
         : null,
   };
 }
@@ -245,4 +245,3 @@ export function serviceHistoryAlert(
 export const recordLine = (record: { serviceDate: string; mileage: number; dealerName: string }) =>
   `${formatDate(record.serviceDate)}, ${formatKm(record.mileage)}, ${record.dealerName}`;
 
-export const notProvided = (value: string | null | undefined) => (value?.trim() ? value : NOT_PROVIDED);

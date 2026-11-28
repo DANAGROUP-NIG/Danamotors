@@ -62,8 +62,8 @@ export default function PortalServiceHistoryPage() {
             </Link>,
             job.vehicle
               ? `${job.vehicle.make ?? ""} ${job.vehicle.model ?? ""}`.trim() ||
-                (job.vehicle.registrationNumber ?? "—")
-              : "—",
+                (job.vehicle.registrationNumber ?? "Not provided")
+              : "Not provided",
             <span key={`d-${job.id}`} className="line-clamp-1 max-w-[260px]">
               {job.description}
             </span>,

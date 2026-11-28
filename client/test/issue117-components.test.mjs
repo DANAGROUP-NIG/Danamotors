@@ -29,39 +29,6 @@ function load(file, stubs = {}) {
   );
   return module.exports;
 }
-test("signature dialog required fields", () => {
-  const { signatureFieldsValid: valid } = load(
-    "features/job-cards/components/signature-fields.ts",
-  );
-  const fields = {
-    drawn: true,
-    name: "Test Customer",
-    customerName: "Test Customer",
-    relationship: "",
-    approved: true,
-    reason: "",
-  };
-  assert.equal(valid(fields), true);
-  for (const patch of [
-    { drawn: false },
-    { name: " " },
-    { approved: false },
-    { name: "Other signer" },
-  ])
-    assert.equal(valid({ ...fields, ...patch }), false);
-  assert.equal(
-    valid({ ...fields, approved: false, reason: "Not agreed" }),
-    true,
-  );
-  assert.equal(
-    valid({
-      ...fields,
-      name: "Other signer",
-      relationship: "Authorized contact",
-    }),
-    true,
-  );
-});
 test("print component excludes internal fields and handles unsigned/superseded versions", () => {
   const data = {
     estimate: {
@@ -129,10 +96,7 @@ test("print component excludes internal fields and handles unsigned/superseded v
       "@/components/CustomerExplanation": load(
         "components/CustomerExplanation.tsx",
       ),
-      "@/features/service-transactions/transaction.logic": load(
-        "features/service-transactions/transaction.logic.ts",
-      ),
-      "@/features/job-cards/lib/estimate.logic": load("features/job-cards/lib/estimate.logic.ts"),
+      "@/features/job-cards/lib/estimate.logic": load("features/job-cards/lib/estimate.logic.ts", { "@/lib/format": load("lib/format.ts") }),
       "@/lib/format": load("lib/format.ts"),
       "@/components/ui/button": {
         Button: ({ children }) => React.createElement("button", null, children),

@@ -1,11 +1,8 @@
 "use client";
 
+import { NOT_PROVIDED, formatDateTime, formatMoney } from "@/lib/format";
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  lagosDate,
-  moneyText,
-} from "@/features/service-transactions/transaction.logic";
 import type { ReceiptDocument as ReceiptData } from "../hooks/use-receipt";
 
 export function ReceiptDocument({ receipt }: { receipt: ReceiptData }) {
@@ -18,7 +15,7 @@ export function ReceiptDocument({ receipt }: { receipt: ReceiptData }) {
   const receivedBy =
     [receipt.issuedBy?.firstName, receipt.issuedBy?.lastName]
       .filter(Boolean)
-      .join(" ") || "—";
+      .join(" ") || NOT_PROVIDED;
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-5 p-4 lg:p-6 print:p-0">
@@ -43,7 +40,7 @@ export function ReceiptDocument({ receipt }: { receipt: ReceiptData }) {
               {receipt.receiptNumber}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {snapshot?.branchName || receipt.branch?.name || "—"}
+              {snapshot?.branchName || receipt.branch?.name || NOT_PROVIDED}
             </p>
           </div>
           <div className="text-right">
@@ -53,7 +50,7 @@ export function ReceiptDocument({ receipt }: { receipt: ReceiptData }) {
               {receipt.status}
             </span>
             <p className="mt-2 text-sm">
-              Payment date: {lagosDate(receipt.issuedAt)}
+              Payment date: {formatDateTime(receipt.issuedAt)}
             </p>
           </div>
         </header>
@@ -64,7 +61,7 @@ export function ReceiptDocument({ receipt }: { receipt: ReceiptData }) {
             className="border border-border p-3 text-sm font-semibold text-destructive"
           >
             {receipt.status}
-            {receipt.cancelRemark ? ` — ${receipt.cancelRemark}` : ""}
+            {receipt.cancelRemark ? `. ${receipt.cancelRemark}` : ""}
           </p>
         )}
 
@@ -77,10 +74,10 @@ export function ReceiptDocument({ receipt }: { receipt: ReceiptData }) {
                 <dt className="text-muted-foreground">Job card</dt>
                 <dd>{snapshot.jobNumber}</dd>
                 <dt className="text-muted-foreground">Vehicle registration</dt>
-                <dd>{snapshot.registrationNumber || "—"}</dd>
+                <dd>{snapshot.registrationNumber || NOT_PROVIDED}</dd>
                 <dt className="text-muted-foreground">Estimate</dt>
                 <dd>
-                  {snapshot.estimateNumber || "—"} · Version{" "}
+                  {snapshot.estimateNumber || NOT_PROVIDED}, version{" "}
                   {snapshot.estimateVersion}
                 </dd>
               </dl>
@@ -92,9 +89,9 @@ export function ReceiptDocument({ receipt }: { receipt: ReceiptData }) {
               <dt className="text-muted-foreground">Payment method</dt>
               <dd>{receipt.mode.replaceAll("_", " ")}</dd>
               <dt className="text-muted-foreground">Bank</dt>
-              <dd>{receipt.bank?.name || "—"}</dd>
+              <dd>{receipt.bank?.name || NOT_PROVIDED}</dd>
               <dt className="text-muted-foreground">Reference</dt>
-              <dd className="break-words">{receipt.reference || "—"}</dd>
+              <dd className="break-words">{receipt.reference || NOT_PROVIDED}</dd>
             </dl>
           </div>
         </section>
@@ -125,7 +122,7 @@ export function ReceiptDocument({ receipt }: { receipt: ReceiptData }) {
                   )}
                 </td>
                 <td className="whitespace-nowrap py-3 text-right tabular-nums">
-                  {moneyText(receipt.amount)}
+                  {formatMoney(receipt.amount)}
                 </td>
               </tr>
             </tbody>
@@ -135,7 +132,7 @@ export function ReceiptDocument({ receipt }: { receipt: ReceiptData }) {
                   Total received on this receipt
                 </th>
                 <td className="whitespace-nowrap py-3 text-right font-semibold tabular-nums">
-                  {moneyText(receipt.amount)}
+                  {formatMoney(receipt.amount)}
                 </td>
               </tr>
             </tfoot>
@@ -150,11 +147,11 @@ export function ReceiptDocument({ receipt }: { receipt: ReceiptData }) {
             <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <dt>Estimate total</dt>
               <dd className="text-right tabular-nums">
-                {moneyText(snapshot.estimateTotal)}
+                {formatMoney(snapshot.estimateTotal)}
               </dd>
               <dt>Total advances received</dt>
               <dd className="text-right tabular-nums">
-                {moneyText(snapshot.receivedAmount)}
+                {formatMoney(snapshot.receivedAmount)}
               </dd>
               <dt>Percentage paid</dt>
               <dd className="text-right">
@@ -166,13 +163,13 @@ export function ReceiptDocument({ receipt }: { receipt: ReceiptData }) {
                 Estimated balance
               </dt>
               <dd className="border-t border-border pt-2 text-right font-semibold tabular-nums">
-                {moneyText(snapshot.balanceAmount)}
+                {formatMoney(snapshot.balanceAmount)}
               </dd>
               {snapshot.excessAmount > 0 && (
                 <>
                   <dt>Excess advance</dt>
                   <dd className="text-right tabular-nums">
-                    {moneyText(snapshot.excessAmount)}
+                    {formatMoney(snapshot.excessAmount)}
                   </dd>
                 </>
               )}
@@ -205,7 +202,7 @@ export function ReceiptDocument({ receipt }: { receipt: ReceiptData }) {
                         "Account adjustment"}
                     </td>
                     <td className="py-2 text-right tabular-nums">
-                      {moneyText(allocation.amount)}
+                      {formatMoney(allocation.amount)}
                     </td>
                   </tr>
                 ))}

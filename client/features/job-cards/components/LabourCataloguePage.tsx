@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/format";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Save, SlidersHorizontal, X } from "lucide-react";
@@ -51,10 +52,6 @@ const emptyForm: LabourForm = {
   defaultHours: "1",
   rate: "",
 };
-const money = (value: number) =>
-  new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(
-    value,
-  );
 
 export function LabourCataloguePage() {
   const queryClient = useQueryClient();
@@ -230,7 +227,7 @@ export function LabourCataloguePage() {
           No active labour items.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full min-w-180 text-sm">
             <thead className="border-b text-left text-muted-foreground">
               <tr>
@@ -344,7 +341,7 @@ export function LabourCataloguePage() {
                         }
                       />
                       <span className="sr-only">
-                        Current rate {money(item.rate)}
+                        Current rate {formatMoney(item.rate)}
                       </span>
                     </td>
                     {canUpdate && (

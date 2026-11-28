@@ -18,7 +18,6 @@ const protectedPrefixes = [
   "/quotations",
   "/invoices",
   "/payments",
-  "/repairs",
   "/purchasing",
   "/finance",
   "/reports",

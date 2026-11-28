@@ -327,7 +327,7 @@ export class PortalService {
               id: latestJob.id,
               jobNumber: latestJob.jobNumber,
               status: latestJob.status,
-              progress: latestJob.progress,
+              stage: latestJob.stage,
               description: latestJob.description,
               createdAt: latestJob.createdAt,
             }
@@ -363,7 +363,7 @@ export class PortalService {
         id: jobCard.id,
         jobNumber: jobCard.jobNumber,
         status: jobCard.status,
-        progress: jobCard.progress,
+        stage: jobCard.stage,
         description: jobCard.description,
         estimatedCost: customerPays(jobCard.estimates[0]),
         createdAt: jobCard.createdAt,
@@ -391,9 +391,8 @@ export class PortalService {
       jobNumber: jobCard.jobNumber,
       description: jobCard.description,
       status: jobCard.status,
-      estimatedHours: jobCard.estimatedHours,
       estimatedCost: customerPays(jobCard.estimates[0]),
-      progress: jobCard.progress,
+      stage: jobCard.stage,
       // The job's quality check result (current inspection); customers see the result and date only.
       // TODO(confirm): whether customers should also see the supervisor's notes.
       qualityCheck: qcStateOf(jobCard.inspections.find((inspection) => !inspection.supersededAt) ?? null, jobCard.estimationCharge?.status === 'ADDED'),

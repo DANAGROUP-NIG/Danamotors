@@ -1,3 +1,4 @@
+import { formatQuantity } from "@/lib/format";
 import { z } from "zod";
 import type { StatusTone } from "@/components/ui/table-components/StatusBadge";
 import type {
@@ -110,10 +111,6 @@ export function findingPayload(complaintId: string | null, draft: FindingDraft, 
   };
 }
 
-/** Quantities show like "1", "4.5" or "0.25": never a trailing ".00", never a price. */
-export function formatQuantity(quantity: number): string {
-  return new Intl.NumberFormat("en-NG", { maximumFractionDigits: 2 }).format(quantity);
-}
 
 export function itemLine(item: Pick<FindingItem, "kind" | "description" | "quantity">): string {
   return item.kind === "LABOUR" ? item.description : `${item.description} (qty ${formatQuantity(item.quantity)})`;

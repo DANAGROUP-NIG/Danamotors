@@ -188,13 +188,10 @@ describeDb('Labour slips on isolated local PostgreSQL', () => {
     expect((await service.get(slip.id, { ...other, allBranches: true })).id).toBe(slip.id);
   });
 
-  it('keeps document charges and hours safe from legacy edit/delete and reclassification paths', async () => {
+  it('keeps document charges safe from reclassification', async () => {
     const card = await job();
     const slip = await create(card.id);
-    const legacy: LabourService = new (require('./labour.service').LabourService)();
     const charges: JobCardLineService = new (require('../job-card-line/jobCardLine.service').JobCardLineService)();
-    await expect(legacy.updateJobCardLine(slip.lines[0].id, { hours: 9 })).rejects.toThrow('labour slip');
-    await expect(legacy.removeJobCardLine(slip.lines[0].id)).rejects.toThrow('legacy labour endpoint');
     await expect(charges.updateLine(card.id, slip.lines[0].chargeLine!.id, { chargeType: 'FREE' }, { userId: actor.userId, canChargeGoodwill: true })).rejects.toThrow('labour slip');
   });
 

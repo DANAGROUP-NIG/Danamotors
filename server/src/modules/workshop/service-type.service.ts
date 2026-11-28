@@ -36,7 +36,7 @@ export class ServiceTypeService {
     return {
       items: settings.map(setting => toOption(setting, date)),
       reason: settings.length ? 'READY' as const : 'NO_SERVICE_SETTINGS' as const,
-      message: settings.length ? null : `No active service settings are configured for ${vehicleName || 'this vehicle model'}. Configure the model charges in Workshop masters → Service type.`,
+      message: settings.length ? null : `No active service settings are configured for ${vehicleName || 'this vehicle model'}. Configure the model charges in Settings, Workshop masters, Service type.`,
     };
   }
 

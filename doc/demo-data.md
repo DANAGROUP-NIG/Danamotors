@@ -49,6 +49,13 @@ Only the staged job card jobs (JC-S01 onward, all at the main branch): `npm run 
 needs staff at the main branch only, so it still runs where the second branch has no service advisor or technician (the
 shared server since 27 Nov 2026).
 
+Every run except `--reset-test` first makes sure the job card settings exist (`prisma/seed/demo/settings.ts`): branch
+settings for the main and second branch with the job card defaults (estimation charge ₦25,000.00 or 10%, storage free
+for 48 hours then ₦2,000.00 a day, follow-up call after 2 days, step targets 30, 120, 120, 120 and 60 minutes), the
+default service history rule row, and the 12 company-wide job card terms. Each is created only when nothing is saved
+yet, so an administrator's values survive. The run prints what it created or left. See "Settings checklist" in
+`doc/job-cards.md`.
+
 Only the post-service follow-up demo: `npm run prisma:seed:demo -- --psf-only` (needs the PSF migration). It adds
 customers `DEMO-C61`…`DEMO-C65` (C62 and C65 without a phone, C65 without an address; C64 at the second branch),
 labour `DM-PSF-AC` (followed up), `DM-PSF-ENG` (major) and `DM-PSF-WASH` (not followed up), service type `AC`

@@ -324,7 +324,6 @@ it("guards workshop actions and warranty cases by ID", async () => {
   const warranty = new WarrantyController();
   for (const method of [
     workshop.assignTechnician,
-    workshop.updateProgress,
     warranty.getCase,
   ]) {
     for (const [permissions, role, allowed] of [
