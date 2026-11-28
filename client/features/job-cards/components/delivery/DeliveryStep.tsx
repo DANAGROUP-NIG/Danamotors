@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2, RefreshCw, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
@@ -7,6 +8,7 @@ import { useLateReasons } from "@/features/late-deliveries/hooks/use-late-delive
 import { apiErrorMessage } from "@/features/warranty/lib/warranty-format";
 import { blockedSummary, collectorPerson, deliveryPayload, deliveryProblems, emptyDeliveryForm, type DeliveryForm } from "../../lib/delivery.logic";
 import { useApproveRelease, useDeliver, useJobDelivery, useRequestRelease, useSignPhoneApprovals } from "../../hooks/use-job-delivery";
+import { gatePassPrintHref } from "../../lib/job-print.logic";
 import type { JobCard } from "../../types/job-card.types";
 import type { JobWorkspace } from "../../types/job-workspace.types";
 import type { StageBarProps } from "../check-in/CheckInStep";
@@ -29,12 +31,10 @@ export function DeliveryStep({
   job,
   workspace,
   bar,
-  onPrintGatePass,
 }: {
   job: JobCard;
   workspace: JobWorkspace;
   bar: StageBarProps;
-  onPrintGatePass: () => void;
 }) {
   const query = useJobDelivery(job.id);
   const deliver = useDeliver(job.id, job.jobNumber);
@@ -53,14 +53,7 @@ export function DeliveryStep({
   // One request ID per attempt at the form: a double click or a retry after a lost answer delivers once.
   const requestId = useRef(crypto.randomUUID());
   const releaseRequestId = useRef(crypto.randomUUID());
-  // "Complete delivery and print gate pass": print once the job comes back with its gate pass number.
-  const [printWhenReady, setPrintWhenReady] = useState(false);
-  useEffect(() => {
-    if (printWhenReady && job.gatePassNumber) {
-      setPrintWhenReady(false);
-      onPrintGatePass();
-    }
-  }, [printWhenReady, job.gatePassNumber, onPrintGatePass]);
+  const router = useRouter();
 
   const quiet = { ...bar, primary: null, secondary: [] };
   if (query.isLoading)
@@ -97,7 +90,7 @@ export function DeliveryStep({
       </>
     );
 
-  if (step.delivered) return <DeliveredSummary jobId={job.id} step={step} onPrintGatePass={onPrintGatePass} />;
+  if (step.delivered) return <DeliveredSummary jobId={job.id} step={step} />;
 
   const busy = deliver.isPending || signPhone.isPending;
   const set = <K extends keyof DeliveryForm>(key: K, value: DeliveryForm[K]) => setForm((current) => ({ ...current, [key]: value }));
@@ -110,7 +103,8 @@ export function DeliveryStep({
     setTried(true);
     if (busy || problems.length) return;
     deliver.mutate(deliveryPayload(step, form, requestId.current), {
-      onSuccess: () => setPrintWhenReady(true),
+      // "Complete delivery and print gate pass": open the A6 slip, which prints as soon as it loads.
+      onSuccess: () => router.push(gatePassPrintHref(job.id, true)),
       // A refused delivery gets a fresh request ID once the advisor changes something and tries again.
       onError: () => {
         requestId.current = crypto.randomUUID();

@@ -76,11 +76,36 @@ export function ActionMenu({
     updatePosition();
   }, [open, children, updatePosition]);
 
+  // The menu sits at the end of the page (a portal), so Tab from the button would never reach it:
+  // focus moves into the menu when it opens, and back to the button when Esc closes it.
+  const items = () => Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? []);
+  useEffect(() => {
+    if (!open) return;
+    const frame = window.requestAnimationFrame(() => items()[0]?.focus({ preventScroll: true }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.querySelector<HTMLElement>("button, a, [tabindex]")?.focus();
+        return;
+      }
+      if (!menuRef.current?.contains(document.activeElement)) return;
+      const list = items();
+      const index = list.indexOf(document.activeElement as HTMLElement);
+      const step = event.key === "ArrowDown" || (event.key === "Tab" && !event.shiftKey) ? 1 : event.key === "ArrowUp" || (event.key === "Tab" && event.shiftKey) ? -1 : 0;
+      if (event.key === "Home" || event.key === "End") {
+        event.preventDefault();
+        list[event.key === "Home" ? 0 : list.length - 1]?.focus();
+      } else if (step && list.length) {
+        // Tab and the arrow keys move through the items and wrap, as in a menu.
+        event.preventDefault();
+        list[(index + step + list.length) % list.length]?.focus();
+      }
     };
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node;

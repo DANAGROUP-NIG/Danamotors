@@ -1,9 +1,11 @@
 "use client";
+import Link from "next/link";
 import { CalendarCheck, CheckCircle2, FileText, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { formatDateTime, NOT_PROVIDED } from "@/lib/format";
 import { collectorTypeLabel, deliveredTitle, followUpLine } from "../../lib/delivery.logic";
+import { gatePassPrintHref } from "../../lib/job-print.logic";
 import { useJobBilling } from "../../hooks/use-job-billing";
 import type { JobDeliveryStep } from "../../types/job-delivery.types";
 import { InvoiceCard } from "../billing/BillingCards";
@@ -11,7 +13,7 @@ import { DetailList, StageCard } from "../workspace/StageCard";
 import { DeclinedCard, WorkDoneCard } from "./DeliveryCards";
 
 /** The delivered job, read only: who took it and when, the gate pass, the follow-up call, the work and the bill. */
-export function DeliveredSummary({ jobId, step, onPrintGatePass }: { jobId: string; step: JobDeliveryStep; onPrintGatePass: () => void }) {
+export function DeliveredSummary({ jobId, step }: { jobId: string; step: JobDeliveryStep }) {
   const delivered = step.delivered!;
   const billing = useJobBilling(jobId);
   const collector = delivered.collector;
@@ -26,9 +28,11 @@ export function DeliveredSummary({ jobId, step, onPrintGatePass }: { jobId: stri
           title="Gate pass"
           actions={
             delivered.gatePassNumber ? (
-              <Button type="button" variant="outline" onClick={onPrintGatePass}>
-                <Printer aria-hidden="true" />
-                Print gate pass
+              <Button variant="outline" asChild>
+                <Link href={gatePassPrintHref(jobId, true)}>
+                  <Printer aria-hidden="true" />
+                  Print gate pass
+                </Link>
               </Button>
             ) : undefined
           }

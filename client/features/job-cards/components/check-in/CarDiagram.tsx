@@ -10,6 +10,8 @@ const MARK_STYLE: Record<DamageType, string> = {
   DENT: "fill-amber-50 stroke-amber-700 [&_text]:fill-amber-700",
   SCRATCH: "fill-blue-50 stroke-blue-700 [&_text]:fill-blue-700",
 };
+/** On the printed job card: black and grey only; the letter tells the marks apart. */
+const PRINT_MARK = "fill-card stroke-foreground [&_text]:fill-foreground";
 
 const WIDTH = 200;
 const HEIGHT = 400;
@@ -24,6 +26,7 @@ export function CarDiagram({
   editable,
   onTap,
   onMoveDraft,
+  tone = "screen",
 }: {
   marks: Pick<DamageMark, "id" | "type" | "x" | "y">[];
   /** A mark being placed, before its type is chosen. */
@@ -31,6 +34,7 @@ export function CarDiagram({
   editable: boolean;
   onTap: (position: { x: number; y: number }) => void;
   onMoveDraft: (position: { x: number; y: number }) => void;
+  tone?: "screen" | "print";
 }) {
   const svg = useRef<SVGSVGElement>(null);
   const tap = (event: MouseEvent<SVGSVGElement>) => {
@@ -82,7 +86,7 @@ export function CarDiagram({
           <path d="M52 22 Q62 16 76 14 M148 22 Q138 16 124 14" />
         </g>
         {marks.map((mark) => (
-          <g key={mark.id} className={MARK_STYLE[mark.type]} aria-label={damageLine(mark)} role="img">
+          <g key={mark.id} className={tone === "print" ? PRINT_MARK : MARK_STYLE[mark.type]} aria-label={damageLine(mark)} role="img">
             <circle cx={(mark.x / 100) * WIDTH} cy={(mark.y / 100) * HEIGHT} r={12} strokeWidth={2} />
             <text
               x={(mark.x / 100) * WIDTH}

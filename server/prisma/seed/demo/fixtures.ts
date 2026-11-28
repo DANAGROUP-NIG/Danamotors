@@ -70,6 +70,12 @@ export const CUSTOMERS = {
     phoneNumber: "+2348099900105", email: "adaeze.okafor@demo.danamotors.test",
     address: "3 Sample Avenue, Isolo", city: "Lagos", state: "Lagos", branch: "main",
   },
+  // Printed job card (phase 11): a name with Yoruba tone marks, to check accents survive on paper and in PDFs.
+  ogunleye: {
+    code: "DEMO-C06", type: "INDIVIDUAL", salutation: "Mr.", firstName: "Ọlá", lastName: "Ògúnlẹ̀yẹ̀",
+    phoneNumber: "+2348099900106", email: "ola.ogunleye@demo.danamotors.test",
+    address: "14 Sample Way, Lekki", city: "Lagos", state: "Lagos", branch: "main",
+  },
   test1: {
     code: "TEST-C01", type: "INDIVIDUAL", firstName: "TEST-Warranty", lastName: "Customer One",
     phoneNumber: "+2348099900191", email: "test.warranty1@demo.danamotors.test",
@@ -179,6 +185,7 @@ export const VEHICLES = {
   stgDeliverLate: { vin: "KNAPM81DMK7000535", registrationNumber: "LSR-545ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2260 },
   stgDeliverRep: { vin: "KNAPM81DMK7000536", registrationNumber: "LSR-546ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2390 },
   stgDelivered: { vin: "KNAPM81DMK7000537", registrationNumber: "LSR-547ST", customer: "okafor", model: "SORENTO", saleDaysAgo: 2340 },
+  stgPrintLong: { vin: "KNAPM81DMK7000538", registrationNumber: "LSR-548ST", customer: "ogunleye", model: "SORENTO", saleDaysAgo: 2280 },
 } satisfies Record<string, VehicleFixture>;
 
 export type VehicleKey = keyof typeof VEHICLES;
@@ -765,6 +772,33 @@ const DELIVERY_DIAGNOSIS: DiagnosisFixture = {
   ],
 };
 
+/** Printed job card (phase 11): nine long requests in the customer's words, so page 1 runs onto a second sheet. */
+const PRINT_LONG_REQUESTS = [
+  "Periodic service (50,000 km), including the engine oil and filter change recommended in the service book",
+  "Loud grinding noise from the front left wheel whenever I brake gently in slow traffic on the Third Mainland Bridge. It has become worse over the last two weeks",
+  "The air conditioning blows warm air after about twenty minutes of driving in the afternoon heat, then cools again once the car has been parked for a while",
+  "A rattling sound from under the rear of the car over speed bumps and rough roads around Lekki Phase 1, mostly when the boot is loaded",
+  "The steering wheel vibrates at speeds above 90 km/h on the Lekki to Epe expressway, and the car pulls slightly to the right when I let go of the wheel",
+  "The driver's power window goes down slowly and sometimes stops halfway. It needs to be pushed up by hand before it closes",
+  "Dashboard warning light that looks like an exclamation mark in a circle came on twice last week and went off by itself after restarting the engine",
+  "Please check the battery and charging system. The car was slow to start on two cold mornings in Ikeja after standing overnight",
+  "Rear wiper smears the screen and leaves a wide band of water across the middle. Please replace the blade if it is worn",
+];
+const PRINT_LONG_DIAGNOSIS: DiagnosisFixture = {
+  stop: "confirmed",
+  findings: [
+    { request: 0, text: "Due for the 50,000 km service.", labour: [], parts: [["engineOil", 1]] },
+    { request: 1, text: "Front left pads worn to the backing plate. Disc scored but within limits after skimming.", labour: ["brakePads"], parts: [["brakePads", 1]] },
+    { request: 2, text: "AC condenser fins blocked with debris. Cleaned and pressure checked; cooling normal after cleaning." },
+    { request: 3, text: "Exhaust heat shield bracket loose at the rear silencer. Refitted with a new clip." },
+    { request: 4, text: "Front wheels out of balance; right front tyre worn on the inner edge. Wheel alignment recommended." },
+    { request: 5, text: "Driver's window regulator dry and slow. Cleaned and lubricated; operates fully." },
+    { request: 6, text: "Tyre pressure warning: rear left tyre 6 psi low. Valve core replaced and pressures set." },
+    { request: 7, text: "Battery tested good at 12.6 V; charging 14.2 V. Terminals cleaned." },
+    { request: 8, text: "Rear wiper blade torn. Replacement recommended." },
+  ],
+};
+
 /** One job at every step of the staged job card (job card revamp, phase 0). Seeded after JOBS. */
 export const STAGE_JOBS: JobFixture[] = [
   stageJob("JC-S01", "stgCheckIn", {
@@ -1097,6 +1131,41 @@ export const STAGE_JOBS: JobFixture[] = [
     complaints: ["Periodic service (50,000 km)", "Brakes noisy when stopping"],
     mileage: 51_220, withTechnician: true, target: "BILLED_PAID", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1], ["engineOil", 1]],
     diagnosis: BILLING_DIAGNOSIS,
+    delivery: { deliver: true, promiseDays: 14 },
+  }),
+  // Printed job card (phase 11): two earlier visits on the same vehicle for the "Vehicle history" lines, then the
+  // delivered job with nine long requests and an accented customer name.
+  {
+    ...stageJob("JC-S37A", "stgPrintLong", {
+      description: "30,000 km periodic service.",
+      complaints: ["Periodic service (30,000 km)"],
+      mileage: 30_120, withTechnician: true, target: "BILLED_PAID", estimate: "none", estimateStep: "approved", labour: [], issues: [["engineOil", 1]],
+      diagnosis: { stop: "confirmed", findings: [{ request: 0, text: "Due for the 30,000 km service.", labour: [], parts: [["engineOil", 1]] }] },
+    }),
+    startDaysAgo: 200,
+    spanHours: 26,
+  },
+  {
+    ...stageJob("JC-S37B", "stgPrintLong", {
+      description: "40,000 km periodic service. Brake check.",
+      complaints: ["Periodic service (40,000 km)", "Brake check"],
+      mileage: 40_060, withTechnician: true, target: "BILLED_PAID", estimate: "none", estimateStep: "approved", labour: [], issues: [["engineOil", 1]],
+      diagnosis: {
+        stop: "confirmed",
+        findings: [
+          { request: 0, text: "Due for the 40,000 km service.", labour: [], parts: [["engineOil", 1]] },
+          { request: 1, text: "Brake pads at 5 mm. No work needed yet." },
+        ],
+      },
+    }),
+    startDaysAgo: 110,
+    spanHours: 30,
+  },
+  stageJob("JC-S37", "stgPrintLong", {
+    description: "50,000 km periodic service and several faults reported by the owner.",
+    complaints: PRINT_LONG_REQUESTS,
+    mileage: 50_240, withTechnician: true, target: "BILLED_PAID", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1], ["engineOil", 1]],
+    diagnosis: PRINT_LONG_DIAGNOSIS,
     delivery: { deliver: true, promiseDays: 14 },
   }),
   stageJob("JC-S12", "stgSigned", {

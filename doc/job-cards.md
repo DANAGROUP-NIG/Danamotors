@@ -88,7 +88,7 @@ Moves that change the status are announced by the existing status notification r
 - **Cancel job** asks for a reason in a dialog that names the job and plate. It closes only on Keep job, the close button or success; Esc and outside clicks do not close it. The cancelled job shows a red Cancelled badge and a panel "Cancelled by name, date. Reason: ..." with View activity.
 - **Job file** drawer (480 px, full screen on phones, focus kept inside, Esc closes), tabs: Customer and vehicle (customer, vehicle, this visit's details including the opening estimate, tyres, battery, checklist and internal remarks), Visit history (last two earlier visits at any branch, and the repeat block), Warranty and campaigns (warranty at creation, linked campaigns, who pays), Documents and prints (opening approval, estimate revisions, bills, gate pass, picking list, customer explanation), Activity (late delivery, step changes, status changes).
 - **Page states**: a skeleton shaped like the frame while loading; "Could not load job N" with Try again; "Job card not found"; "You cannot open this job card" for another branch's job, saying who can open it.
-- **Print menu**: estimate, signed job-opening approval, picking list and gate pass. The printed job card itself comes in phase 11. When printing, only the gate pass prints.
+- **Print menu**: Print job card and Print gate pass (phase 11, see "Printed job card and gate pass (phase 11)"), Print estimate, Print signed job-opening approval and Print picking list. Printing the job page itself (Ctrl+P) prints the page as shown.
 
 The old "Workshop actions" form was split into the step sections above. Its status dropdown no longer offers Start work, Send for QC, Wait for parts, Mark ready or Cancel, because the action bar does these through the stage service; that stops a job skipping steps. Since phase 9, delivery is done on the Delivery step only (see "Delivery (phase 9)").
 
@@ -373,7 +373,7 @@ Step 8 is the handover, on the advisor's tablet with the customer. `GET /service
 
 The bar names the first thing missing and how many more ("Tick Returned for every belonging: 1 is not ticked yet. 2 more things to do before delivery."). Payment comes first: an unpaid job without credit shows the payment reason with **Open the invoice in Billing**.
 
-**Complete delivery** (`POST /service/job-cards/:id/delivery`, `{ requestId, collectorType, returnedCodes, lateReasonIds, lateRemarks?, accepted, signatureImage }`) runs in one transaction under the job row lock: the checks above (409 `DELIVERY_BLOCKED` with every reason; 403 `DELIVERY_FORBIDDEN` for anyone but the service advisor, service manager or admin with `jobcard:update` and `estimate:sign`), then a `JobDeliverySignature` (one per job: the signed document with work done, declined items, belongings, collector and any release approval; document and evidence hashes like `JobOpeningSignature`; never updated or deleted), then the `DELIVER` stage action through the existing workflow (payment gate, delivery advisor, server time, late reasons, gate pass number, status DELIVERED, status history, notifications, step Closed). The delivery advisor is the advisor handing over, or the job's advisor when a manager hands over. Audited `JOB_DELIVERY_SIGNED` (no signer name or image). A repeated request ID returns the delivery. The screen then prints the gate pass and shows "Delivered to Adaeze Okafor, 28 Nov 2026, 15:20", the gate pass number, **Print gate pass**, "Follow-up call scheduled for 30 Nov 2026." and the bill.
+**Complete delivery** (`POST /service/job-cards/:id/delivery`, `{ requestId, collectorType, returnedCodes, lateReasonIds, lateRemarks?, accepted, signatureImage }`) runs in one transaction under the job row lock: the checks above (409 `DELIVERY_BLOCKED` with every reason; 403 `DELIVERY_FORBIDDEN` for anyone but the service advisor, service manager or admin with `jobcard:update` and `estimate:sign`), then a `JobDeliverySignature` (one per job: the signed document with work done, declined items, belongings, collector and any release approval; document and evidence hashes like `JobOpeningSignature`; never updated or deleted), then the `DELIVER` stage action through the existing workflow (payment gate, delivery advisor, server time, late reasons, gate pass number, status DELIVERED, status history, notifications, step Closed). The delivery advisor is the advisor handing over, or the job's advisor when a manager hands over. Audited `JOB_DELIVERY_SIGNED` (no signer name or image). A repeated request ID returns the delivery. The screen then opens the A6 gate pass slip, which prints as soon as it loads (phase 11); **Back to job card** shows "Delivered to Adaeze Okafor, 28 Nov 2026, 15:20", the gate pass number, **Print gate pass**, "Follow-up call scheduled for 30 Nov 2026." and the bill.
 
 **One delivery path.** The workflow now refuses DELIVERED for a service job unless it comes from the `DELIVER` action ("Deliver the vehicle from the Delivery step of the job card ..."), so the old `PUT /service/job-cards/:id` with status DELIVERED no longer delivers service jobs. PDI jobs keep their own path.
 
@@ -434,6 +434,37 @@ The board reads the database three times whatever the number of jobs: a ranked I
 **Settings.** **Settings, Company**, branch section **Workshop board time targets**: Check-in, Diagnosis, Warranty check, Awaiting approval and Quality check, in whole minutes from 1 to 10,080 (7 days). Defaults from the plan (30, 120, 120, 120, 60; `TODO(confirm)`). Saving is audited `BRANCH_SETTINGS_UPDATED` as before. Fixed in passing: a branch whose rules had been saved before could not save them again ("Unrecognized key(s) in object: 'booksClosedUpTo'"); the books-closed date is no longer part of the branch rules form.
 
 **Migration** `20261127220000_jobcard_board_targets` (additive): the five `BranchSettings.stageTarget...Minutes` columns with their defaults. No data conversion.
+
+### Printed job card and gate pass (phase 11)
+
+The paper job card and the gate pass slip, printed from the browser. Both are pages of their own with **Back to job card** and a print button on screen only; opened with `?print=1` they print once loaded.
+
+**Where.** Header **Print** menu: **Print job card** (service jobs, with `estimate:print`) and **Print gate pass** (once the vehicle is delivered). Job file, **Documents and prints**, **Other prints**: the same two. **Complete delivery and print gate pass** opens the slip and prints it; the delivered summary's **Print gate pass** does the same.
+
+**Job card, A4, `/job-cards/[id]/print`.** Front, filled from the stored job: company name and branch line, Warranty or Non-warranty ticked (`isWarrantyJob`, as the header tag), job number, service advisor, km and date opened; customer (name, phone, address); vehicle (model, registration, VIN, engine number, sold by, sold on); customer requests numbered; instructions to the technician (the advisor's from check-in, then the supervisor's allocation note); body and paint damage on the check-in drawing (C, D, S marks, black and grey) with each mark in words; the fuel gauge; the 25 checklist items (ticked when present, "Missing" or "Not working" otherwise, blank when not checked) and the checklist note; cause and nature of defect (findings in request order, then those the customer did not mention, then those found during the repair), with "Confirmed by" (service engineer) and "Checked and certified roadworthy by" (quality check); estimated and actual (delivery date and time, promised against delivered, then parts, oil, labour, service charges and total in naira, customer amounts before VAT, the Billing step's figures); five signature boxes; last two visits. Back: "Terms and conditions", the **Settings > Terms & Conditions**, document **Job card** clauses, numbered, on a new sheet. Sections never split across sheets; a long job runs the front onto a second sheet.
+
+| Box | Name and date | Signature |
+|---|---|---|
+| Service advisor | The job's advisor, when check-in was completed | Blank line |
+| Technician | Who last sent the work for quality check, and when (else the assigned technician, no date) | Blank line |
+| Service manager | The quality check certifier, when certified (`TODO(confirm)`: the paper card's service manager box carries the "certified roadworthy" signature, which the supervisor or quality inspector gives) | The certification signature |
+| Customer authorisation | "I authorise the work requested above and accept the terms and conditions overleaf." The latest check-in signer, "(Representative, Brother)" for someone else | The consent signature. Out of date: printed with "Details changed after the customer signed." Unverifiable: not printed, "The signature could not be verified. Ask the customer to sign the printed copy." |
+| Customer delivery | "I have taken delivery of the vehicle and I am satisfied with the repairs." The collector | The delivery signature |
+
+Nothing captured prints blank name and date lines for a pen signature. Every other missing value prints "Not provided"; dates use the shared Lagos formatter, money the shared naira formatter.
+
+**Gate pass, A6, `/job-cards/[id]/gate-pass/print`.** Company and branch, "Gate pass", job number, gate pass number, registration (or VIN), model, customer, collected by, delivered by, date and time delivered, and lines for the security signature and time out.
+
+**Print styling.** Black, grey and the navy accent (title bars printed with exact colours), the app's shell hidden, A4 9 mm and 10 mm margins with "Page N of M", the job card at 85% type size on paper, A6 (105 mm by 148 mm, given as a size because Chrome does not accept the A6 keyword) with 6 mm margins. Font stack "Segoe UI", "Noto Sans", "DejaVu Sans", Arial: each has the naira sign and the combining tone marks of Yoruba and Igbo names.
+
+**States.** Loading skeleton; "Could not load the job card" with **Try again**; "You cannot print this job card" (no `estimate:print`: "Service advisors, service managers and workshop supervisors can print it.", or another branch); "Job card not found"; "The gate pass is not available yet" with "The gate pass is issued when the vehicle is delivered. Complete the Delivery step first."; PDI jobs are not printed as a service job card.
+
+| Endpoint | Permission | Purpose |
+|---|---|---|
+| `GET /service/job-cards/:id/print` | `jobcard:read`, `estimate:print`, job branch | The print data (explicit projection; signature images included). 409 `JOB_PRINT_PDI` for PDI. `Cache-Control: private, no-store` |
+| `GET /service/job-cards/:id/print/gate-pass` | `jobcard:read`, job branch | The slip. 409 `GATE_PASS_NOT_ISSUED` before delivery |
+
+No migration: every printed value was already stored. **Removed:** the in-page gate pass (`JobGatePassPrint`), the `onPrintGatePass` callbacks, and the `print:hidden` classes on the job page that only let the gate pass print alone.
 
 ### Vehicles with multiple job cards (issue 142)
 

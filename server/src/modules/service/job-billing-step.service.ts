@@ -338,7 +338,8 @@ export class JobBillingStepService {
    * Estimated: the customer's lines on the governing approved estimate, declined lines left out (a supplementary
    * revision carries the earlier approved lines). Actual: what the bill would charge the customer now.
    */
-  private async comparison(jobCardId: string) {
+  /** The paper card's estimated and actual table (also printed on the job card, phase 11). */
+  async comparison(jobCardId: string) {
     const estimates = await prisma.estimate.findMany({ where: { jobCardId }, ...latestEstimateQuery, take: 2 });
     const estimate = governingEstimate(estimates);
     const decided = estimate?.approvals.some((approval) => approval.approved !== null);

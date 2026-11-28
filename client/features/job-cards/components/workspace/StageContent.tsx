@@ -20,14 +20,12 @@ export function StageContent({
   job,
   workspace,
   bar,
-  onPrintGatePass,
   onOpenTab,
 }: {
   job: JobCard;
   workspace: JobWorkspace;
   /** Check-in, Diagnosis and Warranty show the action bar themselves, with their own buttons. */
   bar: StageBarProps;
-  onPrintGatePass: () => void;
   onOpenTab: (tab: JobFileTab) => void;
 }) {
   switch (workspace.stage) {
@@ -58,10 +56,10 @@ export function StageContent({
       return workspace.jobType === "PDI" ? null : <BillingStep job={job} workspace={workspace} bar={bar} />;
     case "DELIVERY":
       // PDI jobs keep their own screens; everything else uses the staged delivery (phase 9).
-      return workspace.jobType === "PDI" ? null : <DeliveryStep job={job} workspace={workspace} bar={bar} onPrintGatePass={onPrintGatePass} />;
+      return workspace.jobType === "PDI" ? null : <DeliveryStep job={job} workspace={workspace} bar={bar} />;
     case "CLOSED":
       // The delivered summary: who collected the vehicle, the gate pass, the follow-up call and the bill.
-      return <DeliveryStep job={job} workspace={workspace} bar={bar} onPrintGatePass={onPrintGatePass} />;
+      return <DeliveryStep job={job} workspace={workspace} bar={bar} />;
     case "CANCELLED":
       return null;
   }

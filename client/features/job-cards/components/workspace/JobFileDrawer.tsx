@@ -20,7 +20,6 @@ export function JobFileDrawer({
   onClose,
   job,
   workspace,
-  onPrintGatePass,
 }: {
   open: boolean;
   tab: JobFileTab;
@@ -28,7 +27,6 @@ export function JobFileDrawer({
   onClose: () => void;
   job: JobCard;
   workspace: JobWorkspace;
-  onPrintGatePass: () => void;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -97,7 +95,7 @@ export function JobFileDrawer({
           {tab === "customer" && <CustomerVehicleTab job={job} />}
           {tab === "visits" && <VisitHistoryTab job={job} visits={workspace.previousVisits} declinedItems={workspace.declinedItems ?? []} />}
           {tab === "warranty" && <WarrantyTab job={job} />}
-          {tab === "documents" && <DocumentsTab job={job} onPrintGatePass={onPrintGatePass} />}
+          {tab === "documents" && <DocumentsTab job={job} />}
           {tab === "activity" && <ActivityTab job={job} activity={workspace.activity} />}
         </div>
       </div>

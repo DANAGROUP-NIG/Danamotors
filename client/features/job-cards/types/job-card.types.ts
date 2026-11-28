@@ -222,6 +222,8 @@ export type JobCard = {
   /** Internal delay remark. */
   lateRemarks?: string | null;
   gatePassNumber?: string | null;
+  /** SERVICE or PDI. PDI jobs keep their own screens and documents. */
+  jobType?: "SERVICE" | "PDI";
   serviceTypeId?: string | null;
   serviceType?: {
     description: string;

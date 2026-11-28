@@ -18,13 +18,13 @@ import {
   waitingMessage,
   type JobFileTab,
 } from "../../lib/job-frame.logic";
+import { gatePassPrintHref, jobCardPrintHref } from "../../lib/job-print.logic";
 import { SUB_STEP_LABELS, phoneStepLabel, splitActions, type JobStep } from "../../lib/job-stage.logic";
 import type { JobCard } from "../../types/job-card.types";
 import type { StageAction } from "../../types/job-workspace.types";
 import { AlertStrip } from "./AlertStrip";
 import { CancelJobDialog } from "./CancelJobDialog";
 import { JobFileDrawer } from "./JobFileDrawer";
-import { JobGatePassPrint } from "./JobGatePassPrint";
 import { JobHeader, type PrintItem } from "./JobHeader";
 import { CancelledPanel, JobFrameSkeleton, JobLoadProblem } from "./JobPageStates";
 import { JobStepper } from "./JobStepper";
@@ -71,7 +71,6 @@ function JobFrame({ job }: { job: JobCard }) {
 
   const openTab = useCallback((tab: JobFileTab) => setDrawer({ open: true, tab }), []);
   const closeDrawer = useCallback(() => setDrawer((current) => ({ ...current, open: false })), []);
-  const printGatePass = useCallback(() => window.print(), []);
 
   if (!workspace) return null;
 
@@ -126,14 +125,16 @@ function JobFrame({ job }: { job: JobCard }) {
   const latestEstimate = job.estimates?.[0];
   const signature = consent.data?.signature;
   const printItems: PrintItem[] = [
+    // The printed job card is the paper form of a service job; PDI keeps its own documents.
+    ...(workspace.jobType !== "PDI" && hasPermission("estimate:print") ? [{ label: "Print job card", href: jobCardPrintHref(job.id) }] : []),
+    ...(job.gatePassNumber ? [{ label: "Print gate pass", href: gatePassPrintHref(job.id) }] : []),
     ...(latestEstimate && hasPermission("estimate:print")
-      ? [{ label: "Estimate", href: `/job-cards/${job.id}/estimates/${latestEstimate.id}/print` }]
+      ? [{ label: "Print estimate", href: `/job-cards/${job.id}/estimates/${latestEstimate.id}/print` }]
       : []),
     ...(signature && consent.data?.state !== "invalid" && hasPermission("estimate:print")
-      ? [{ label: "Signed job-opening approval", href: `/job-cards/${job.id}/opening-consent/${signature.id}/print` }]
+      ? [{ label: "Print signed job-opening approval", href: `/job-cards/${job.id}/opening-consent/${signature.id}/print` }]
       : []),
-    ...(hasPermission("jobcard:picking-list:print") ? [{ label: "Picking list", href: `/service-transactions/job-picking/${job.id}/print` }] : []),
-    ...(job.gatePassNumber ? [{ label: "Gate pass", onSelect: printGatePass }] : []),
+    ...(hasPermission("jobcard:picking-list:print") ? [{ label: "Print picking list", href: `/service-transactions/job-picking/${job.id}/print` }] : []),
   ];
 
   const openSummary = (stage: JobStep) => {
@@ -151,7 +152,7 @@ function JobFrame({ job }: { job: JobCard }) {
   return (
     <div className="px-4 lg:px-5">
       <JobHeader job={job} workspace={workspace} now={now} printItems={printItems} onOpenJobFile={() => openTab(drawer.tab)} />
-      <div className="space-y-4 pt-4 print:hidden">
+      <div className="space-y-4 pt-4">
         <JobStepper
           steps={steps}
           phoneLabel={phoneStepLabel(workspace.stage)}
@@ -184,12 +185,12 @@ function JobFrame({ job }: { job: JobCard }) {
               </h2>
               {subStep && <p className="text-sm text-muted-foreground">{subStep}</p>}
             </div>
-            <StageContent job={job} workspace={workspace} bar={bar} onPrintGatePass={printGatePass} onOpenTab={openTab} />
+            <StageContent job={job} workspace={workspace} bar={bar} onOpenTab={openTab} />
           </section>
         )}
       </div>
       {!ownBar && <StageActionBar {...bar} />}
-      <div className="pb-4 print:hidden" />
+      <div className="pb-4" />
       <JobFileDrawer
         open={drawer.open}
         tab={drawer.tab}
@@ -197,7 +198,6 @@ function JobFrame({ job }: { job: JobCard }) {
         onClose={closeDrawer}
         job={job}
         workspace={workspace}
-        onPrintGatePass={printGatePass}
       />
       <CancelJobDialog
         key={cancelling ? "open" : "closed"}
@@ -209,7 +209,6 @@ function JobFrame({ job }: { job: JobCard }) {
         onConfirm={(reason) => run("CANCEL", reason)}
         onClose={() => setCancelling(false)}
       />
-      <JobGatePassPrint job={job} />
     </div>
   );
 }

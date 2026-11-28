@@ -104,10 +104,13 @@ test("A: the owner collects; the phone approvals are signed first; belongings an
   await expect(bar(page).getByRole("button", { name: COMPLETE })).toBeEnabled();
   await bar(page).getByRole("button", { name: COMPLETE }).click();
   await expect(page.getByText(/^Job \d+ delivered\. Gate pass \d+ issued\.$/)).toBeVisible();
-  await expect(page.getByText(/^Delivered to Adaeze Okafor, \d{1,2} \w{3} 2026, \d{2}:\d{2}$/)).toBeVisible();
-  await expect(card(page, "Gate pass").getByRole("button", { name: "Print gate pass" })).toBeVisible();
-  await expect(page.getByText(/^Follow-up call scheduled for \d{1,2} \w{3} 2026\.$/)).toBeVisible();
+  // Phase 11: the A6 gate pass slip opens and prints; Back to job card shows the delivered summary.
+  await expect(page).toHaveURL(new RegExp(`/job-cards/${id}/gate-pass/print\\?print=1$`), { timeout: 30_000 });
   await expect.poll(() => printed(page)).toBe(1);
+  await page.getByRole("link", { name: "Back to job card" }).click();
+  await expect(page.getByText(/^Delivered to Adaeze Okafor, \d{1,2} \w{3} 2026, \d{2}:\d{2}$/)).toBeVisible({ timeout: 30_000 });
+  await expect(card(page, "Gate pass").getByRole("link", { name: "Print gate pass" })).toBeVisible();
+  await expect(page.getByText(/^Follow-up call scheduled for \d{1,2} \w{3} 2026\.$/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Closed job" })).toBeVisible();
   await expectCleanText(page, "Delivered summary");
   await card(page, "Gate pass").scrollIntoViewIfNeeded();
@@ -161,6 +164,7 @@ test("B: late delivery needs reasons; the entries survive a lost connection; oth
 test("C: someone else collects with a service manager's approval; the check-in signer is offered", async ({ browser, request }) => {
   const id = await jobIdByPlate(request, "LSR-546ST");
   const advisor = await pageAs(browser, "advisor");
+  await countPrints(advisor);
   await open(advisor, id, DELIVERY);
   await expect(advisor.getByLabel("Kunle Adeyemi (signed at check-in)")).toBeVisible();
   await expect(card(advisor, "Collected by").getByText("Matches job card signer")).toHaveCount(1);
@@ -204,7 +208,10 @@ test("C: someone else collects with a service manager's approval; the check-in s
   await sign(advisor, "Customer signs to take delivery of the vehicle");
   await expect(card(advisor, "Customer signature").getByText("Signing as Bola Ade.")).toBeVisible();
   await bar(advisor).getByRole("button", { name: COMPLETE }).click();
-  await expect(advisor.getByText(/^Delivered to Bola Ade, \d{1,2} \w{3} 2026, \d{2}:\d{2}$/)).toBeVisible();
+  await expect(advisor.getByRole("heading", { name: "Gate pass", exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(advisor.getByRole("row", { name: "Collected by Bola Ade" })).toBeVisible();
+  await advisor.getByRole("link", { name: "Back to job card" }).click();
+  await expect(advisor.getByText(/^Delivered to Bola Ade, \d{1,2} \w{3} 2026, \d{2}:\d{2}$/)).toBeVisible({ timeout: 30_000 });
   await expect(card(advisor, "Handover").getByText("Someone else, approved by a manager")).toBeVisible();
   await shot(advisor, "p9-someone-else-delivered-1440");
 });
@@ -216,7 +223,7 @@ test("D: a delivered job is a read-only summary at every size; the follow-up cal
     await open(page, id, "Closed job");
     await expect(page.getByText(/^Delivered to .+, \d{1,2} \w{3} 2026, \d{2}:\d{2}$/)).toBeVisible();
     await expect(page.getByText(/^Follow-up call scheduled for \d{1,2} \w{3} 2026\.$/)).toBeVisible();
-    await expect(page.getByRole("button", { name: "Print gate pass" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Print gate pass" })).toBeVisible();
     await expect(page.getByRole("button", { name: COMPLETE })).toHaveCount(0);
     await expectNoHorizontalOverflow(page, `Delivered summary at ${name} px`);
     await expectCleanText(page, `Delivered summary at ${name} px`);

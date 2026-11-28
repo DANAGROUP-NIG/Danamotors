@@ -400,3 +400,33 @@ Built on Jayking (no phase branch, at the owner's request).
 
 - Settings: a branch whose rules had been saved once could not be saved again ("Unrecognized key(s) in object: 'booksClosedUpTo'"). The save error now shows the first field message from the server.
 - `JobCardsTable` load error read "Failed to load job cards. Check the API connection"; it now says "Could not load the job cards. Check your connection and try again." with **Try again**.
+
+## Phase 11: Printed job card and gate pass (28 Nov 2026)
+
+Built on Jayking (no phase branch, at the owner's request).
+
+### Plan
+
+1. Data: no migration. Every printed field already exists (check-in, damage marks, findings, quality check certification and signature, consent and delivery signatures, gate pass number).
+2. Server: pure `job-print.logic.ts` (25 checklist rows, findings order, numbered terms, the five signature boxes, the technician's sign-off, address line) and `job-print.service.ts`, reusing billing's estimated and actual (`JobBillingStepService.comparison`, now public), the workspace's `previousVisits` (now exported), `DocumentTermsService.effective('JOB_CARD')`, `getCompanyProfile` and the consent state check; `GET /service/job-cards/:id/print` (`jobcard:read` and `estimate:print`) and `GET /service/job-cards/:id/print/gate-pass` (`jobcard:read`), branch-scoped, `Cache-Control: private, no-store`.
+3. Client: `lib/job-print.logic.ts` (every printed value through the shared formatters and NOT_PROVIDED), `use-job-print`, `components/print/` (JobCardPrint, GatePassSlip, PrintParts, PrintPageFrame), routes `/job-cards/[id]/print` (A4) and `/job-cards/[id]/gate-pass/print` (A6) with `?print=1`; Print menu and Documents tab entries; delivery completion opens the slip.
+4. Demo data: JC-S37 (LSR-548ST, customer Ọlá Ògúnlẹ̀yẹ̀, nine long requests, delivered) and two earlier delivered visits on the same vehicle (JC-S37A, JC-S37B).
+5. Tests: logic, routes, integration, client logic, Playwright phase 11 (PDF page counts and print renders); docs and manual test guide.
+
+### Status (milestones)
+
+- [x] Server: logic, service, routes; old in-page gate pass replaced.
+- [x] Client: print routes, components, menu and Documents tab; `JobGatePassPrint` deleted with the `onPrintGatePass` prop chain and the `print:hidden` classes that only served it.
+- [x] Demo seed: JC-S37, JC-S37A, JC-S37B. Local e2e template `dana_demo_p11` (phase 10 template plus the new jobs and the server's 12 JOB_CARD clauses copied in).
+- [x] Docs: `doc/job-cards.md` ("Printed job card and gate pass (phase 11)"), manual test guide `doc/testing/jobcard-revamp/phase-11-manual-test.md`.
+
+### Tests (28 Nov 2026)
+
+- Server: new `job-print.logic.test.ts` (10: checklist order and states, unknown values ignored, text lines, findings order, numbered terms, technician sign-off, address line, the five boxes, blank boxes, stale and unverifiable consent signatures), `job-print.routes.test.ts` (3: own branch, no cache, `estimate:print` for the job card but not the gate pass, no `jobcard:read`, another branch, missing job, bad ID) and a print case in `job-delivery.integration.test.ts` (delivered job printed with "Ọlá Ògúnlẹ̀yẹ̀" read back from Postgres, gate pass refused before delivery, an unverifiable consent signature not printed). Touched modules (print, delivery, billing step, stage, document terms) on the local test database: 164 of 164. Server typecheck (the server's lint) clean.
+- Client: new `test/job-print.test.mjs` (6: top boxes, customer and vehicle; every missing value printing "Not provided"; estimated and actual in naira with Lagos dates and times; fuel, checklist, signatures, visits and footer; gate pass rows; render of the whole job card and slip with no "undefined", "null", "NaN" or dashes). All client tests 170 of 171 (`issue117-components`, missing `BillHeads`, as before). Typecheck clean, lint 0 errors (74 old warnings), production build passes with `/job-cards/[id]/print` and `/job-cards/[id]/gate-pass/print`.
+- Browser (Playwright): phase 11 suite 4 of 4 (the advisor's Print menu, every section of the front with the accented name, 9 requests, 25 checklist items, naira totals, the five signature boxes and both visits, 12 numbered terms; the long job printing on 3 A4 sheets and a short one on exactly 2; 390 and 768 px without sideways scrolling; the A6 slip from the Documents tab, the delivered summary with `?print=1`, and the keyboard menu, printing on one 105 by 148 mm sheet; the technician refused the job card but allowed the gate pass; a job not delivered: no gate pass, blank delivery lines; offline error and Try again; Tab and Enter to print). Phase 9 updated for the slip page (5 of 5); phases 0 and 1 (19 of 19) and 10 (9 of 9) again after the shared menu change.
+
+### Found and fixed in passing
+
+- The shared `ActionMenu` rendered its items at the end of the page, so keyboard users could open a menu but never reach its items with Tab. Opening a menu now focuses its first item; the arrow keys, Tab, Home and End move through the items; Esc closes it and returns focus to the button.
+- Chrome does not accept the `A6` page keyword (the slip came out Letter size); the slip's page size is given in millimetres.

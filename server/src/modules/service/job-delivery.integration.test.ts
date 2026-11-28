@@ -8,6 +8,7 @@ import type { JobQualityCheckService } from "./job-quality-check.service";
 import type { JobBillingStepService } from "./job-billing-step.service";
 import type { JobDeliveryService } from "./job-delivery.service";
 import type { PsfService } from "../psf/psf.service";
+import type { JobPrintService } from "./job-print.service";
 import { QC_GENERAL_CHECKS } from "./job-quality-check.logic";
 import { BELONGINGS_NOTE, LATE_REASONS_NEEDED, RELEASE_RULE, validDeliveryEvidence } from "./job-delivery.logic";
 import { followUpDueAt } from "../psf/psf.logic";
@@ -30,6 +31,7 @@ describeDb("Delivery: handover, belongings, collector, signatures, late reasons 
   let billingStep: JobBillingStepService;
   let delivery: JobDeliveryService;
   let psf: PsfService;
+  let prints: JobPrintService;
   const run = `${Date.now()}`;
   let branchName: string;
   let branchId: string;
@@ -61,6 +63,7 @@ describeDb("Delivery: handover, belongings, collector, signatures, late reasons 
     billingStep = new (require("./job-billing-step.service").JobBillingStepService)();
     delivery = new (require("./job-delivery.service").JobDeliveryService)();
     psf = new (require("../psf/psf.service").PsfService)();
+    prints = new (require("./job-print.service").JobPrintService)();
     branchName = `Delivery fixture ${run}`;
     branchId = (await db.branch.create({ data: { name: branchName } })).id;
     const person = async (key: Key, role: string) => {
@@ -316,5 +319,60 @@ describeDb("Delivery: handover, belongings, collector, signatures, late reasons 
       deliveryAdvisorId: users.advisor.id,
       stage: "CLOSED",
     });
+  });
+
+  // Phase 11: the printed job card and gate pass read the delivered job as stored, accents included.
+  it("prints the delivered job card front and back and the gate pass, with blank lines where nothing was signed", async () => {
+    const jobId = await jobAtDelivery();
+    await expect(prints.gatePass(jobId)).rejects.toMatchObject({ statusCode: 409, code: "GATE_PASS_NOT_ISSUED" });
+    await db.customer.update({ where: { id: customerId }, data: { firstName: "Ọlá", lastName: "Ògúnlẹ̀yẹ̀", address: "14 Admiralty Way", city: "Lekki", state: "Lagos" } });
+    await db.jobCheckIn.update({ where: { jobCardId: jobId }, data: { fuelLevel: "HALF", instructionsToTechnician: "Check the front brakes.\nRoad test after the repair." } });
+    await db.jobDamageMark.create({ data: { jobCardId: jobId, requestId: randomUUID(), createdById: users.advisor.id, type: "SCRATCH", x: 50, y: 94, note: "Light scratch" } });
+    await delivery.signPhoneApprovals(jobId, advisor(), { requestId: randomUUID(), signerName: "Ọlá Ògúnlẹ̀yẹ̀", accepted: true, signatureImage: SIGNATURE }, "test-device");
+    await delivery.deliver(jobId, advisor(), handover());
+
+    const card = await prints.jobCard(jobId);
+    expect(card.customer).toEqual({ name: "Ọlá Ògúnlẹ̀yẹ̀", phone: "0803 555 0142", address: "14 Admiralty Way, Lekki, Lagos" });
+    expect(card.job).toMatchObject({ mileage: 48250, advisor: "advisor Synthetic", warranty: false });
+    expect(card.job.gatePassNumber).toBeTruthy();
+    expect(card.requests).toEqual(["Noise from front left wheel when braking"]);
+    expect(card.instructions.advisor).toEqual(["Check the front brakes.", "Road test after the repair."]);
+    expect(card.fuelLevel).toBe("HALF");
+    expect(card.damageMarks).toEqual([expect.objectContaining({ type: "SCRATCH", x: 50, y: 94, note: "Light scratch" })]);
+    expect(card.checklist).toHaveLength(25);
+    expect(card.checklist.find((row) => row.code === "SPARE_WHEEL")?.state).toBe("MISSING");
+    expect(card.findings).toEqual([{ text: "Pads worn to 2 mm.", source: "Request 1" }]);
+    expect(card.roadworthy).toMatchObject({ by: "supervisor Synthetic" });
+    expect(card.comparison.rows?.at(-1)).toMatchObject({ group: "TOTAL" });
+    expect(card.signatures.map((box) => [box.title, box.name, !!box.image])).toEqual([
+      ["Service advisor", "advisor Synthetic", false],
+      ["Technician", "technician Synthetic", false],
+      ["Service manager", "supervisor Synthetic", true],
+      // No check-in signature on this job: blank lines for a pen signature.
+      ["Customer authorisation", null, false],
+      ["Customer delivery", "Ọlá Ògúnlẹ̀yẹ̀", true],
+    ]);
+    expect(card.signatures[1].date).toBeInstanceOf(Date);
+    expect(JSON.stringify(card)).not.toMatch(/passwordHash|evidenceHash|documentHash/);
+
+    const pass = await prints.gatePass(jobId);
+    expect(pass).toMatchObject({
+      jobNumber: card.job.number,
+      gatePassNumber: card.job.gatePassNumber,
+      customer: "Ọlá Ògúnlẹ̀yẹ̀",
+      collectedBy: "Ọlá Ògúnlẹ̀yẹ̀",
+      deliveredBy: "advisor Synthetic",
+    });
+    expect(pass.deliveredAt).toBeInstanceOf(Date);
+
+    // A check-in signature whose evidence cannot be verified is never printed as valid.
+    await db.jobOpeningSignature.create({
+      data: {
+        jobCardId: jobId, revision: 1, idempotencyKey: randomUUID(), documentHash: "a".repeat(64), scopeHash: "b".repeat(64), evidenceHash: "c".repeat(64),
+        snapshot: {}, signerName: "Ọlá Ògúnlẹ̀yẹ̀", capturedById: users.advisor.id, signatureImage: SIGNATURE,
+      },
+    });
+    const reprinted = await prints.jobCard(jobId);
+    expect(reprinted.signatures[3]).toMatchObject({ name: "Ọlá Ògúnlẹ̀yẹ̀", image: null, note: "The signature could not be verified. Ask the customer to sign the printed copy." });
   });
 });

@@ -45,7 +45,7 @@ export function JobHeader({
   const plate = job.vehicle?.registrationNumber || job.vehicle?.vin || NOT_PROVIDED;
   const phone = job.customer?.phoneNumber?.trim();
   return (
-    <header className="relative z-20 -mx-4 md:sticky md:top-0 border-b border-border bg-card/95 px-4 pb-3 pt-3 backdrop-blur supports-[backdrop-filter]:bg-card/90 lg:-mx-5 lg:px-5 print:hidden">
+    <header className="relative z-20 -mx-4 md:sticky md:top-0 border-b border-border bg-card/95 px-4 pb-3 pt-3 backdrop-blur supports-[backdrop-filter]:bg-card/90 lg:-mx-5 lg:px-5">
       <Link
         href="/job-cards"
         className="mb-2 inline-flex items-center gap-1 rounded text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

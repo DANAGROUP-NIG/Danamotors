@@ -333,7 +333,7 @@ async function cancellation(
  * The vehicle's last two visits before this job, for the Visit history tab (the paper card's
  * "last two visits"). Any branch, as service history is shared; cancelled and PDI jobs are not visits.
  */
-async function previousVisits(tx: Prisma.TransactionClient, job: Pick<WorkspaceJob, "id" | "vehicleId" | "createdAt">) {
+export async function previousVisits(tx: Prisma.TransactionClient, job: Pick<WorkspaceJob, "id" | "vehicleId" | "createdAt">) {
   if (!job.vehicleId) return [];
   const visits = await tx.jobCard.findMany({
     where: {

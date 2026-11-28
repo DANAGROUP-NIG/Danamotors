@@ -1,8 +1,6 @@
 "use client";
 import Link from "next/link";
-import { Printer } from "lucide-react";
 import { CustomerExplanation } from "@/components/CustomerExplanation";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 import { customerCategoryLabel } from "@/features/customers/lib/customer-category";
@@ -18,6 +16,7 @@ import {
   vehicleTitle,
   yesNo,
 } from "../../lib/job-frame.logic";
+import { gatePassPrintHref, jobCardPrintHref } from "../../lib/job-print.logic";
 import { STAGE_LABELS } from "../../lib/job-stage.logic";
 import { canonicalJobStatus } from "../../types/job-card-status";
 import type { JobCard } from "../../types/job-card.types";
@@ -156,7 +155,7 @@ export function WarrantyTab({ job }: { job: JobCard }) {
   );
 }
 
-export function DocumentsTab({ job, onPrintGatePass }: { job: JobCard; onPrintGatePass: () => void }) {
+export function DocumentsTab({ job }: { job: JobCard }) {
   const { hasPermission } = useAuth();
   const canPrintEstimate = hasPermission("estimate:print");
   const consent = useJobOpeningConsent(job.id, hasPermission("jobcard:read"));
@@ -218,13 +217,24 @@ export function DocumentsTab({ job, onPrintGatePass }: { job: JobCard; onPrintGa
       </StageCard>
       <StageCard title="Other prints">
         <ul className="space-y-2 text-sm">
+          {job.jobType !== "PDI" && (
+            <li className="flex flex-wrap items-center justify-between gap-2">
+              <span>Job card, front and back</span>
+              {canPrintEstimate ? (
+                <Link href={jobCardPrintHref(job.id)} className={linkCls}>
+                  Print job card
+                </Link>
+              ) : (
+                <span className="text-muted-foreground">Service advisors and managers print it</span>
+              )}
+            </li>
+          )}
           <li className="flex flex-wrap items-center justify-between gap-2">
-            <span>Gate pass {job.gatePassNumber ?? ""}</span>
+            <span>Gate pass{job.gatePassNumber ? ` ${job.gatePassNumber}` : ""}</span>
             {job.gatePassNumber ? (
-              <Button type="button" variant="outline" size="sm" onClick={onPrintGatePass}>
-                <Printer aria-hidden="true" />
+              <Link href={gatePassPrintHref(job.id)} className={linkCls}>
                 Print gate pass
-              </Button>
+              </Link>
             ) : (
               <span className="text-muted-foreground">Issued when the vehicle is delivered</span>
             )}
